@@ -39,14 +39,19 @@
 #endif
 
 #elif defined(__APPLE__)
-#include <compat/apple_compat.h>
-#if MAC_OS_X_VERSION_10_7
-#include <OpenGL/gl3.h>
-#include <OpenGL/gl3ext.h>
-#else
-#include <OpenGL/gl.h>
-#include <OpenGL/glext.h>
-#endif
+    #include <compat/apple_compat.h>
+    #ifdef TARGET_IPHONE
+        #include <OpenGLES/ES3/gl.h>
+        #include <OpenGLES/ES3/glext.h>
+    #else
+        #if MAC_OS_X_VERSION_10_7
+        #include <OpenGL/gl3.h>
+        #include <OpenGL/gl3ext.h>
+        #else
+        #include <OpenGL/gl.h>
+        #include <OpenGL/glext.h>
+        #endif
+    #endif
 #elif defined(HAVE_PSGL)
 #include <PSGL/psgl.h>
 #include <GLES/glext.h>
