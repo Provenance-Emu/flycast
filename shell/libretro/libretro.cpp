@@ -1917,6 +1917,8 @@ static bool set_opengl_hw_render(u32 preferred)
 	params.imm_vbo_disable       = NULL;
 #if defined(__APPLE__) && defined(HAVE_OPENGL)
 	preferred = RETRO_HW_CONTEXT_OPENGL_CORE;
+#else
+    preferred = RETRO_HW_CONTEXT_OPENGLES3;
 #endif
 #ifdef HAVE_OIT
 	if (config::RendererType == RenderType::OpenGL_OIT || config::RendererType == RenderType::DirectX11_OIT || config::RendererType == RenderType::Vulkan_OIT)
