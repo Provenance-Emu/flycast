@@ -280,7 +280,6 @@ static void rend_create_renderer()
 #else
 	switch (config::RendererType)
 	{
-	default:
 #ifdef USE_OPENGL
 	case RenderType::OpenGL:
 		renderer = rend_GLES2();
