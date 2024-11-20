@@ -1,0 +1,8 @@
+version: "Apple Swift version 6.0.2 (swiftlang-6.0.2.1.2 clang-1600.0.26.4)"
+options: "cba118b7433b249c6a8e762a17b8780a9e80db6b563a8a92a1fc075d316197f8"
+build_start_time: [1732066310, 170520000]
+build_end_time: [1732066360, 301998000]
+inputs:
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/CMakeFiles/flycast-CMakeForceLinker.swift": [1732066017, 289761355]
+  ? "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/DerivedSources/GeneratedAssetSymbols.swift"
+  : [1732066310, 162826775]

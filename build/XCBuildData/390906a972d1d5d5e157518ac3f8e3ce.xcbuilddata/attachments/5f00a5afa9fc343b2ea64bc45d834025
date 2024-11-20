@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+if test "$CONFIGURATION" = "Debug"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast
+  git config tar.tar.xz.command xz\ -c
+  git archive --prefix=flycast_libretro-0.7.3/ -o flycast_libretro-0.7.3.tar.gz HEAD
+  git archive --prefix=flycast_libretro-0.7.3/ -o flycast_libretro-0.7.3.tar.xz HEAD
+fi
+if test "$CONFIGURATION" = "Release"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast
+  git config tar.tar.xz.command xz\ -c
+  git archive --prefix=flycast_libretro-0.7.3/ -o flycast_libretro-0.7.3.tar.gz HEAD
+  git archive --prefix=flycast_libretro-0.7.3/ -o flycast_libretro-0.7.3.tar.xz HEAD
+fi
+if test "$CONFIGURATION" = "MinSizeRel"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast
+  git config tar.tar.xz.command xz\ -c
+  git archive --prefix=flycast_libretro-0.7.3/ -o flycast_libretro-0.7.3.tar.gz HEAD
+  git archive --prefix=flycast_libretro-0.7.3/ -o flycast_libretro-0.7.3.tar.xz HEAD
+fi
+if test "$CONFIGURATION" = "RelWithDebInfo"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast
+  git config tar.tar.xz.command xz\ -c
+  git archive --prefix=flycast_libretro-0.7.3/ -o flycast_libretro-0.7.3.tar.gz HEAD
+  git archive --prefix=flycast_libretro-0.7.3/ -o flycast_libretro-0.7.3.tar.xz HEAD
+fi
+

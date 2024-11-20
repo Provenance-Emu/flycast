@@ -1,0 +1,36 @@
+{
+  "" : {
+    "dependencies" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Debug-iphoneos/Objects-normal/arm64/AltKit-master.d",
+    "diagnostics" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Debug-iphoneos/Objects-normal/arm64/AltKit-master.dia",
+    "emit-module-dependencies" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Debug-iphoneos/Objects-normal/arm64/AltKit-master-emit-module.d",
+    "emit-module-diagnostics" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Debug-iphoneos/Objects-normal/arm64/AltKit-master-emit-module.dia",
+    "swift-dependencies" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Debug-iphoneos/Objects-normal/arm64/AltKit-master.swiftdeps"
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Extensions/ALTServerError+Conveniences.swift" : {
+
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Extensions/Result+Conveniences.swift" : {
+
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/Connection.swift" : {
+
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/NetworkConnection.swift" : {
+
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/Server.swift" : {
+
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/ServerConnection.swift" : {
+
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/ServerManager.swift" : {
+
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/ServerProtocol.swift" : {
+
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Types/CodableServerError.swift" : {
+
+  }
+}

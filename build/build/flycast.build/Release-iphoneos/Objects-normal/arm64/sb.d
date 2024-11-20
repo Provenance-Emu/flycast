@@ -1,0 +1,29 @@
+dependencies: \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/emulator/flycast-ios-Prefix.pch \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/holly/sb.cpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/holly/sb.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/types.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/build.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/cstdlib.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/config.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/replacement.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/cstdio.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/log/Log.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/hwreg.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/holly/holly_intc.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/aica/aica_if.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/stdclass.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/md5/md5.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/gdrom/gdrom_if.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/maple/maple_if.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/maple/maple_devs.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/maple/maple_cfg.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/maple/maple_helper.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/input/gamepad.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/serialize.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/modem/modem.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/naomi/naomi.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/naomi/multiboard.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/pvr/pvr_sb_regs.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/emulator.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/bba/bba.h

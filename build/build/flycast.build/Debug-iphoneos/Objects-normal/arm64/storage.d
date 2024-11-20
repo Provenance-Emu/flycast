@@ -1,0 +1,19 @@
+dependencies: \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/emulator/flycast-ios-Prefix.pch \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/oslib/storage.cpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/oslib/storage.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/types.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/build.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/cstdlib.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/config.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/replacement.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/cstdio.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/log/Log.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/oslib/directory.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/stackstring.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/convert.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/detail/is_string_container.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/utf/convert.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/utf/utf.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/stdclass.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/md5/md5.h

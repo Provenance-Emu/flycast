@@ -1,0 +1,25 @@
+dependencies: \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/emulator/flycast-ios-Prefix.pch \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/mem/addrspace.cpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/mem/addrspace.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/types.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/build.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/cstdlib.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/config.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/replacement.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/cstdio.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/log/Log.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/aica/aica_if.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/stdclass.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/md5/md5.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/pvr/pvr_mem.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/sh4/sh4_if.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/pvr/elan.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/sh4/dyna/blockmanager.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/sh4/dyna/decoder.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/sh4/dyna/shil.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/sh4/dyna/shil_canonical.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/sh4/dyna/../sh4_if.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/sh4/sh4_mem.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/oslib/oslib.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/oslib/virtmem.h

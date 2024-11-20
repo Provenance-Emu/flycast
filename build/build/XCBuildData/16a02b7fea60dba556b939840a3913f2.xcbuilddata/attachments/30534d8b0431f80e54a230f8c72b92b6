@@ -1,0 +1,20 @@
+{
+  "" : {
+    "const-values" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/Objects-normal/arm64/flycast-master.swiftconstvalues",
+    "dependencies" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/Objects-normal/arm64/flycast-master.d",
+    "diagnostics" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/Objects-normal/arm64/flycast-master.dia",
+    "emit-module-dependencies" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/Objects-normal/arm64/flycast-master-emit-module.d",
+    "emit-module-diagnostics" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/Objects-normal/arm64/flycast-master-emit-module.dia",
+    "swift-dependencies" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/Objects-normal/arm64/flycast-master.swiftdeps"
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/CMakeFiles/flycast-CMakeForceLinker.swift" : {
+    "index-unit-output-path" : "/flycast.build/Release-iphoneos/Objects-normal/arm64/flycast-CMakeForceLinker.o",
+    "llvm-bc" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/Objects-normal/arm64/flycast-CMakeForceLinker.bc",
+    "object" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/Objects-normal/arm64/flycast-CMakeForceLinker.o"
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "index-unit-output-path" : "/flycast.build/Release-iphoneos/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Release-iphoneos/Objects-normal/arm64/GeneratedAssetSymbols.o"
+  }
+}

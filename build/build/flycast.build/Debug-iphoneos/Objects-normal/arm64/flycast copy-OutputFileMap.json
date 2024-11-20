@@ -1,0 +1,15 @@
+{
+  "" : {
+    "dependencies" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Debug-iphoneos/Objects-normal/arm64/flycast copy-master.d",
+    "diagnostics" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Debug-iphoneos/Objects-normal/arm64/flycast copy-master.dia",
+    "emit-module-dependencies" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Debug-iphoneos/Objects-normal/arm64/flycast copy-master-emit-module.d",
+    "emit-module-diagnostics" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Debug-iphoneos/Objects-normal/arm64/flycast copy-master-emit-module.dia",
+    "swift-dependencies" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Debug-iphoneos/Objects-normal/arm64/flycast copy-master.swiftdeps"
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/CMakeFiles/flycast-CMakeForceLinker.swift" : {
+
+  },
+  "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/flycast.build/Debug-iphoneos/DerivedSources/GeneratedAssetSymbols.swift" : {
+
+  }
+}

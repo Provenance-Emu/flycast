@@ -1,0 +1,71 @@
+#!/bin/sh
+set -e
+if test "$CONFIGURATION" = "Debug"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast
+  chmod -R u+w flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest 2>/dev/null || true
+  rm -rf flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -E tar xf flycast_libretro-0.7.3.tar.gz
+  chmod -R u-w flycast_libretro-0.7.3
+  mkdir flycast_libretro-0.7.3-build
+  mkdir flycast_libretro-0.7.3-dest
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -DCMAKE_INSTALL_PREFIX=flycast_libretro-0.7.3-dest flycast_libretro-0.7.3 -B flycast_libretro-0.7.3-build
+  make -C flycast_libretro-0.7.3-build -j4
+  make -C flycast_libretro-0.7.3-build test
+  make -C flycast_libretro-0.7.3-build install
+  make -C flycast_libretro-0.7.3-build clean
+  chmod -R u+w flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  rm -rf flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  echo flycast_libretro-0.7.3.tar.gz\ is\ ready\ for\ distribution.
+fi
+if test "$CONFIGURATION" = "Release"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast
+  chmod -R u+w flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest 2>/dev/null || true
+  rm -rf flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -E tar xf flycast_libretro-0.7.3.tar.gz
+  chmod -R u-w flycast_libretro-0.7.3
+  mkdir flycast_libretro-0.7.3-build
+  mkdir flycast_libretro-0.7.3-dest
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -DCMAKE_INSTALL_PREFIX=flycast_libretro-0.7.3-dest flycast_libretro-0.7.3 -B flycast_libretro-0.7.3-build
+  make -C flycast_libretro-0.7.3-build -j4
+  make -C flycast_libretro-0.7.3-build test
+  make -C flycast_libretro-0.7.3-build install
+  make -C flycast_libretro-0.7.3-build clean
+  chmod -R u+w flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  rm -rf flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  echo flycast_libretro-0.7.3.tar.gz\ is\ ready\ for\ distribution.
+fi
+if test "$CONFIGURATION" = "MinSizeRel"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast
+  chmod -R u+w flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest 2>/dev/null || true
+  rm -rf flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -E tar xf flycast_libretro-0.7.3.tar.gz
+  chmod -R u-w flycast_libretro-0.7.3
+  mkdir flycast_libretro-0.7.3-build
+  mkdir flycast_libretro-0.7.3-dest
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -DCMAKE_INSTALL_PREFIX=flycast_libretro-0.7.3-dest flycast_libretro-0.7.3 -B flycast_libretro-0.7.3-build
+  make -C flycast_libretro-0.7.3-build -j4
+  make -C flycast_libretro-0.7.3-build test
+  make -C flycast_libretro-0.7.3-build install
+  make -C flycast_libretro-0.7.3-build clean
+  chmod -R u+w flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  rm -rf flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  echo flycast_libretro-0.7.3.tar.gz\ is\ ready\ for\ distribution.
+fi
+if test "$CONFIGURATION" = "RelWithDebInfo"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast
+  chmod -R u+w flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest 2>/dev/null || true
+  rm -rf flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -E tar xf flycast_libretro-0.7.3.tar.gz
+  chmod -R u-w flycast_libretro-0.7.3
+  mkdir flycast_libretro-0.7.3-build
+  mkdir flycast_libretro-0.7.3-dest
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -DCMAKE_INSTALL_PREFIX=flycast_libretro-0.7.3-dest flycast_libretro-0.7.3 -B flycast_libretro-0.7.3-build
+  make -C flycast_libretro-0.7.3-build -j4
+  make -C flycast_libretro-0.7.3-build test
+  make -C flycast_libretro-0.7.3-build install
+  make -C flycast_libretro-0.7.3-build clean
+  chmod -R u+w flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  rm -rf flycast_libretro-0.7.3 flycast_libretro-0.7.3-build flycast_libretro-0.7.3-dest
+  echo flycast_libretro-0.7.3.tar.gz\ is\ ready\ for\ distribution.
+fi
+

@@ -1,0 +1,24 @@
+Target dependency graph (9 targets)
+Target 'ALL_BUILD' in project 'flycast_libretro'
+➜ Explicit dependency on target 'flycast_libretro' in project 'flycast_libretro'
+➜ Explicit dependency on target 'xxhash' in project 'flycast_libretro'
+➜ Explicit dependency on target 'libminiupnpc-static' in project 'flycast_libretro'
+➜ Explicit dependency on target 'zip' in project 'flycast_libretro'
+➜ Explicit dependency on target 'ZERO_CHECK' in project 'flycast_libretro'
+Target 'flycast_libretro' in project 'flycast_libretro'
+➜ Explicit dependency on target 'xxhash' in project 'flycast_libretro'
+➜ Explicit dependency on target 'chdr-static' in project 'flycast_libretro'
+➜ Explicit dependency on target 'lzma' in project 'flycast_libretro'
+➜ Explicit dependency on target 'zlib' in project 'flycast_libretro'
+➜ Explicit dependency on target 'libminiupnpc-static' in project 'flycast_libretro'
+➜ Explicit dependency on target 'zip' in project 'flycast_libretro'
+➜ Explicit dependency on target 'ZERO_CHECK' in project 'flycast_libretro'
+Target 'ZERO_CHECK' in project 'flycast_libretro' (no dependencies)
+Target 'zip' in project 'flycast_libretro' (no dependencies)
+Target 'libminiupnpc-static' in project 'flycast_libretro' (no dependencies)
+Target 'chdr-static' in project 'flycast_libretro'
+➜ Explicit dependency on target 'lzma' in project 'flycast_libretro'
+➜ Explicit dependency on target 'zlib' in project 'flycast_libretro'
+Target 'zlib' in project 'flycast_libretro' (no dependencies)
+Target 'lzma' in project 'flycast_libretro' (no dependencies)
+Target 'xxhash' in project 'flycast_libretro' (no dependencies)

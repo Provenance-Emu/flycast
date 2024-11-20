@@ -1,0 +1,9 @@
+"/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Extensions/ALTServerError+Conveniences.swift":
+  swiftmodule: "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/AltKit.swiftmodule"
+  swiftdoc: "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/AltKit.swiftdoc"
+  swiftsourceinfo: "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/AltKit.swiftsourceinfo"
+  dependencies: "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/AltKit-master.d"
+  diagnostics: "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/AltKit-master.dia"
+  const-values: "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/AltKit-master.swiftconstvalues"
+  abi-baseline-json: "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/AltKit.abi.json"
+  objc-header: "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/AltKit-Swift.h"

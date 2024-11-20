@@ -1,0 +1,98 @@
+{
+  "buildCommand" : {
+    "command" : "prepareForIndexing",
+    "enableIndexBuildArena" : false,
+    "targets" : null
+  },
+  "configuredTargets" : [
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a00b451ba91aa906272a6930ac4bc8e20a7"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a00804537a8d3c42426a6347b1a9d29b1a3"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a0075b5d2bd4f754a689b4bc3b207647e8d"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a00a9aca2ee3c8db47a9238be27ed178654"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a0081e883d90b55a8e34f88c4982156a7ee"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a003b7065cb11773b2ee634b11477d1f033"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a00424090cb8c1a55cc9fb397da173fc8d8"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a004cc2f01de4025c223f3bb731788ed087"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a000e832f4afcb29a3c52578064f0607dee"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a00f26776eb86be19d5bf9de79ea45bba70"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a005e3f3c93b7fd4885988450faffaea3f4"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a0071d3806d3f70864db02b8bda6f75f90b"
+    }
+  ],
+  "containerPath" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/cmake/flycast_libretro.xcodeproj",
+  "continueBuildingAfterErrors" : true,
+  "dependencyScope" : "workspace",
+  "enableIndexBuildArena" : false,
+  "hideShellScriptEnvironment" : false,
+  "parameters" : {
+    "action" : "build",
+    "activeArchitecture" : "undefined_arch",
+    "activeRunDestination" : {
+      "disableOnlyActiveArch" : true,
+      "platform" : "iphoneos",
+      "sdk" : "iphoneos18.1",
+      "sdkVariant" : "iphoneos",
+      "supportedArchitectures" : [
+        "armv4t",
+        "armv5",
+        "armv6",
+        "armv7",
+        "armv7f",
+        "armv7s",
+        "armv7k",
+        "arm64",
+        "arm64e"
+      ],
+      "targetArchitecture" : "undefined_arch"
+    },
+    "arenaInfo" : {
+      "buildIntermediatesPath" : "",
+      "buildProductsPath" : "",
+      "derivedDataPath" : "/Users/jmattiello/Library/Developer/Xcode/DerivedData",
+      "indexDataStoreFolderPath" : "/Users/jmattiello/Library/Developer/Xcode/DerivedData/flycast_libretro-asqyuhwgngfuctawwmpgtegnludk/Index.noindex/DataStore",
+      "indexEnableDataStore" : true,
+      "indexPCHPath" : "/Users/jmattiello/Library/Developer/Xcode/DerivedData/flycast_libretro-asqyuhwgngfuctawwmpgtegnludk/Index.noindex/PrecompiledHeaders",
+      "pchPath" : ""
+    },
+    "configurationName" : "Debug",
+    "overrides" : {
+      "synthesized" : {
+        "table" : {
+          "ENABLE_PREVIEWS" : "NO",
+          "ENABLE_XOJIT_PREVIEWS" : "NO",
+          "ONLY_ACTIVE_ARCH" : "YES"
+        }
+      }
+    }
+  },
+  "qos" : "default",
+  "schemeCommand" : "launch",
+  "showNonLoggedProgress" : true,
+  "useDryRun" : true,
+  "useImplicitDependencies" : true,
+  "useLegacyBuildLocations" : false,
+  "useParallelTargets" : true
+}

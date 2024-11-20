@@ -1,0 +1,1325 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXAggregateTarget section */
+		4C99F5E1695C1086C3EBB87C /* uninstall */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 2C361E22534648B280513FF9 /* Build configuration list for PBXAggregateTarget "uninstall" */;
+			buildPhases = (
+				A13776A685E8BEF9FCDA9793 /* Generate CMakeFiles/uninstall */,
+			);
+			dependencies = (
+				DFE2455D278F4A6582C13266 /* PBXTargetDependency */,
+			);
+			name = uninstall;
+			productName = uninstall;
+		};
+		57BA31AE482D1BECE9B718B2 /* install */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = C2FD645827D8460784FCEAC0 /* Build configuration list for PBXAggregateTarget "install" */;
+			buildPhases = (
+				93426DA6A4AC2C2AC9CE883C /* CMake PostBuild Rules */,
+			);
+			dependencies = (
+				91D02F9FC2454B69B343781E /* PBXTargetDependency */,
+			);
+			name = install;
+			productName = install;
+		};
+		7E8467770BDCFA64AD67C5D6 /* ALL_BUILD */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 2A46154D611F41F89429DAE2 /* Build configuration list for PBXAggregateTarget "ALL_BUILD" */;
+			buildPhases = (
+				0F37271C7123B845E7CEED7C /* Generate CMakeFiles/ALL_BUILD */,
+			);
+			dependencies = (
+				1B7CB0A3E5AD4A40945E5581 /* PBXTargetDependency */,
+				E98325C7FEAF449E9103C8C1 /* PBXTargetDependency */,
+			);
+			name = ALL_BUILD;
+			productName = ALL_BUILD;
+		};
+		8C3077B28D3270ADD4E09DA4 /* ZERO_CHECK */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 53E65A2C6E0045138FDF7746 /* Build configuration list for PBXAggregateTarget "ZERO_CHECK" */;
+			buildPhases = (
+				1948F4D66EE276ECE9B49AF5 /* Generate CMakeFiles/ZERO_CHECK */,
+			);
+			dependencies = (
+			);
+			name = ZERO_CHECK;
+			productName = ZERO_CHECK;
+		};
+/* End PBXAggregateTarget section */
+
+/* Begin PBXBuildFile section */
+		068B197EB2AB47D698E16482 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress.c */ = {isa = PBXBuildFile; fileRef = 93DD12BDA02D44E6A214211B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress.c */; };
+		06F02883E1C6441DAD4BB8C2 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/pool.c */ = {isa = PBXBuildFile; fileRef = C70113ECF3164C9587778D18 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/pool.c */; };
+		0A07BB5325034C0CBB4A6166 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_double_fast.c */ = {isa = PBXBuildFile; fileRef = 376355EA27624588ADCD8D6C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_double_fast.c */; };
+		0F9F4B17658648F9856F63B4 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/pool.h */ = {isa = PBXBuildFile; fileRef = 57C37C7CCF4546CDB9C05BAC /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/pool.h */; };
+		123FE8692B76458D984F7C64 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_block.h */ = {isa = PBXBuildFile; fileRef = 0F2069E4BB8448DCAFE03855 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_block.h */; };
+		15FC6BF099A5476FBCCEFAFD /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/huf_compress.c */ = {isa = PBXBuildFile; fileRef = 07620A565822411DAC979C23 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/huf_compress.c */; };
+		1F03C4D234A149698AC0CCCD /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/clevels.h */ = {isa = PBXBuildFile; fileRef = 4F8B3C90175A4758A2374BF1 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/clevels.h */; };
+		24423E8B550148FDA5C5ED8B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zstd_errors.h */ = {isa = PBXBuildFile; fileRef = 39F5F4B9946D4D0EB3C7FA9C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zstd_errors.h */; };
+		26161098A7C246AF9B8CC8D7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_opt.c */ = {isa = PBXBuildFile; fileRef = A19B812C84874CA6812F828C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_opt.c */; };
+		280FCE8E484A4F8C81BDA99D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_sequences.c */ = {isa = PBXBuildFile; fileRef = 6C416D53FEF240B081C1AB1D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_sequences.c */; };
+		2B3FA473774941B6BDB7D1C9 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/divsufsort.c */ = {isa = PBXBuildFile; fileRef = E9EFEF816A1E41988A6684CF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/divsufsort.c */; };
+		2C05BF00B0F74834934EC490 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zdict.h */ = {isa = PBXBuildFile; fileRef = 38FB21626BE247E6A98F6B10 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zdict.h */; };
+		2C87A8575AA24633B9D882AC /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/bitstream.h */ = {isa = PBXBuildFile; fileRef = DACAC5F8D18A4B1499471C11 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/bitstream.h */; };
+		2DE03733A6AB4B4C99588979 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_internal.h */ = {isa = PBXBuildFile; fileRef = 16DD6287BFBD4C8BA4178509 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_internal.h */; };
+		3042BA5A4229481B8CFB1689 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_trace.h */ = {isa = PBXBuildFile; fileRef = 3DD00515717247B0AD8AB9E5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_trace.h */; };
+		32304D46CF4145179AC74B1C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstdmt_compress.h */ = {isa = PBXBuildFile; fileRef = 37AFFAEC4D05482482261C16 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstdmt_compress.h */; };
+		32392BEED4E14BEBA2C8B49D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm_geartab.h */ = {isa = PBXBuildFile; fileRef = 4C2D839E9FAB4C9AAB756089 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm_geartab.h */; };
+		340C3A04CE88491995DD1F63 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/bits.h */ = {isa = PBXBuildFile; fileRef = 64073696E5784DB1AFF9F70B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/bits.h */; };
+		343900EC0D7344A39064165A /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/cover.h */ = {isa = PBXBuildFile; fileRef = 3E807C9EECE84898ABF91CAC /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/cover.h */; };
+		40A5DE39A84C411A9E1AF54D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_deps.h */ = {isa = PBXBuildFile; fileRef = BE5F13328C92444788FA669D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_deps.h */; };
+		434B2AA9388A4538B52318EE /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm.h */ = {isa = PBXBuildFile; fileRef = 395C5EA4FA85493090E16550 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm.h */; };
+		43CD85138FCD4990B72B3B2B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/threading.h */ = {isa = PBXBuildFile; fileRef = 537EF9685ED749A3BF323A3B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/threading.h */; };
+		43FFE5C1693E4563902B651F /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/error_private.h */ = {isa = PBXBuildFile; fileRef = AA133523FB6943C8825AA19E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/error_private.h */; };
+		48B50E8350CA43B68BE012D7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/xxhash.c */ = {isa = PBXBuildFile; fileRef = B56FF5041BE34CF1819102F7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/xxhash.c */; };
+		4C5451EF7A2C46A3AA86C802 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_literals.h */ = {isa = PBXBuildFile; fileRef = 3E12E635AD2048579465C6A3 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_literals.h */; };
+		4E4C5FD1D3004ADDADAED9AF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/entropy_common.c */ = {isa = PBXBuildFile; fileRef = 799D57EA40794107A1261A06 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/entropy_common.c */; };
+		508B52F102F9475B8D6EA579 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_sequences.h */ = {isa = PBXBuildFile; fileRef = 898756A6AD7647919AA60E6D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_sequences.h */; };
+		52E7C9C01AA941EE957F57A1 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_ddict.c */ = {isa = PBXBuildFile; fileRef = 754E497F7F7444DE81688BC4 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_ddict.c */; };
+		566A08D9B4094B6BA8A3A951 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_superblock.h */ = {isa = PBXBuildFile; fileRef = 708C3BE3A17C41FB9C7E7044 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_superblock.h */; };
+		56C8E83EC6C049C28237EDC1 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm.c */ = {isa = PBXBuildFile; fileRef = 9A03795B381F4A0DBF352D10 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm.c */; };
+		5AC1EB3B4C1D4F4591C78777 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_cwksp.h */ = {isa = PBXBuildFile; fileRef = 193AEFBA85FE4B79B49E4DF6 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_cwksp.h */; };
+		67CCE06D1DB542499E7E9E29 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/fastcover.c */ = {isa = PBXBuildFile; fileRef = B0506FD226D3489DBD4F7CA7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/fastcover.c */; };
+		68DFEDDCEC8E4DCE8069E8B5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_lazy.h */ = {isa = PBXBuildFile; fileRef = 93DCB9568A714EE89772EDB2 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_lazy.h */; };
+		68E45DD9D603463EA395D7B5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeFiles/libzstd_static.dir/Info.plist */ = {isa = PBXBuildFile; fileRef = 56CBA9551552464C8BDFFB92 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeFiles/libzstd_static.dir/Info.plist */; };
+		6B6C188DA9EA4CA8866AB609 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse_decompress.c */ = {isa = PBXBuildFile; fileRef = EEBAF5D511854D56A64700DF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse_decompress.c */; };
+		6F21BF54C2DE495883255A87 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress.c */ = {isa = PBXBuildFile; fileRef = D1B0959981A845D38914E073 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress.c */; };
+		7355F29F865B4547A72E1B99 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/debug.c */ = {isa = PBXBuildFile; fileRef = 9659CB6554C54AFAAE52B4C5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/debug.c */; };
+		7720D31CCF8242DA9FFCD8C8 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_fast.h */ = {isa = PBXBuildFile; fileRef = 2E7F4AA19D3B4DB688EFAC97 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_fast.h */; };
+		7CDE0D3AA8D24A9BAEFF1976 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_fast.c */ = {isa = PBXBuildFile; fileRef = 82CDB1FEC46F43FF90B16D62 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_fast.c */; };
+		7D45D3CCA9344761B24517EB /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_internal.h */ = {isa = PBXBuildFile; fileRef = 7D0EE111B5CD4ACAA5841957 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_internal.h */; };
+		82DBB97749AB415287DD1210 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/cpu.h */ = {isa = PBXBuildFile; fileRef = 0FE3F2CE8B8641579620C71C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/cpu.h */; };
+		896234D0DEE8491688640E05 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/allocations.h */ = {isa = PBXBuildFile; fileRef = C6C03552F0AA41579D7B890A /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/allocations.h */; };
+		8A6712FFB6CC44E6B49AF87B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/huf_decompress.c */ = {isa = PBXBuildFile; fileRef = 1E49D8DD2B1C46AEB2021AEE /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/huf_decompress.c */; };
+		8DF7BF8FB9AA49AAB3717383 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/compiler.h */ = {isa = PBXBuildFile; fileRef = 7AEEBD39208A4FF7867431E0 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/compiler.h */; };
+		9132DB2F89B041C39BDE0FDA /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/debug.h */ = {isa = PBXBuildFile; fileRef = 80043FFB3BAA48BE81827F16 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/debug.h */; };
+		93FB7B68FEEA4389947DE55E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_block.c */ = {isa = PBXBuildFile; fileRef = 0E1DB446253A439EAE882469 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_block.c */; };
+		95735589B9B04047969A2BAA /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zstd.h */ = {isa = PBXBuildFile; fileRef = E18F4BFE17A041329B8B34A8 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zstd.h */; };
+		9ADFA3C9519F4AD39FB6E0EE /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeLists.txt */ = {isa = PBXBuildFile; fileRef = B18C96103492408EA8030372 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeLists.txt */; };
+		A7E7138A8BE84DCF9A38EC27 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_literals.c */ = {isa = PBXBuildFile; fileRef = 56AF343FDE9A40B9A4D21919 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_literals.c */; };
+		A91D727566F94DE99EF8CCC5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/mem.h */ = {isa = PBXBuildFile; fileRef = 9C73B7779E9640848C50243E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/mem.h */; };
+		B40DEF23A0C6466A92C3DB32 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/hist.c */ = {isa = PBXBuildFile; fileRef = 40CEF05AAA6B48079B7F91D4 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/hist.c */; };
+		B4A3CCDBA9AF4D5DBA870FC4 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/cover.c */ = {isa = PBXBuildFile; fileRef = 0F76F1898A534EE28A56F219 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/cover.c */; };
+		B506A12AECF84AAA934A09C6 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/zdict.c */ = {isa = PBXBuildFile; fileRef = 845851FCA1B64F43924C9C99 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/zdict.c */; };
+		B77F8CE5BB2644C8ADC8CE94 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_common.c */ = {isa = PBXBuildFile; fileRef = 75AB633685BB42B8BC874970 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_common.c */; };
+		B9331272C0594A3C9208916D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_superblock.c */ = {isa = PBXBuildFile; fileRef = 2AC774A45FD348B0B6768613 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_superblock.c */; };
+		B9A6114FC51B49F38E4867A5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstdmt_compress.c */ = {isa = PBXBuildFile; fileRef = AE23F4F15F5F431983EC436D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstdmt_compress.c */; };
+		BA7C030084CA4EC58B429FB7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/divsufsort.h */ = {isa = PBXBuildFile; fileRef = B9F74A3FB13D4542903CB50A /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/divsufsort.h */; };
+		DCB68EA4BE4D481FA5687CA8 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/error_private.c */ = {isa = PBXBuildFile; fileRef = C10AB1CD9FE74F44A486B707 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/error_private.c */; };
+		DE0C8216629542E790F1B851 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/huf.h */ = {isa = PBXBuildFile; fileRef = 1C7A9AC6BE1249EB8A8614DF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/huf.h */; };
+		E16422646A8E4D1E8755171F /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_ddict.h */ = {isa = PBXBuildFile; fileRef = B15D6BE91DB5437C8658DCF0 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_ddict.h */; };
+		E1882C6C5B034A91BF38F7BE /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_double_fast.h */ = {isa = PBXBuildFile; fileRef = 21C76E3492FF482CB0A6EA3E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_double_fast.h */; };
+		E76E0005EAF244A5946710B6 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/xxhash.h */ = {isa = PBXBuildFile; fileRef = F2C28984B6ED48859A68722D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/xxhash.h */; };
+		E878445E1B074910966B91FA /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_lazy.c */ = {isa = PBXBuildFile; fileRef = 5A6B779F76D846D9A1264204 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_lazy.c */; };
+		EAAC8E5BF6904AEAB8B0A85C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_internal.h */ = {isa = PBXBuildFile; fileRef = 327598D7993942A4B491CE37 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_internal.h */; };
+		EC294F2F4F8D490096B2A8F7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/portability_macros.h */ = {isa = PBXBuildFile; fileRef = 53C3C2C8CE984F41AB7E8E86 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/portability_macros.h */; };
+		EF47B2E59630488394B9D90A /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_opt.h */ = {isa = PBXBuildFile; fileRef = 47AB9EFC1CA7489EA19CF1CF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_opt.h */; };
+		F212463CCFAE44FDB57AB049 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/threading.c */ = {isa = PBXBuildFile; fileRef = 663D15D8DB9647338192924E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/threading.c */; };
+		F63FED73F51540CA8DDE619B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/fse_compress.c */ = {isa = PBXBuildFile; fileRef = F770E52F8A5C42D6BC31A1D5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/fse_compress.c */; };
+		F7B2157A4CC04806A8C3B8B5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse.h */ = {isa = PBXBuildFile; fileRef = 62224DD75AA44C6D885C7D71 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse.h */; };
+		FCA0A457BFF84635BB76E45F /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/hist.h */ = {isa = PBXBuildFile; fileRef = 4DD1B57576694626B67B4418 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/hist.h */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXBuildStyle section */
+		0DD878243DF8416EAC94F59D /* MinSizeRel */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = MinSizeRel;
+		};
+		48F19A4B5239456F85A30DFB /* Debug */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = Debug;
+		};
+		BF20C9BF98354D919D155648 /* Release */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = Release;
+		};
+		EDD7CC49D7C34615A44BC2C2 /* RelWithDebInfo */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = RelWithDebInfo;
+		};
+/* End PBXBuildStyle section */
+
+/* Begin PBXContainerItemProxy section */
+		1455DEE47A024ACD810B790B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0CC1187F1A70466B91566E81 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7E8467770BDCFA64AD67C5D6;
+			remoteInfo = ALL_BUILD;
+		};
+		3E6CF36B0E69409D94AAD46B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0CC1187F1A70466B91566E81 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 92C9B5FE49230EAE1BA30390;
+			remoteInfo = libzstd_static;
+		};
+		714B72277FCA4D97B23EEB44 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0CC1187F1A70466B91566E81 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8C3077B28D3270ADD4E09DA4;
+			remoteInfo = ZERO_CHECK;
+		};
+		84B8C1254E1F4D58B9E5942B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0CC1187F1A70466B91566E81 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8C3077B28D3270ADD4E09DA4;
+			remoteInfo = ZERO_CHECK;
+		};
+		EECFC00BA251409C9EF6DE48 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0CC1187F1A70466B91566E81 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8C3077B28D3270ADD4E09DA4;
+			remoteInfo = ZERO_CHECK;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		07620A565822411DAC979C23 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/huf_compress.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = huf_compress.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/huf_compress.c"; sourceTree = "<absolute>"; };
+		0E1DB446253A439EAE882469 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_block.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_decompress_block.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_block.c"; sourceTree = "<absolute>"; };
+		0F2069E4BB8448DCAFE03855 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_block.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_decompress_block.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_block.h"; sourceTree = "<absolute>"; };
+		0F76F1898A534EE28A56F219 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/cover.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = cover.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/cover.c"; sourceTree = "<absolute>"; };
+		0FE3F2CE8B8641579620C71C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/cpu.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = cpu.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/cpu.h"; sourceTree = "<absolute>"; };
+		16DD6287BFBD4C8BA4178509 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_internal.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_compress_internal.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_internal.h"; sourceTree = "<absolute>"; };
+		193AEFBA85FE4B79B49E4DF6 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_cwksp.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_cwksp.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_cwksp.h"; sourceTree = "<absolute>"; };
+		1AE26B6DC2944EE4A12146FE /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = CMakeLists.txt; sourceTree = SOURCE_ROOT; };
+		1C7A9AC6BE1249EB8A8614DF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/huf.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = huf.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/huf.h"; sourceTree = "<absolute>"; };
+		1E49D8DD2B1C46AEB2021AEE /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/huf_decompress.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = huf_decompress.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/huf_decompress.c"; sourceTree = "<absolute>"; };
+		21C76E3492FF482CB0A6EA3E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_double_fast.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_double_fast.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_double_fast.h"; sourceTree = "<absolute>"; };
+		2AC774A45FD348B0B6768613 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_superblock.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_compress_superblock.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_superblock.c"; sourceTree = "<absolute>"; };
+		2E7F4AA19D3B4DB688EFAC97 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_fast.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_fast.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_fast.h"; sourceTree = "<absolute>"; };
+		327598D7993942A4B491CE37 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_internal.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_internal.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_internal.h"; sourceTree = "<absolute>"; };
+		376355EA27624588ADCD8D6C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_double_fast.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_double_fast.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_double_fast.c"; sourceTree = "<absolute>"; };
+		37AFFAEC4D05482482261C16 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstdmt_compress.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstdmt_compress.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstdmt_compress.h"; sourceTree = "<absolute>"; };
+		38FB21626BE247E6A98F6B10 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zdict.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zdict.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zdict.h"; sourceTree = "<absolute>"; };
+		395C5EA4FA85493090E16550 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_ldm.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm.h"; sourceTree = "<absolute>"; };
+		39F5F4B9946D4D0EB3C7FA9C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zstd_errors.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_errors.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zstd_errors.h"; sourceTree = "<absolute>"; };
+		3DD00515717247B0AD8AB9E5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_trace.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_trace.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_trace.h"; sourceTree = "<absolute>"; };
+		3E12E635AD2048579465C6A3 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_literals.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_compress_literals.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_literals.h"; sourceTree = "<absolute>"; };
+		3E807C9EECE84898ABF91CAC /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/cover.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = cover.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/cover.h"; sourceTree = "<absolute>"; };
+		40CEF05AAA6B48079B7F91D4 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/hist.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = hist.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/hist.c"; sourceTree = "<absolute>"; };
+		47AB9EFC1CA7489EA19CF1CF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_opt.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_opt.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_opt.h"; sourceTree = "<absolute>"; };
+		4C2D839E9FAB4C9AAB756089 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm_geartab.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_ldm_geartab.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm_geartab.h"; sourceTree = "<absolute>"; };
+		4DD1B57576694626B67B4418 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/hist.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = hist.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/hist.h"; sourceTree = "<absolute>"; };
+		4F8B3C90175A4758A2374BF1 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/clevels.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = clevels.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/clevels.h"; sourceTree = "<absolute>"; };
+		537EF9685ED749A3BF323A3B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/threading.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = threading.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/threading.h"; sourceTree = "<absolute>"; };
+		53C3C2C8CE984F41AB7E8E86 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/portability_macros.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = portability_macros.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/portability_macros.h"; sourceTree = "<absolute>"; };
+		56AF343FDE9A40B9A4D21919 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_literals.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_compress_literals.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_literals.c"; sourceTree = "<absolute>"; };
+		56CBA9551552464C8BDFFB92 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeFiles/libzstd_static.dir/Info.plist */ = {isa = PBXFileReference; explicitFileType = sourcecode.text.plist; fileEncoding = 4; name = Info.plist; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeFiles/libzstd_static.dir/Info.plist"; sourceTree = "<absolute>"; };
+		57C37C7CCF4546CDB9C05BAC /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/pool.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = pool.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/pool.h"; sourceTree = "<absolute>"; };
+		5A6B779F76D846D9A1264204 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_lazy.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_lazy.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_lazy.c"; sourceTree = "<absolute>"; };
+		62224DD75AA44C6D885C7D71 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = fse.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse.h"; sourceTree = "<absolute>"; };
+		64073696E5784DB1AFF9F70B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/bits.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = bits.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/bits.h"; sourceTree = "<absolute>"; };
+		663D15D8DB9647338192924E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/threading.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = threading.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/threading.c"; sourceTree = "<absolute>"; };
+		6C416D53FEF240B081C1AB1D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_sequences.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_compress_sequences.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_sequences.c"; sourceTree = "<absolute>"; };
+		708C3BE3A17C41FB9C7E7044 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_superblock.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_compress_superblock.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_superblock.h"; sourceTree = "<absolute>"; };
+		754E497F7F7444DE81688BC4 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_ddict.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_ddict.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_ddict.c"; sourceTree = "<absolute>"; };
+		75AB633685BB42B8BC874970 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_common.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_common.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_common.c"; sourceTree = "<absolute>"; };
+		799D57EA40794107A1261A06 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/entropy_common.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = entropy_common.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/entropy_common.c"; sourceTree = "<absolute>"; };
+		7AEEBD39208A4FF7867431E0 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/compiler.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = compiler.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/compiler.h"; sourceTree = "<absolute>"; };
+		7D0EE111B5CD4ACAA5841957 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_internal.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_decompress_internal.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_internal.h"; sourceTree = "<absolute>"; };
+		80043FFB3BAA48BE81827F16 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/debug.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = debug.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/debug.h"; sourceTree = "<absolute>"; };
+		82CDB1FEC46F43FF90B16D62 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_fast.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_fast.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_fast.c"; sourceTree = "<absolute>"; };
+		845851FCA1B64F43924C9C99 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/zdict.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zdict.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/zdict.c"; sourceTree = "<absolute>"; };
+		898756A6AD7647919AA60E6D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_sequences.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_compress_sequences.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_sequences.h"; sourceTree = "<absolute>"; };
+		93DCB9568A714EE89772EDB2 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_lazy.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_lazy.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_lazy.h"; sourceTree = "<absolute>"; };
+		93DD12BDA02D44E6A214211B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_compress.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress.c"; sourceTree = "<absolute>"; };
+		9659CB6554C54AFAAE52B4C5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/debug.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = debug.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/debug.c"; sourceTree = "<absolute>"; };
+		9A03795B381F4A0DBF352D10 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_ldm.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm.c"; sourceTree = "<absolute>"; };
+		9C73B7779E9640848C50243E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/mem.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = mem.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/mem.h"; sourceTree = "<absolute>"; };
+		A19B812C84874CA6812F828C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_opt.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_opt.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_opt.c"; sourceTree = "<absolute>"; };
+		AA133523FB6943C8825AA19E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/error_private.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = error_private.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/error_private.h"; sourceTree = "<absolute>"; };
+		AE23F4F15F5F431983EC436D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstdmt_compress.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstdmt_compress.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstdmt_compress.c"; sourceTree = "<absolute>"; };
+		B0506FD226D3489DBD4F7CA7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/fastcover.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = fastcover.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/fastcover.c"; sourceTree = "<absolute>"; };
+		B15D6BE91DB5437C8658DCF0 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_ddict.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_ddict.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_ddict.h"; sourceTree = "<absolute>"; };
+		B18C96103492408EA8030372 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = CMakeLists.txt; sourceTree = SOURCE_ROOT; };
+		B20BCE473A1F4C69AAEE45B4 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = CMakeLists.txt; sourceTree = SOURCE_ROOT; };
+		B56FF5041BE34CF1819102F7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/xxhash.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = xxhash.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/xxhash.c"; sourceTree = "<absolute>"; };
+		B9F74A3FB13D4542903CB50A /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/divsufsort.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = divsufsort.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/divsufsort.h"; sourceTree = "<absolute>"; };
+		BE5F13328C92444788FA669D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_deps.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd_deps.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_deps.h"; sourceTree = "<absolute>"; };
+		C10AB1CD9FE74F44A486B707 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/error_private.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = error_private.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/error_private.c"; sourceTree = "<absolute>"; };
+		C6C03552F0AA41579D7B890A /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/allocations.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = allocations.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/allocations.h"; sourceTree = "<absolute>"; };
+		C70113ECF3164C9587778D18 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/pool.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = pool.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/pool.c"; sourceTree = "<absolute>"; };
+		D1B0959981A845D38914E073 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = zstd_decompress.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress.c"; sourceTree = "<absolute>"; };
+		DACAC5F8D18A4B1499471C11 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/bitstream.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = bitstream.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/bitstream.h"; sourceTree = "<absolute>"; };
+		E18F4BFE17A041329B8B34A8 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zstd.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = zstd.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zstd.h"; sourceTree = "<absolute>"; };
+		E9EFEF816A1E41988A6684CF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/divsufsort.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = divsufsort.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/divsufsort.c"; sourceTree = "<absolute>"; };
+		EEBAF5D511854D56A64700DF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse_decompress.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = fse_decompress.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse_decompress.c"; sourceTree = "<absolute>"; };
+		F2C28984B6ED48859A68722D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/xxhash.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = xxhash.h; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/xxhash.h"; sourceTree = "<absolute>"; };
+		F770E52F8A5C42D6BC31A1D5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/fse_compress.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = fse_compress.c; path = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/fse_compress.c"; sourceTree = "<absolute>"; };
+		FFA6C743DCDE4115BDB4BA2A /* libzstd_static */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libzstd.a; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5576276DA26A47DE8C5BE3C8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		013BECB046A24528A03231E1 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				FFA6C743DCDE4115BDB4BA2A /* libzstd_static */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		1FD5B11C985448BF86732AEB /* Source Files */ = {
+			isa = PBXGroup;
+			children = (
+				9659CB6554C54AFAAE52B4C5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/debug.c */,
+				799D57EA40794107A1261A06 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/entropy_common.c */,
+				C10AB1CD9FE74F44A486B707 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/error_private.c */,
+				EEBAF5D511854D56A64700DF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse_decompress.c */,
+				C70113ECF3164C9587778D18 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/pool.c */,
+				663D15D8DB9647338192924E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/threading.c */,
+				B56FF5041BE34CF1819102F7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/xxhash.c */,
+				75AB633685BB42B8BC874970 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_common.c */,
+				F770E52F8A5C42D6BC31A1D5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/fse_compress.c */,
+				40CEF05AAA6B48079B7F91D4 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/hist.c */,
+				07620A565822411DAC979C23 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/huf_compress.c */,
+				93DD12BDA02D44E6A214211B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress.c */,
+				56AF343FDE9A40B9A4D21919 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_literals.c */,
+				6C416D53FEF240B081C1AB1D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_sequences.c */,
+				2AC774A45FD348B0B6768613 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_superblock.c */,
+				376355EA27624588ADCD8D6C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_double_fast.c */,
+				82CDB1FEC46F43FF90B16D62 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_fast.c */,
+				5A6B779F76D846D9A1264204 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_lazy.c */,
+				9A03795B381F4A0DBF352D10 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm.c */,
+				A19B812C84874CA6812F828C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_opt.c */,
+				AE23F4F15F5F431983EC436D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstdmt_compress.c */,
+				1E49D8DD2B1C46AEB2021AEE /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/huf_decompress.c */,
+				754E497F7F7444DE81688BC4 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_ddict.c */,
+				D1B0959981A845D38914E073 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress.c */,
+				0E1DB446253A439EAE882469 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_block.c */,
+				0F76F1898A534EE28A56F219 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/cover.c */,
+				E9EFEF816A1E41988A6684CF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/divsufsort.c */,
+				B0506FD226D3489DBD4F7CA7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/fastcover.c */,
+				845851FCA1B64F43924C9C99 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/zdict.c */,
+			);
+			name = "Source Files";
+			sourceTree = "<group>";
+		};
+		5E2F84C94F1448798B920CF0 /* Header Files */ = {
+			isa = PBXGroup;
+			children = (
+				C6C03552F0AA41579D7B890A /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/allocations.h */,
+				64073696E5784DB1AFF9F70B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/bits.h */,
+				DACAC5F8D18A4B1499471C11 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/bitstream.h */,
+				7AEEBD39208A4FF7867431E0 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/compiler.h */,
+				0FE3F2CE8B8641579620C71C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/cpu.h */,
+				80043FFB3BAA48BE81827F16 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/debug.h */,
+				AA133523FB6943C8825AA19E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/error_private.h */,
+				62224DD75AA44C6D885C7D71 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse.h */,
+				1C7A9AC6BE1249EB8A8614DF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/huf.h */,
+				9C73B7779E9640848C50243E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/mem.h */,
+				57C37C7CCF4546CDB9C05BAC /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/pool.h */,
+				53C3C2C8CE984F41AB7E8E86 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/portability_macros.h */,
+				537EF9685ED749A3BF323A3B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/threading.h */,
+				F2C28984B6ED48859A68722D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/xxhash.h */,
+				BE5F13328C92444788FA669D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_deps.h */,
+				327598D7993942A4B491CE37 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_internal.h */,
+				3DD00515717247B0AD8AB9E5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_trace.h */,
+				4F8B3C90175A4758A2374BF1 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/clevels.h */,
+				4DD1B57576694626B67B4418 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/hist.h */,
+				16DD6287BFBD4C8BA4178509 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_internal.h */,
+				3E12E635AD2048579465C6A3 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_literals.h */,
+				898756A6AD7647919AA60E6D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_sequences.h */,
+				708C3BE3A17C41FB9C7E7044 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_superblock.h */,
+				193AEFBA85FE4B79B49E4DF6 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_cwksp.h */,
+				21C76E3492FF482CB0A6EA3E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_double_fast.h */,
+				2E7F4AA19D3B4DB688EFAC97 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_fast.h */,
+				93DCB9568A714EE89772EDB2 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_lazy.h */,
+				395C5EA4FA85493090E16550 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm.h */,
+				4C2D839E9FAB4C9AAB756089 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm_geartab.h */,
+				47AB9EFC1CA7489EA19CF1CF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_opt.h */,
+				37AFFAEC4D05482482261C16 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstdmt_compress.h */,
+				B15D6BE91DB5437C8658DCF0 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_ddict.h */,
+				0F2069E4BB8448DCAFE03855 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_block.h */,
+				7D0EE111B5CD4ACAA5841957 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_internal.h */,
+				3E807C9EECE84898ABF91CAC /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/cover.h */,
+				B9F74A3FB13D4542903CB50A /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/divsufsort.h */,
+				38FB21626BE247E6A98F6B10 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zdict.h */,
+				E18F4BFE17A041329B8B34A8 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zstd.h */,
+				39F5F4B9946D4D0EB3C7FA9C /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/zstd_errors.h */,
+			);
+			name = "Header Files";
+			sourceTree = "<group>";
+		};
+		962E2B3D77F447549AABCE58 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				56CBA9551552464C8BDFFB92 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeFiles/libzstd_static.dir/Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		973462F4F9D8424AA70E5B17 /* ALL_BUILD */ = {
+			isa = PBXGroup;
+			children = (
+				C6D9DA680A7546668D59A798 /* CMake Rules */,
+				1AE26B6DC2944EE4A12146FE /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeLists.txt */,
+			);
+			name = ALL_BUILD;
+			sourceTree = "<group>";
+		};
+		9EE198713B5842E6834764C7 = {
+			isa = PBXGroup;
+			children = (
+				FCC47E3F24EC4D5EA3736ADA /* libzstd_static */,
+				D4438A0F8C2646B5B65741C3 /* uninstall */,
+				973462F4F9D8424AA70E5B17 /* ALL_BUILD */,
+				013BECB046A24528A03231E1 /* Products */,
+				B192D4E1371F48E484A2BA67 /* Frameworks */,
+				EA36369C1EF74523898A3FF2 /* Resources */,
+			);
+			sourceTree = "<group>";
+		};
+		A2A6880540904D4990940336 /* CMake Rules */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = "CMake Rules";
+			sourceTree = "<group>";
+		};
+		B192D4E1371F48E484A2BA67 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C6D9DA680A7546668D59A798 /* CMake Rules */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = "CMake Rules";
+			sourceTree = "<group>";
+		};
+		D4438A0F8C2646B5B65741C3 /* uninstall */ = {
+			isa = PBXGroup;
+			children = (
+				A2A6880540904D4990940336 /* CMake Rules */,
+				B20BCE473A1F4C69AAEE45B4 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeLists.txt */,
+			);
+			name = uninstall;
+			sourceTree = "<group>";
+		};
+		EA36369C1EF74523898A3FF2 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		FCC47E3F24EC4D5EA3736ADA /* libzstd_static */ = {
+			isa = PBXGroup;
+			children = (
+				1FD5B11C985448BF86732AEB /* Source Files */,
+				5E2F84C94F1448798B920CF0 /* Header Files */,
+				962E2B3D77F447549AABCE58 /* Resources */,
+				B18C96103492408EA8030372 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeLists.txt */,
+			);
+			name = libzstd_static;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		92C9B5FE49230EAE1BA30390 /* libzstd_static */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 06CFA47E27DB4CC1AC79C186 /* Build configuration list for PBXNativeTarget "libzstd_static" */;
+			buildPhases = (
+				FD2C5D1EA06344DCB18F346B /* Sources */,
+				5576276DA26A47DE8C5BE3C8 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				016AFA16DFC740C082262F27 /* PBXTargetDependency */,
+			);
+			name = libzstd_static;
+			productName = libzstd_static;
+			productReference = FFA6C743DCDE4115BDB4BA2A /* libzstd_static */;
+			productType = "com.apple.product-type.library.static";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0CC1187F1A70466B91566E81 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1610;
+			};
+			buildConfigurationList = 631ED4E7A1A3478D8FC56F54 /* Build configuration list for PBXProject "libzstd" */;
+			buildSettings = {
+			};
+			buildStyles = (
+				48F19A4B5239456F85A30DFB /* Debug */,
+				BF20C9BF98354D919D155648 /* Release */,
+				0DD878243DF8416EAC94F59D /* MinSizeRel */,
+				EDD7CC49D7C34615A44BC2C2 /* RelWithDebInfo */,
+			);
+			compatibilityVersion = "Xcode 3.2";
+			hasScannedForEncodings = 0;
+			mainGroup = 9EE198713B5842E6834764C7;
+			projectDirPath = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib";
+			projectRoot = "";
+			targets = (
+				7E8467770BDCFA64AD67C5D6 /* ALL_BUILD */,
+				8C3077B28D3270ADD4E09DA4 /* ZERO_CHECK */,
+				57BA31AE482D1BECE9B718B2 /* install */,
+				92C9B5FE49230EAE1BA30390 /* libzstd_static */,
+				4C99F5E1695C1086C3EBB87C /* uninstall */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		0F37271C7123B845E7CEED7C /* Generate CMakeFiles/ALL_BUILD */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate CMakeFiles/ALL_BUILD";
+			outputPaths = (
+"/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeFiles/ALL_BUILD"			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  echo Build\\ all\\ projects
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+		1948F4D66EE276ECE9B49AF5 /* Generate CMakeFiles/ZERO_CHECK */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate CMakeFiles/ZERO_CHECK";
+			outputPaths = (
+"/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeFiles/ZERO_CHECK"			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  make -f /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  make -f /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  make -f /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  make -f /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeScripts/ReRunCMake.make
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+		3C0110FC8322DE7E50886E21 = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here
+exit 0";
+			showEnvVarsInLog = 0;
+		};
+		3C8B9B9628600475EB03CBF8 = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here
+exit 0";
+			showEnvVarsInLog = 0;
+		};
+		87AF4882E018677E2624B544 = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here
+exit 0";
+			showEnvVarsInLog = 0;
+		};
+		93426DA6A4AC2C2AC9CE883C /* CMake PostBuild Rules */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			name = "CMake PostBuild Rules";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -DBUILD_TYPE=$CONFIGURATION -DEFFECTIVE_PLATFORM_NAME=$EFFECTIVE_PLATFORM_NAME -P cmake_install.cmake
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -DBUILD_TYPE=$CONFIGURATION -DEFFECTIVE_PLATFORM_NAME=$EFFECTIVE_PLATFORM_NAME -P cmake_install.cmake
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -DBUILD_TYPE=$CONFIGURATION -DEFFECTIVE_PLATFORM_NAME=$EFFECTIVE_PLATFORM_NAME -P cmake_install.cmake
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -DBUILD_TYPE=$CONFIGURATION -DEFFECTIVE_PLATFORM_NAME=$EFFECTIVE_PLATFORM_NAME -P cmake_install.cmake
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+		9B50530E35CC49C82C2FACCF = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here
+exit 0";
+			showEnvVarsInLog = 0;
+		};
+		A13776A685E8BEF9FCDA9793 /* Generate CMakeFiles/uninstall */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate CMakeFiles/uninstall";
+			outputPaths = (
+"/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/CMakeFiles/uninstall"			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -P /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/cmake_uninstall.cmake
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -P /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/cmake_uninstall.cmake
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -P /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/cmake_uninstall.cmake
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib
+  /opt/homebrew/Cellar/cmake/3.30.5/bin/cmake -P /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/cmake_uninstall.cmake
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		FD2C5D1EA06344DCB18F346B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7355F29F865B4547A72E1B99 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/debug.c */,
+				4E4C5FD1D3004ADDADAED9AF /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/entropy_common.c */,
+				DCB68EA4BE4D481FA5687CA8 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/error_private.c */,
+				6B6C188DA9EA4CA8866AB609 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse_decompress.c */,
+				06F02883E1C6441DAD4BB8C2 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/pool.c */,
+				F212463CCFAE44FDB57AB049 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/threading.c */,
+				48B50E8350CA43B68BE012D7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/xxhash.c */,
+				B77F8CE5BB2644C8ADC8CE94 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/zstd_common.c */,
+				F63FED73F51540CA8DDE619B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/fse_compress.c */,
+				B40DEF23A0C6466A92C3DB32 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/hist.c */,
+				15FC6BF099A5476FBCCEFAFD /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/huf_compress.c */,
+				068B197EB2AB47D698E16482 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress.c */,
+				A7E7138A8BE84DCF9A38EC27 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_literals.c */,
+				280FCE8E484A4F8C81BDA99D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_sequences.c */,
+				B9331272C0594A3C9208916D /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_compress_superblock.c */,
+				0A07BB5325034C0CBB4A6166 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_double_fast.c */,
+				7CDE0D3AA8D24A9BAEFF1976 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_fast.c */,
+				E878445E1B074910966B91FA /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_lazy.c */,
+				56C8E83EC6C049C28237EDC1 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_ldm.c */,
+				26161098A7C246AF9B8CC8D7 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstd_opt.c */,
+				B9A6114FC51B49F38E4867A5 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/compress/zstdmt_compress.c */,
+				8A6712FFB6CC44E6B49AF87B /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/huf_decompress.c */,
+				52E7C9C01AA941EE957F57A1 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_ddict.c */,
+				6F21BF54C2DE495883255A87 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress.c */,
+				93FB7B68FEEA4389947DE55E /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/decompress/zstd_decompress_block.c */,
+				B4A3CCDBA9AF4D5DBA870FC4 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/cover.c */,
+				2B3FA473774941B6BDB7D1C9 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/divsufsort.c */,
+				67CCE06D1DB542499E7E9E29 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/fastcover.c */,
+				B506A12AECF84AAA934A09C6 /* /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/dictBuilder/zdict.c */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		016AFA16DFC740C082262F27 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8C3077B28D3270ADD4E09DA4 /* ZERO_CHECK */;
+			targetProxy = 84B8C1254E1F4D58B9E5942B /* PBXContainerItemProxy */;
+		};
+		1B7CB0A3E5AD4A40945E5581 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 92C9B5FE49230EAE1BA30390 /* libzstd_static */;
+			targetProxy = 3E6CF36B0E69409D94AAD46B /* PBXContainerItemProxy */;
+		};
+		91D02F9FC2454B69B343781E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7E8467770BDCFA64AD67C5D6 /* ALL_BUILD */;
+			targetProxy = 1455DEE47A024ACD810B790B /* PBXContainerItemProxy */;
+		};
+		DFE2455D278F4A6582C13266 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8C3077B28D3270ADD4E09DA4 /* ZERO_CHECK */;
+			targetProxy = 714B72277FCA4D97B23EEB44 /* PBXContainerItemProxy */;
+		};
+		E98325C7FEAF449E9103C8C1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8C3077B28D3270ADD4E09DA4 /* ZERO_CHECK */;
+			targetProxy = EECFC00BA251409C9EF6DE48 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1075462DCCA3470DA2DF2D87 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				SYMROOT = /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build;
+			};
+			name = MinSizeRel;
+		};
+		1BBD3A8572274F8B8225C3B7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = install;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		24C5C809BBEE4C579B44FBD8 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = install;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		3017FAF208A745F7A8882981 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		3F0D794118EF4A46919E512D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				SYMROOT = /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build;
+			};
+			name = Debug;
+		};
+		4BE584EBB9894A00B708ACEA /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/MinSizeRel${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",ZSTD_MULTITHREAD,"'XXH_NAMESPACE=ZSTD_'","'ZSTD_LEGACY_SUPPORT=0'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib","/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = (" -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -Qunused-arguments -Wa,--noexecstack     -DNDEBUG -fPIC -DZSTD_DISABLE_ASM ","$(inherited)");
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = zstd;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/libzstd_static.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		4F79299AFCBF4077A51F325B /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = install;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		5B9A1B6484E944808B3A1E5B /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/RelWithDebInfo${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 2;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",ZSTD_MULTITHREAD,"'XXH_NAMESPACE=ZSTD_'","'ZSTD_LEGACY_SUPPORT=0'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib","/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = (" -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -Qunused-arguments -Wa,--noexecstack        -DNDEBUG -fPIC -DZSTD_DISABLE_ASM ","$(inherited)");
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = zstd;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/libzstd_static.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		82D4F52B4A9E4F85A6C3AEFA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = uninstall;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		86DE06B98653469FA441A905 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		8CD46A2AF007476AAE219C45 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		8EE283C8FBBB4C27BE5FC6BC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = install;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		90572408C0DC459C987AD239 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = uninstall;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		925A52E3814B46E6AADA4E2E /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = uninstall;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		936C7A9B4D7C48E1AB1415CB /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		9E555B0C2A1B41A0BFBFC373 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = uninstall;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		A3107B23C7A7400EBD3169C9 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				SYMROOT = /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build;
+			};
+			name = RelWithDebInfo;
+		};
+		A679BE799367403EB837D5CA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		AE4D2A375C3845A2AF889F79 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/Debug${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",ZSTD_MULTITHREAD,"'XXH_NAMESPACE=ZSTD_'","'ZSTD_LEGACY_SUPPORT=0'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib","/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = (" -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -Qunused-arguments -Wa,--noexecstack    -fPIC -DZSTD_DISABLE_ASM ","$(inherited)");
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = zstd;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/libzstd_static.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		B2F43D5115F24F28B368DFFF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		B84AA8B1996445BE89ED937F /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		D81C552AD08E483ABFF4FC4C /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		D8B77DE1F4154C31A4601692 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				SYMROOT = /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build;
+			};
+			name = Release;
+		};
+		F29D6C49CF594B5C917A738F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/Release${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",ZSTD_MULTITHREAD,"'XXH_NAMESPACE=ZSTD_'","'ZSTD_LEGACY_SUPPORT=0'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib","/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = (" -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wcast-qual -Wstrict-prototypes -Qunused-arguments -Wa,--noexecstack     -DNDEBUG -fPIC -DZSTD_DISABLE_ASM ","$(inherited)");
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = zstd;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/libzstd_static.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		06CFA47E27DB4CC1AC79C186 /* Build configuration list for PBXNativeTarget "libzstd_static" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AE4D2A375C3845A2AF889F79 /* Debug */,
+				F29D6C49CF594B5C917A738F /* Release */,
+				4BE584EBB9894A00B708ACEA /* MinSizeRel */,
+				5B9A1B6484E944808B3A1E5B /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		2A46154D611F41F89429DAE2 /* Build configuration list for PBXAggregateTarget "ALL_BUILD" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				86DE06B98653469FA441A905 /* Debug */,
+				3017FAF208A745F7A8882981 /* Release */,
+				D81C552AD08E483ABFF4FC4C /* MinSizeRel */,
+				B84AA8B1996445BE89ED937F /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		2C361E22534648B280513FF9 /* Build configuration list for PBXAggregateTarget "uninstall" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				82D4F52B4A9E4F85A6C3AEFA /* Debug */,
+				9E555B0C2A1B41A0BFBFC373 /* Release */,
+				925A52E3814B46E6AADA4E2E /* MinSizeRel */,
+				90572408C0DC459C987AD239 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		53E65A2C6E0045138FDF7746 /* Build configuration list for PBXAggregateTarget "ZERO_CHECK" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B2F43D5115F24F28B368DFFF /* Debug */,
+				A679BE799367403EB837D5CA /* Release */,
+				8CD46A2AF007476AAE219C45 /* MinSizeRel */,
+				936C7A9B4D7C48E1AB1415CB /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		631ED4E7A1A3478D8FC56F54 /* Build configuration list for PBXProject "libzstd" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3F0D794118EF4A46919E512D /* Debug */,
+				D8B77DE1F4154C31A4601692 /* Release */,
+				1075462DCCA3470DA2DF2D87 /* MinSizeRel */,
+				A3107B23C7A7400EBD3169C9 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C2FD645827D8460784FCEAC0 /* Build configuration list for PBXAggregateTarget "install" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1BBD3A8572274F8B8225C3B7 /* Debug */,
+				8EE283C8FBBB4C27BE5FC6BC /* Release */,
+				24C5C809BBEE4C579B44FBD8 /* MinSizeRel */,
+				4F79299AFCBF4077A51F325B /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 0CC1187F1A70466B91566E81 /* Project object */;
+}

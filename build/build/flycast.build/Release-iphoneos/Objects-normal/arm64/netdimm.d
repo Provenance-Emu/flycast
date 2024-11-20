@@ -1,0 +1,27 @@
+dependencies: \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/emulator/flycast-ios-Prefix.pch \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/naomi/netdimm.cpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/naomi/netdimm.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/naomi/gdcartridge.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/naomi/naomi_cart.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/types.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/build.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/cstdlib.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/config.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/replacement.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/cstdio.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/log/Log.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/emulator.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/imgread/common.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/gdrom/gdrom_if.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/network/net_platform.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/naomi/naomi.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/naomi/multiboard.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/holly/holly_intc.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/holly/sb.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/hwreg.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/sh4/sh4_sched.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/mem/addrspace.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/serialize.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/naomi/naomi_roms.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/hw/naomi/naomi_regs.h

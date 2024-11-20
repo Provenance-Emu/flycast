@@ -1,0 +1,24 @@
+dependencies: \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/emulator/flycast-ios-Prefix.pch \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/network/dns.cpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/types.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/build.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/cstdlib.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/config.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/replacement.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/nowide/include/nowide/cstdio.hpp \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/log/Log.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/network/net_platform.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/include/pico_stack.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/include/pico_config.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/include/pico_defines.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/include/pico_constants.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/include/pico_addressing.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/modules/pico_mm.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/include/arch/pico_posix.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/include/pico_frame.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/modules/pico_ipv4.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/include/pico_protocol.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/include/pico_queue.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/include/pico_tree.h \
+  /Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/core/deps/picotcp/modules/pico_dns_common.h

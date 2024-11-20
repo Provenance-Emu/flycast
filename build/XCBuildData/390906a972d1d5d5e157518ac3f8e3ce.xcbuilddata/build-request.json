@@ -1,0 +1,125 @@
+{
+  "buildCommand" : {
+    "command" : "prepareForIndexing",
+    "enableIndexBuildArena" : false,
+    "targets" : null
+  },
+  "configuredTargets" : [
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a00c00fe9e9999ebaccd9e52da3630ca00a"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a006a4f70926715e484e9bdddad44e7451e"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a00c0cf9ddb5c04160de29b6de877b4ee85"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a000c32d0ab128943766544cb1fbee5f96e"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a002cacadb49eb4fb239f0317a968fc7f5a"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a007a76bab99879f466f8a0f60b77e0bd6f"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a008a823c6c732d58ef32f01019cc531748"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a006e13631d0a78bbf1d6479481dd430fe8"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a0075b5d2bd4f754a689b4bc3b207647e8d"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a00a9aca2ee3c8db47a9238be27ed178654"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a0081e883d90b55a8e34f88c4982156a7ee"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a0040db28a8efaaa6755194aee78b245546"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a008879994f94a5d7495b150d450cd51bc5"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a003b7065cb11773b2ee634b11477d1f033"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a0022362f166664c4f4a6e215ae64b823ae"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a003b7d6dda340b45845e5e4a965abae671"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a0014b392a99cd21cd105c66eb5963d325e"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a004cc2f01de4025c223f3bb731788ed087"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a00b606b8628171bf837ce59c03901f980c"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a00469c65ecae264e8cda16c17f74c5e6b8"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a00f26776eb86be19d5bf9de79ea45bba70"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a005e3f3c93b7fd4885988450faffaea3f4"
+    },
+    {
+      "guid" : "cad5e3dad2807ba34e495b1d7a637a007e47c66f8bf1e42f1e1a4212c726d9c5"
+    }
+  ],
+  "containerPath" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/cmake/flycast_libretro.xcodeproj",
+  "continueBuildingAfterErrors" : true,
+  "dependencyScope" : "workspace",
+  "enableIndexBuildArena" : false,
+  "hideShellScriptEnvironment" : false,
+  "parameters" : {
+    "action" : "build",
+    "activeArchitecture" : "arm64",
+    "activeRunDestination" : {
+      "disableOnlyActiveArch" : false,
+      "platform" : "macosx",
+      "sdk" : "macosx15.1",
+      "sdkVariant" : "macos",
+      "supportedArchitectures" : [
+        "arm64e",
+        "arm64",
+        "x86_64"
+      ],
+      "targetArchitecture" : "arm64"
+    },
+    "arenaInfo" : {
+      "buildIntermediatesPath" : "",
+      "buildProductsPath" : "",
+      "derivedDataPath" : "/Users/jmattiello/Library/Developer/Xcode/DerivedData",
+      "indexDataStoreFolderPath" : "/Users/jmattiello/Library/Developer/Xcode/DerivedData/flycast_libretro-asqyuhwgngfuctawwmpgtegnludk/Index.noindex/DataStore",
+      "indexEnableDataStore" : true,
+      "indexPCHPath" : "/Users/jmattiello/Library/Developer/Xcode/DerivedData/flycast_libretro-asqyuhwgngfuctawwmpgtegnludk/Index.noindex/PrecompiledHeaders",
+      "pchPath" : ""
+    },
+    "configurationName" : "Debug",
+    "overrides" : {
+      "synthesized" : {
+        "table" : {
+          "ENABLE_PREVIEWS" : "NO",
+          "ENABLE_XOJIT_PREVIEWS" : "NO",
+          "ONLY_ACTIVE_ARCH" : "YES"
+        }
+      }
+    }
+  },
+  "qos" : "default",
+  "schemeCommand" : "launch",
+  "showNonLoggedProgress" : true,
+  "useDryRun" : true,
+  "useImplicitDependencies" : true,
+  "useLegacyBuildLocations" : false,
+  "useParallelTargets" : true
+}
