@@ -2282,10 +2282,10 @@ static void gui_display_settings()
 		    header("CPU Mode");
 		    {
 				ImGui::Columns(2, "cpu_modes", false);
-				OptionRadioButton("Dynarec", config::DynarecEnabled, true,
+				OptionRadioButton("Dynarec", config::DynarecEnabled, false,
 					"Use the dynamic recompiler. Recommended in most cases");
 				ImGui::NextColumn();
-				OptionRadioButton("Interpreter", config::DynarecEnabled, false,
+				OptionRadioButton("Interpreter", config::DynarecEnabled, true,
 					"Use the interpreter. Very slow but may help in case of a dynarec problem");
 				ImGui::Columns(1, NULL, false);
 

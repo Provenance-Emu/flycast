@@ -890,14 +890,14 @@ void Emulator::start()
 	if (config::GGPOEnable && config::ThreadedRendering)
 		// Not supported with GGPO
 		config::EmulateFramebuffer.override(false);
-#if FEAT_SHREC != DYNAREC_NONE
-	if (config::DynarecEnabled)
-	{
-		Get_Sh4Recompiler(&sh4_cpu);
-		INFO_LOG(DYNAREC, "Using Recompiler");
-	}
-	else
-#endif
+//#if FEAT_SHREC != DYNAREC_NONE
+//	if (config::DynarecEnabled)
+//	{
+//		Get_Sh4Recompiler(&sh4_cpu);
+//		INFO_LOG(DYNAREC, "Using Recompiler");
+//	}
+//	else
+//#endif
 	{
 		Get_Sh4Interpreter(&sh4_cpu);
 		INFO_LOG(DYNAREC, "Using Interpreter");

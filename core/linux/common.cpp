@@ -69,7 +69,7 @@ void fault_handler(int sn, siginfo_t * si, void *segfault_ctx)
 		return;
 	}
 #endif
-	ERROR_LOG(COMMON, "SIGSEGV @ %p -> %p was not in vram, dynacode:%d", (void *)ctx.pc, si->si_addr, dyna_cde);
+//	ERROR_LOG(COMMON, "SIGSEGV @ %p -> %p was not in vram, dynacode:%d", (void *)ctx.pc, si->si_addr, dyna_cde);
 #ifdef __SWITCH__
 	MemoryInfo meminfo;
 	u32 pageinfo;
