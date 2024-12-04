@@ -1,23 +1,23 @@
 version: "Apple Swift version 6.0.2 (swiftlang-6.0.2.1.2 clang-1600.0.26.4)"
-options: "ad37ccce629409395483685da8eec72133a288457a6cb7559c6de94d04382c7f"
-build_start_time: [1732070222, 181741000]
-build_end_time: [1732070223, 510355000]
+options: "33cf3a6ed55261706df7dbece851da8ed54ee46c42a1f20af4041a44743349fd"
+build_start_time: [1733282161, 468822000]
+build_end_time: [1733282163, 346570000]
 inputs:
   ? "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Extensions/ALTServerError+Conveniences.swift"
-  : !dirty [1729303113, 976124454]
+  : [1729303113, 976124454]
   ? "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Extensions/Result+Conveniences.swift"
-  : !dirty [1729303113, 976211204]
+  : [1729303113, 976211204]
   ? "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/Connection.swift"
-  : !dirty [1729303113, 976366413]
+  : [1729303113, 976366413]
   ? "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/NetworkConnection.swift"
-  : !dirty [1729303113, 980485968]
+  : [1729303113, 980485968]
   ? "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/Server.swift"
-  : !dirty [1729303113, 981195554]
+  : [1729303113, 981195554]
   ? "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/ServerConnection.swift"
-  : !dirty [1729303113, 981324346]
+  : [1729303113, 981324346]
   ? "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/ServerManager.swift"
-  : !dirty [1729896235, 808426856]
+  : [1729896235, 808426856]
   ? "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/ServerProtocol.swift"
-  : !dirty [1729303113, 981640472]
+  : [1729303113, 981640472]
   ? "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Types/CodableServerError.swift"
-  : !dirty [1729303113, 981806556]
+  : [1729303113, 981806556]

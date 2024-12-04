@@ -1,3 +1,6 @@
+#include <OpenGLES/ES3/gl.h>
+#include <OpenGLES/ES3/glext.h>
+
 #include "glsym/glsym.h"
 #include <stddef.h>
 #define SYM(x) { "gl" #x, &(gl##x) }

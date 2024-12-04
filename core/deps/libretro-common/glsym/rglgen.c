@@ -20,6 +20,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <OpenGLES/ES3/gl.h>
+#include <OpenGLES/ES3/glext.h>
+
 #include <stdint.h>
 #include <string.h>
 

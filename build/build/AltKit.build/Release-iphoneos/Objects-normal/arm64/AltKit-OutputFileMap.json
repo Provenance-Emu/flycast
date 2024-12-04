@@ -8,38 +8,47 @@
     "swift-dependencies" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/AltKit-master.swiftdeps"
   },
   "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Extensions/ALTServerError+Conveniences.swift" : {
+    "index-unit-output-path" : "/AltKit.build/Release-iphoneos/Objects-normal/arm64/ALTServerError+Conveniences.o",
     "llvm-bc" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/ALTServerError+Conveniences.bc",
     "object" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/ALTServerError+Conveniences.o"
   },
   "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Extensions/Result+Conveniences.swift" : {
+    "index-unit-output-path" : "/AltKit.build/Release-iphoneos/Objects-normal/arm64/Result+Conveniences.o",
     "llvm-bc" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/Result+Conveniences.bc",
     "object" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/Result+Conveniences.o"
   },
   "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/Connection.swift" : {
+    "index-unit-output-path" : "/AltKit.build/Release-iphoneos/Objects-normal/arm64/Connection.o",
     "llvm-bc" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/Connection.bc",
     "object" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/Connection.o"
   },
   "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/NetworkConnection.swift" : {
+    "index-unit-output-path" : "/AltKit.build/Release-iphoneos/Objects-normal/arm64/NetworkConnection.o",
     "llvm-bc" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/NetworkConnection.bc",
     "object" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/NetworkConnection.o"
   },
   "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/Server.swift" : {
+    "index-unit-output-path" : "/AltKit.build/Release-iphoneos/Objects-normal/arm64/Server.o",
     "llvm-bc" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/Server.bc",
     "object" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/Server.o"
   },
   "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/ServerConnection.swift" : {
+    "index-unit-output-path" : "/AltKit.build/Release-iphoneos/Objects-normal/arm64/ServerConnection.o",
     "llvm-bc" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/ServerConnection.bc",
     "object" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/ServerConnection.o"
   },
   "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/ServerManager.swift" : {
+    "index-unit-output-path" : "/AltKit.build/Release-iphoneos/Objects-normal/arm64/ServerManager.o",
     "llvm-bc" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/ServerManager.bc",
     "object" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/ServerManager.o"
   },
   "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Server/ServerProtocol.swift" : {
+    "index-unit-output-path" : "/AltKit.build/Release-iphoneos/Objects-normal/arm64/ServerProtocol.o",
     "llvm-bc" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/ServerProtocol.bc",
     "object" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/ServerProtocol.o"
   },
   "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/shell/apple/emulator-ios/AltKit/Sources/AltKit/Types/CodableServerError.swift" : {
+    "index-unit-output-path" : "/AltKit.build/Release-iphoneos/Objects-normal/arm64/CodableServerError.o",
     "llvm-bc" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/CodableServerError.bc",
     "object" : "/Users/jmattiello/Workspace/Provenance/Provenance/Cores/Flycast/flycast/build/build/AltKit.build/Release-iphoneos/Objects-normal/arm64/CodableServerError.o"
   }
