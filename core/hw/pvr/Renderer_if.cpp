@@ -233,7 +233,7 @@ private:
 	{
 		FC_PROFILE_SCOPE;
 
-		if (renderer->Present())
+		if (renderer !=  NULL && renderer->Present())
 		{
 			presented = true;
 			if (!config::ThreadedRendering && !ggpo::active())

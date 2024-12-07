@@ -24,7 +24,8 @@
 #include <stdlib.h>
 #include <glsym/glsym.h>
 #include <glsm/glsm.h>
-
+#define HAVE_OPENGLES = 1
+#include <OpenGLES/ES3/gl.h>
 #ifndef GL_DEPTH_CLAMP
 #define GL_DEPTH_CLAMP                    0x864F
 #define GL_RASTERIZER_DISCARD             0x8C89
@@ -122,7 +123,7 @@ struct gl_cached_state
    struct
    {
       bool used;
-      GLdouble depth;
+      GLfloat depth;
    } cleardepth;
 
    struct
@@ -134,8 +135,8 @@ struct gl_cached_state
    struct
    {
       bool used;
-      GLclampd zNear;
-      GLclampd zFar;
+       GLenum zNear;
+       GLenum zFar;
    } depthrange;
 
    struct
@@ -225,7 +226,7 @@ GLenum rglGetError(void)
 
 void rglProvokingVertex(	GLenum provokeMode)
 {
-#if defined(HAVE_OPENGL)
+#if defined(c)
    glProvokingVertex(provokeMode);
 #endif
 }
@@ -394,7 +395,7 @@ void rglGetBufferSubData(	GLenum target,
    log_cb(RETRO_LOG_INFO, "glGetBufferSubData.\n");
 #endif
 #if defined(HAVE_OPENGL)
-   glGetBufferSubData(target, offset, size, data);
+//   glGetBufferSubData(target, offset, size, data);
 #endif
 }
 
@@ -456,7 +457,7 @@ void rglReadBuffer(GLenum mode)
  * Core in:
  * OpenGLES  : 2.0
  */
-void rglClearDepth(GLdouble depth)
+void rglClearDepth(GLclampf depth)
 {
 #ifdef GLSM_DEBUG
    log_cb(RETRO_LOG_INFO, "glClearDepth.\n");
@@ -506,7 +507,7 @@ void rglPixelStorei(GLenum pname, GLint param)
  * Core in:
  * OpenGLES  : 2.0
  */
-void rglDepthRange(GLclampd zNear, GLclampd zFar)
+void rglDepthRange(GLenum zNear, GLenum zFar)
 {
 #ifdef GLSM_DEBUG
    log_cb(RETRO_LOG_INFO, "glDepthRange.\n");
@@ -920,7 +921,7 @@ void rglFramebufferTexture(GLenum target, GLenum attachment,
    log_cb(RETRO_LOG_INFO, "glFramebufferTexture.\n");
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES_3_2)
-   glFramebufferTexture(target, attachment, texture, level);
+//   glFramebufferTexture(target, attachment, texture, level);
 #endif
 }
 
@@ -1640,7 +1641,7 @@ void rglVertexAttribLPointer(
    log_cb(RETRO_LOG_INFO, "glVertexAttribLPointer.\n");
 #endif
 #if defined(HAVE_OPENGL)
-   glVertexAttribLPointer(index, size, type, stride, pointer);
+//   glVertexAttribLPointer(index, size, type, stride, pointer);
 #endif
 }
 
@@ -1852,7 +1853,7 @@ void rglTexBuffer(GLenum target, GLenum internalFormat, GLuint buffer)
    log_cb(RETRO_LOG_INFO, "glTexBuffer.\n");
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES_3_2)
-   glTexBuffer(target, internalFormat, buffer);
+//   glTexBuffer(target, internalFormat, buffer);
 #endif
 }
 
@@ -2226,7 +2227,7 @@ void rglTexStorage2D(GLenum target, GLsizei levels, GLenum internalFormat,
 void rglDrawRangeElementsBaseVertex(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, GLvoid *indices, GLint basevertex)
 {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES_3_2)
-   glDrawRangeElementsBaseVertex(mode, start, end, count, type, indices, basevertex);
+//   glDrawRangeElementsBaseVertex(mode, start, end, count, type, indices, basevertex);
 #endif
 }
 
@@ -2447,21 +2448,21 @@ void rglCopyImageSubData( 	GLuint srcName,
    log_cb(RETRO_LOG_INFO, "glCopyImageSubData.\n");
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES_3_2)
-   glCopyImageSubData(srcName,
-         srcTarget,
-         srcLevel,
-         srcX,
-         srcY,
-         srcZ,
-         dstName,
-         dstTarget,
-         dstLevel,
-         dstX,
-         dstY,
-         dstZ,
-         srcWidth,
-         srcHeight,
-         srcDepth);
+//   glCopyImageSubData(srcName,
+//         srcTarget,
+//         srcLevel,
+//         srcX,
+//         srcY,
+//         srcZ,
+//         dstName,
+//         dstTarget,
+//         dstLevel,
+//         dstX,
+//         dstY,
+//         dstZ,
+//         srcWidth,
+//         srcHeight,
+//         srcDepth);
 #endif
 }
 
@@ -2578,7 +2579,7 @@ void rglBufferStorage(GLenum target, GLsizeiptr size, const GLvoid *data, GLbitf
    log_cb(RETRO_LOG_INFO, "glBufferStorage.\n");
 #endif
 #if defined(HAVE_OPENGL)
-   glBufferStorage(target, size, data, flags);
+//   glBufferStorage(target, size, data, flags);
 #endif
 }
 
@@ -2637,7 +2638,7 @@ void rglTextureView(	GLuint texture,
    log_cb(RETRO_LOG_INFO, "glTextureView.\n");
 #endif
 #if defined(HAVE_OPENGL)
-   glTextureView(texture, target, origtexture, internalformat, minlevel, numlevels, minlayer, numlayers);
+//   glTextureView(texture, target, origtexture, internalformat, minlevel, numlevels, minlayer, numlayers);
 #endif
 }
 
@@ -2692,7 +2693,7 @@ void rglDrawElementsBaseVertex(GLenum mode, GLsizei count, GLenum type,
    log_cb(RETRO_LOG_INFO, "glDrawElementsBaseVertex.\n");
 #endif
 #if defined(HAVE_OPENGL)
-   glDrawElementsBaseVertex(mode, count, type, indices, basevertex);
+//   glDrawElementsBaseVertex(mode, count, type, indices, basevertex);
 #endif
 }
 
@@ -2739,7 +2740,7 @@ void rglPrimitiveRestartIndex(GLuint index)
    log_cb(RETRO_LOG_INFO, "glPrimitiveRestartIndex.\n");
 #endif
 #if defined(HAVE_OPENGL)
-   glPrimitiveRestartIndex(index);
+//   glPrimitiveRestartIndex(index);
 #endif
 }
 

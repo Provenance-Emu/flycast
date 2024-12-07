@@ -23,6 +23,9 @@
 #include <stddef.h>
 
 #include <glsym/glsym.h>
+#include <OpenGLES/gltypes.h>
+#include <OpenGLES/ES3/gl.h>
+#include <OpenGLES/ES3/glext.h>
 
 #define SYM(x) { "gl" #x, (void*)&(gl##x) }
 

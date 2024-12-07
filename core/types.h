@@ -55,8 +55,8 @@ int darw_printf(const char* Text,...);
 #define TARGET_ARM_MAC
 #include <pthread.h>
 inline static void JITWriteProtect(bool enabled) {
-	if (__builtin_available(macOS 11.0, *))
-		pthread_jit_write_protect_np(enabled);
+//	if (__builtin_available(macOS 11.0, *))
+//		pthread_jit_write_protect_np(enabled);
 }
 #else
 inline static void JITWriteProtect(bool enabled) {

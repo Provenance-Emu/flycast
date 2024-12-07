@@ -22,6 +22,10 @@
 
 #ifndef RGLGEN_DECL_H__
 #define RGLGEN_DECL_H__
+
+#include <OpenGLES/ES2/gl.h>
+#include <OpenGLES/ES2/glext.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

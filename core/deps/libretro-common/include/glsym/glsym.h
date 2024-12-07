@@ -24,6 +24,11 @@
 #define __LIBRETRO_SDK_GLSYM_H__
 
 #include "rglgen.h"
+#include "glsym_es2.h"
+#include "glsym_es3.h"
+#include <OpenGLES/gltypes.h>
+//#include <OpenGLES/ES3/glext.h>
+//#include <OpenGLES/ES3/gl.h>
 
 #ifndef HAVE_PSGL
 #if defined(HAVE_OPENGLES2)
