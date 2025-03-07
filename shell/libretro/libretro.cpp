@@ -87,7 +87,7 @@ constexpr char slash = path_default_slash_c();
 
 #define RETRO_ENVIRONMENT_POLL_TYPE_OVERRIDE (4 | RETRO_ENVIRONMENT_RETROARCH_START_BLOCK)
                                             /* unsigned * --
-                                            * Tells the frontend to override the poll type behavior. 
+                                            * Tells the frontend to override the poll type behavior.
                                             * Allows the frontend to influence the polling behavior of the
                                             * frontend.
                                             *
@@ -378,7 +378,7 @@ void retro_deinit()
 		std::lock_guard<std::mutex> lock(mtx_serialization);
 	}
 	os_UninstallFaultHandler();
-	
+
 #if defined(__APPLE__) || (defined(__GNUC__) && defined(__linux__) && !defined(__ANDROID__))
 	addrspace::release();
 #else
@@ -2398,7 +2398,7 @@ const char* retro_get_system_directory()
 
 void retro_get_system_info(struct retro_system_info *info)
 {
-   info->library_name = "Flycast";
+   info->library_name = "Flycast JITLESS";
 #ifndef GIT_VERSION
 #define GIT_VERSION "undefined"
 #endif
@@ -3059,9 +3059,9 @@ static void UpdateInputState(u32 port)
 			setDeviceButtonStateDirect(ret, port, RETRO_DEVICE_ID_JOYPAD_A, DC_BTN_B );
 			setDeviceButtonStateDirect(ret, port, RETRO_DEVICE_ID_JOYPAD_Y, DC_BTN_X );
 			setDeviceButtonStateDirect(ret, port, RETRO_DEVICE_ID_JOYPAD_X, DC_BTN_Y );
-			setDeviceButtonStateDirect2(ret, port, RETRO_DEVICE_ID_JOYPAD_L, 
+			setDeviceButtonStateDirect2(ret, port, RETRO_DEVICE_ID_JOYPAD_L,
 			                                       RETRO_DEVICE_ID_JOYPAD_L2, DC_BTN_Z );
-			setDeviceButtonStateDirect2(ret, port, RETRO_DEVICE_ID_JOYPAD_R, 
+			setDeviceButtonStateDirect2(ret, port, RETRO_DEVICE_ID_JOYPAD_R,
 			                                       RETRO_DEVICE_ID_JOYPAD_R2, DC_BTN_C );
 			setDeviceButtonStateDirect(ret, port, RETRO_DEVICE_ID_JOYPAD_START, DC_BTN_START );
 
@@ -3077,7 +3077,7 @@ static void UpdateInputState(u32 port)
 		{
 			int16_t ret = 0;
 			kcode[port] = 0xFFFF; // active-low
-			
+
 			if ( device_type[port] == RETRO_DEVICE_TWINSTICK_SATURN )
 			{
 				// NOTE: This is a remapping of the RetroPad layout in the block below to make using a real
