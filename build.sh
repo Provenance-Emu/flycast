@@ -9,14 +9,14 @@ ARCH="arm64"
 IOS_MIN_VERSION="15.0"
 IOS="ON"
 SYSTEM_NAME="iOS"
-RUN_BUILD="OFF"
+RUN_BUILD="ON"
 
 # Initialize flags
 C_FLAGS="-arch ${ARCH} \
 -DIOS \
 -miphoneos-version-min=${IOS_MIN_VERSION} \
 -DUSE_JIT=OFF \
--DTARGET_NO_NIXPROF"
+-DTARGET_NO_NIXPROF \
 -fdata-sections \
 -ffast-math \
 -ffunction-sections \
@@ -28,14 +28,15 @@ C_FLAGS="-arch ${ARCH} \
 -ftree-vectorize \
 -funsafe-math-optimizations \
 -fvectorize \
--march=armv8.5-a+simd \
--mcpu=apple-a14"
+-march=armv8-a+simd \
+-mcpu=apple-a10 \
+-Ofast"
 
 CXX_FLAGS="-arch ${ARCH} \
 -DIOS \
 -miphoneos-version-min=${IOS_MIN_VERSION} \
 -DUSE_JIT=OFF \
--DTARGET_NO_NIXPROF"
+-DTARGET_NO_NIXPROF \
 -fdata-sections \
 -ffast-math \
 -ffunction-sections \
@@ -47,8 +48,9 @@ CXX_FLAGS="-arch ${ARCH} \
 -ftree-vectorize \
 -funsafe-math-optimizations \
 -fvectorize \
--march=armv8.5-a+simd \
--mcpu=apple-a14"
+-march=armv8-a+simd \
+-mcpu=apple-a10 \
+-Ofast"
 
 # Add a function to display usage information
 print_usage() {
@@ -184,7 +186,7 @@ if [ $? -eq 0 ]; then
   # Run make if requested
   if [ "${RUN_BUILD}" = "ON" ]; then
     echo "Running make in ${BUILD_DIR}..."
-    cmake --build ${BUILD_DIR}
+    cmake --build ${BUILD_DIR} -- -j4
 
     if [ $? -eq 0 ]; then
       echo "Build successful!"
