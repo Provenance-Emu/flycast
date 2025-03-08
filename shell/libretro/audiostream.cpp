@@ -25,6 +25,9 @@
 
 #include <vector>
 #include <mutex>
+#include <thread>
+#include <atomic>
+#include <condition_variable>
 
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
 #include <arm_neon.h>
@@ -68,6 +71,51 @@ static int16_t *audio_out_buffer = nullptr;
 static TimeStretcher timeStretcher;
 static std::vector<s16> stretch_buffer;
 bool use_timestretch = true;
+
+// Add a separate thread for audio processing
+static std::thread audio_thread;
+static std::atomic<bool> audio_thread_running;
+static std::condition_variable audio_cv;
+static std::mutex audio_thread_mutex;
+
+void audio_thread_func()
+{
+	while (audio_thread_running)
+	{
+		// Wait for audio data or shutdown signal
+		std::unique_lock<std::mutex> lock(audio_thread_mutex);
+		audio_cv.wait(lock, []{ return !audio_thread_running || audio_buffer_idx > 0; });
+
+		if (!audio_thread_running)
+			break;
+
+		// Process audio in a separate thread
+		if (audio_buffer_idx > 0)
+		{
+			size_t num_frames = audio_buffer_idx >> 1;
+
+			// Copy audio data to a local buffer
+			std::vector<s16> local_buffer(audio_buffer.begin(), audio_buffer.begin() + audio_buffer_idx);
+
+			// Reset the main audio buffer
+			audio_buffer_idx = 0;
+			drop_samples = false;
+
+			// Release the lock while processing audio
+			lock.unlock();
+
+			// Process audio (time stretching, etc.)
+			if (use_timestretch && (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
+				throttle_state == RETRO_THROTTLE_FAST_FORWARD))
+			{
+				// ... time stretching code ...
+			}
+
+			// Send audio to frontend
+			audio_batch_cb(local_buffer.data(), num_frames);
+		}
+	}
+}
 
 void retro_audio_init(void)
 {
@@ -140,11 +188,13 @@ void retro_audio_upload(void)
 
 	size_t num_frames = audio_buffer_idx >> 1;
 
-	/* When running in unthrottled mode, use time stretching or sample dropping */
+	// Debug output to check if we're getting audio samples
+	DEBUG_LOG(AUDIO, "Audio upload: %d frames", (int)num_frames);
+
 	if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
 		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
 	{
-		// In unthrottled mode, we need to be more aggressive with sample dropping
+		// In unthrottled mode, use time stretching or sample dropping
 		if (!use_timestretch)
 		{
 			// Simple sample dropping - keep only 1/4 of the samples
@@ -160,11 +210,10 @@ void retro_audio_upload(void)
 			}
 
 			if (output_frames > 0)
+			{
+				DEBUG_LOG(AUDIO, "Sending %d frames (dropped from %d)", (int)output_frames, (int)num_frames);
 				audio_batch_cb(audio_out_buffer, output_frames);
-
-			audio_buffer_idx = 0;
-			drop_samples = false;
-			return;
+			}
 		}
 		else
 		{
@@ -185,82 +234,24 @@ void retro_audio_upload(void)
 
 			if (stretched_frames > 0)
 			{
+				DEBUG_LOG(AUDIO, "Sending %d stretched frames (from %d)", stretched_frames, (int)num_frames);
 				audio_batch_cb(audio_out_buffer, stretched_frames);
-
-				audio_buffer_idx = 0;
-				drop_samples = false;
-				return;
 			}
 		}
 	}
-
-	/* Update vsync swap interval detection */
-	if (libretro_detect_vsync_swap_interval)
+	else
 	{
-		/* Simple running average (leaky-integrator) */
-		audio_samples_per_frame_avg = ((1.0f / (float)VSYNC_SWAP_INTERVAL_FRAMES) * (float)num_frames) +
-				((1.0f - (1.0f / (float)VSYNC_SWAP_INTERVAL_FRAMES)) * audio_samples_per_frame_avg);
-
-		float swap_ratio = audio_samples_per_frame_avg /
-				libretro_expected_audio_samples_per_run;
-		unsigned swap_integer;
-		float swap_remainder;
-
-		/* If internal frame rate is equal to (within threshold)
-		 * or higher than the default 60 (or 50) Hz, fall back
-		 * to a swap interval of 1 */
-		if (swap_ratio < (1.0f + VSYNC_SWAP_INTERVAL_THRESHOLD))
-		{
-			swap_integer = 1;
-			swap_remainder = 0.0f;
-		}
-		else
-		{
-			swap_integer = (unsigned)(swap_ratio + 0.5f);
-			swap_remainder = swap_ratio - (float)swap_integer;
-			swap_remainder = (swap_remainder < 0.0f) ?
-					-swap_remainder : swap_remainder;
-		}
-
-		/* > Swap interval is considered 'valid' if it is
-		 *   within VSYNC_SWAP_INTERVAL_THRESHOLD of an integer
-		 *   value
-		 * > If valid, check if new swap interval differs from
-		 *   previously logged value */
-		if ((swap_remainder <= VSYNC_SWAP_INTERVAL_THRESHOLD) &&
-			 (swap_integer != libretro_vsync_swap_interval))
-		{
-			vsync_swap_interval_conter =
-					(swap_integer == vsync_swap_interval_last) ?
-							(vsync_swap_interval_conter + 1) : 0;
-
-			/* Check whether swap interval is 'stable' */
-			if (vsync_swap_interval_conter >= VSYNC_SWAP_INTERVAL_FRAMES)
-			{
-				libretro_vsync_swap_interval = swap_integer;
-				vsync_swap_interval_conter = 0;
-
-				/* Notify frontend */
-				retro_system_av_info avinfo;
-				setAVInfo(avinfo);
-				environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &avinfo);
-			}
-
-			vsync_swap_interval_last = swap_integer;
-		}
-		else
-			vsync_swap_interval_conter = 0;
+		// In normal mode, send audio directly
+		DEBUG_LOG(AUDIO, "Sending %d frames directly", (int)num_frames);
+		audio_batch_cb(audio_buffer.data(), num_frames);
 	}
 
-	// For normal mode, send audio directly
-	audio_batch_cb(audio_buffer.data(), num_frames);
-
-	/* Reset audio buffer */
+	// Reset audio buffer
 	audio_buffer_idx = 0;
 	drop_samples = false;
 }
 
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+// Add this function to handle audio in synced mode
 void WriteSample(s16 r, s16 l)
 {
 	// Use a mutex to ensure thread safety
@@ -269,6 +260,7 @@ void WriteSample(s16 r, s16 l)
 	if (drop_samples)
 		return;
 
+	// Check for buffer overflow
 	if (audio_buffer.size() < audio_buffer_idx + 2)
 	{
 		// Audio buffer overflow...
@@ -277,34 +269,11 @@ void WriteSample(s16 r, s16 l)
 		return;
 	}
 
-	// Store samples directly without noise
+	// Store samples directly - no special handling based on throttle state
+	// This ensures we always capture audio samples
 	audio_buffer[audio_buffer_idx++] = l;
 	audio_buffer[audio_buffer_idx++] = r;
 }
-#else
-// Original implementation
-void WriteSample(s16 r, s16 l)
-{
-	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
-
-	if (drop_samples)
-		return;
-
-	if (audio_buffer.size() < audio_buffer_idx + 2)
-	{
-		/* Audio buffer overflow...
-		 * > Drop any existing samples
-		 * > Drop any future samples until the next
-		 *   call of retro_audio_upload() */
-		audio_buffer_idx = 0;
-		drop_samples = true;
-		return;
-	}
-
-	audio_buffer[audio_buffer_idx++] = l;
-	audio_buffer[audio_buffer_idx++] = r;
-}
-#endif
 
 void InitAudio()
 {

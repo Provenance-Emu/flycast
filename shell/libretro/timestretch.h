@@ -35,45 +35,36 @@ public:
             return framesToCopy;
         }
 
-        // For unthrottled mode, we need to be more aggressive with sample dropping
+        // For unthrottled mode, we need to be very aggressive with sample dropping
         if (mStretchFactor < 0.5f)
         {
             // Calculate skip factor based on stretch factor
             // Lower stretch factor = more samples skipped
-            int skipFactor = std::max(2, static_cast<int>(1.0f / mStretchFactor));
+            int skipFactor = std::max(4, static_cast<int>(1.0f / mStretchFactor));
 
             int outputFrames = 0;
             for (int i = 0; i < inputFrames && outputFrames < maxOutputFrames; i += skipFactor)
             {
+                // Add a tiny bit of noise to break up patterns
+                static u32 noise_seed = 0x55555555;
+                noise_seed = noise_seed * 1664525 + 1013904223;
+
                 for (int ch = 0; ch < mChannels; ch++)
-                    output[outputFrames * mChannels + ch] = input[i * mChannels + ch];
-                outputFrames++;
-            }
-
-            return outputFrames;
-        }
-
-        // For slow motion, we duplicate samples
-        if (mStretchFactor > 1.5f)
-        {
-            // Calculate duplication factor based on stretch factor
-            int dupFactor = std::max(2, static_cast<int>(mStretchFactor));
-
-            int outputFrames = 0;
-            for (int i = 0; i < inputFrames && outputFrames < maxOutputFrames; i++)
-            {
-                for (int dup = 0; dup < dupFactor && outputFrames < maxOutputFrames; dup++)
                 {
-                    for (int ch = 0; ch < mChannels; ch++)
-                        output[outputFrames * mChannels + ch] = input[i * mChannels + ch];
-                    outputFrames++;
+                    int noise = ((noise_seed >> (ch * 8)) & 3) - 1; // -1, 0, or 1
+                    output[outputFrames * mChannels + ch] = input[i * mChannels + ch] + noise;
                 }
+                outputFrames++;
+
+                // Occasionally skip a different number of samples to break patterns
+                if ((i & 0x3F) == 0)
+                    i += (noise_seed >> 24) & 3;
             }
 
             return outputFrames;
         }
 
-        // For moderate speed changes, use simple linear interpolation
+        // For other cases, use simple linear interpolation
         return processLinearInterpolation(input, inputFrames, output, maxOutputFrames);
     }
 
