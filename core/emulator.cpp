@@ -1111,34 +1111,3 @@ void Emulator::diskChange()
 }
 
 Emulator emu;
-
-// Run the CPU for one frame without rendering
-bool Emulator::run_cpu_frame()
-{
-    if (!settings.platform.isArcade())
-        rend_vblank();
-
-    // Run the CPU for one frame
-    getSh4Executor()->Run();
-
-    return true;
-}
-
-// Run CPU frame with audio prediction
-bool Emulator::run_cpu_frame_with_audio_prediction()
-{
-    // Run the CPU for one frame
-    bool result = run_cpu_frame();
-
-    // The actual audio prediction is implemented in audiostream.cpp
-    // This is just a placeholder to maintain the interface
-
-    return result;
-}
-
-// Render a frame from the CPU run-ahead buffer
-bool Emulator::render_from_cpu_ahead()
-{
-    // Fix: Use the correct function to render a single frame
-    return rend_single_frame(false);
-}

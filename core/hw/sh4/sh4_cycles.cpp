@@ -18,7 +18,7 @@
 */
 #include "sh4_cycles.h"
 #include "modules/mmu.h"
-#include "throttle.h"
+
 int Sh4Cycles::countCycles(u16 op)
 {
 	sh4_opcodelistentry *opcode = OpDesc[op];
@@ -62,44 +62,27 @@ int Sh4Cycles::countCycles(u16 op)
 		false,
 		true,	// mac.wl @Rm+,@Rn+
 	};
-
-	// Optimize memory operations
 	if (isMemOp[opcode->ex_type])
 	{
-		// Reduce memory operation penalty in throttled mode
-		if (throttle_state == RETRO_THROTTLE_NORMAL)
-		{
-			if (++memOps < 8) // Allow more memory ops before penalty
-				cycles = mmu_enabled() ? 3 : 1; // Reduce penalty
-		}
-		else
-		{
-			if (++memOps < 4)
-				cycles = mmu_enabled() ? 5 : 2;
-		}
+		if (++memOps < 4)
+			cycles = mmu_enabled() ? 5 : 2;
 	}
+	// TODO only for mem read?
 #endif
 
-	// Optimize parallel execution
 	if (lastUnit == CO
 			|| opcode->unit == CO
 			|| (lastUnit == opcode->unit && lastUnit != MT))
 	{
-		// Cannot run in parallel
+		// cannot run in parallel
 		lastUnit = opcode->unit;
-
-		// Reduce cycle count in throttled mode for better performance
-		if (throttle_state == RETRO_THROTTLE_NORMAL)
-			cycles += opcode->IssueCycles / 2; // Half the cycles
-		else
-			cycles += opcode->IssueCycles;
+		cycles += opcode->IssueCycles;
 	}
 	else
 	{
-		// Can run in parallel
+		// can run in parallel
 		lastUnit = CO;
 	}
-
 	return cycles * cpuRatio;
 }
 

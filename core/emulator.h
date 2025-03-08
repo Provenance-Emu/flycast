@@ -187,15 +187,6 @@ public:
 
 	void dc_reset(bool hard); // for tests only
 
-	// Run the CPU for one frame without rendering
-	bool run_cpu_frame();
-
-	// Run CPU frame with audio prediction
-	bool run_cpu_frame_with_audio_prediction();
-
-	// Render a frame from the CPU run-ahead buffer
-	bool render_from_cpu_ahead();
-
 private:
 	bool checkStatus(bool wait = false);
 	void runInternal();
@@ -221,9 +212,6 @@ private:
 	std::mutex mutex;
 	Sh4Executor *interpreter = nullptr;
 	Sh4Executor *recompiler = nullptr;
-
-	// Buffer for predicted audio
-	std::vector<s16> predicted_audio_buffer;
 };
 extern Emulator emu;
 
