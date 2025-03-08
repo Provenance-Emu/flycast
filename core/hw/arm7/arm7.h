@@ -8,6 +8,8 @@ void init();
 void term();
 void reset();
 void run(u32 samples);
+/// Run ARM7 in non-blocking mode, processing a smaller batch of samples
+void runNonBlocking(u32 samples);
 void enable(bool enabled);
 // Called when the arm interrupts the SH4 to make sure it has enough cycles to finish what it's doing.
 void avoidRaceCondition();
