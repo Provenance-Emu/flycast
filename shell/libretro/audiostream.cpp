@@ -18,6 +18,7 @@
 #include "cfg/option.h"
 #include "audio/audiostream.h"
 #include "emulator.h"
+#include "throttle.h"
 
 #include <libretro.h>
 
@@ -216,7 +217,7 @@ void retro_audio_upload(void)
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
 void WriteSample(s16 r, s16 l)
 {
-	// Simplified version that still provides optimization but is more reliable
+	// Use a mutex to ensure thread safety
 	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
 
 	if (drop_samples)
@@ -230,10 +231,27 @@ void WriteSample(s16 r, s16 l)
 		return;
 	}
 
-	// Use direct memory access instead of NEON for simplicity
-	audio_buffer[audio_buffer_idx] = l;
-	audio_buffer[audio_buffer_idx + 1] = r;
-	audio_buffer_idx += 2;
+	// When running unthrottled, add a small amount of noise to break up patterns
+	if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
+		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+	{
+		// Add a tiny bit of noise to break up patterns (very subtle)
+		static u32 noise_seed = 0x55555555;
+		noise_seed = noise_seed * 1664525 + 1013904223;
+		int noise_l = ((noise_seed >> 16) & 3) - 1; // -1, 0, or 1
+		noise_seed = noise_seed * 1664525 + 1013904223;
+		int noise_r = ((noise_seed >> 16) & 3) - 1; // -1, 0, or 1
+
+		// Store samples with noise
+		audio_buffer[audio_buffer_idx++] = l + noise_l;
+		audio_buffer[audio_buffer_idx++] = r + noise_r;
+	}
+	else
+	{
+		// Normal operation - store samples directly
+		audio_buffer[audio_buffer_idx++] = l;
+		audio_buffer[audio_buffer_idx++] = r;
+	}
 }
 #else
 // Original implementation
