@@ -1178,81 +1178,90 @@ static void update_variables(bool first_startup)
 
 void retro_run()
 {
-	bool updated = false;
-	if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
-		update_variables(false);
+    bool updated = false;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
+        update_variables(false);
 
-	if (devices_need_refresh)
-		refresh_devices(false);
+    if (devices_need_refresh)
+        refresh_devices(false);
 
-	// Check throttle state
-	struct retro_throttle_state throttle_state_info;
-	throttle_state_info.rate = 0.0f;
+    // Check throttle state
+    struct retro_throttle_state throttle_state_info;
+    throttle_state_info.rate = 0.0f;
 
-	if (environ_cb(RETRO_ENVIRONMENT_GET_THROTTLE_STATE, &throttle_state_info))
-	{
-		throttle_state = throttle_state_info.mode;
-		throttle_rate = throttle_state_info.rate;
-	}
-
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-	if (isOpenGL(config::RendererType))
-		glsm_ctl(GLSM_CTL_STATE_BIND, nullptr);
-#endif
-
-	// On the first call, we start the emulator
-	if (first_run)
-		emu.start();
-
-	poll_cb();
-	os_UpdateInputState();
-	bool fastforward = false;
-	if (environ_cb(RETRO_ENVIRONMENT_GET_FASTFORWARDING, &fastforward))
-		settings.input.fastForwardMode = fastforward;
-
-	is_dupe = true;
-	try {
-		if (config::ThreadedRendering)
-		{
-			// Render
-			for (int i = 0; i < 5 && is_dupe; i++)
-				is_dupe = !emu.render();
-		}
-		else
-		{
-			startTime = sh4_sched_now64();
-			emu.render();
-		}
-	} catch (const FlycastException& e) {
-		ERROR_LOG(COMMON, "%s", e.what());
-		os_notify(e.what(), 5000);
-		environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-	}
+    if (environ_cb(RETRO_ENVIRONMENT_GET_THROTTLE_STATE, &throttle_state_info))
+    {
+        throttle_state = throttle_state_info.mode;
+        throttle_rate = throttle_state_info.rate;
+    }
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-	if (isOpenGL(config::RendererType))
-		glsm_ctl(GLSM_CTL_STATE_UNBIND, nullptr);
+    if (isOpenGL(config::RendererType))
+        glsm_ctl(GLSM_CTL_STATE_BIND, nullptr);
 #endif
 
-	video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
+    // On the first call, we start the emulator
+    if (first_run)
+        emu.start();
 
-	// Adjust audio upload based on throttle state
-	if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
-	{
-		// When unthrottled, use time stretching for better audio quality
-		retro_audio_upload();
-	}
-	else if (!config::ThreadedRendering || config::LimitFPS)
-	{
-		retro_audio_upload();
-	}
-	else
-	{
-		retro_audio_flush_buffer();
-	}
+    poll_cb();
+    os_UpdateInputState();
+    bool fastforward = false;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_FASTFORWARDING, &fastforward))
+        settings.input.fastForwardMode = fastforward;
 
-	first_run = false;
+    is_dupe = true;
+    try {
+        if (config::ThreadedRendering)
+        {
+            // In unthrottled mode, we need to be more aggressive with frame skipping
+            if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
+                throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+            {
+                // Render only one frame to avoid blocking
+                is_dupe = !emu.render();
+            }
+            else
+            {
+                // Normal mode - render up to 5 frames
+                for (int i = 0; i < 5 && is_dupe; i++)
+                    is_dupe = !emu.render();
+            }
+        }
+        else
+        {
+            startTime = sh4_sched_now64();
+            emu.render();
+        }
+    } catch (const FlycastException& e) {
+        ERROR_LOG(COMMON, "%s", e.what());
+        os_notify(e.what(), 5000);
+        environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+    }
+
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+    if (isOpenGL(config::RendererType))
+        glsm_ctl(GLSM_CTL_STATE_UNBIND, nullptr);
+#endif
+
+    video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
+
+    // Always upload audio in unthrottled mode to prevent audio buffer overflow
+    if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
+        throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+    {
+        retro_audio_upload();
+    }
+    else if (!config::ThreadedRendering || config::LimitFPS)
+    {
+        retro_audio_upload();
+    }
+    else
+    {
+        retro_audio_flush_buffer();
+    }
+
+    first_run = false;
 }
 
 static bool loadGame()
