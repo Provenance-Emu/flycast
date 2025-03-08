@@ -65,7 +65,7 @@
 #include "cfg/option.h"
 #include "version.h"
 #include "oslib/oslib.h"
-#include "throttle.h"
+#include "timestretch.h"
 
 constexpr char slash = path_default_slash_c();
 
@@ -137,6 +137,13 @@ static bool textureUpscaleEnabled = false;
 #endif
 static bool vmuScreenSettingsShown = true;
 static bool lightgunSettingsShown = true;
+
+
+int throttle_state = RETRO_THROTTLE_NORMAL;
+float throttle_rate = 1.0f;
+
+// Add this extern declaration at the top of the file
+extern bool use_timestretch;
 
 u32 kcode[4] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
 u16 rt[4];
@@ -1158,6 +1165,15 @@ static void update_variables(bool first_startup)
 		// must *not* be changed once a game is started
 		config::EmulateBBA.override(emulateBba);
 	}
+
+	var.key = CORE_OPTION_NAME "_use_timestretch";
+	if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+	{
+		if (!strcmp(var.value, "enabled"))
+			use_timestretch = true;
+		else
+			use_timestretch = false;
+	}
 }
 
 void retro_run()
@@ -1224,8 +1240,8 @@ void retro_run()
 	if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
 		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
 	{
-		// When unthrottled, we need to be more aggressive with audio buffer management
-		retro_audio_flush_buffer();
+		// When unthrottled, use time stretching for better audio quality
+		retro_audio_upload();
 	}
 	else if (!config::ThreadedRendering || config::LimitFPS)
 	{
@@ -3769,6 +3785,3 @@ void os_notify(const char *msg, int durationMs, const char *details)
 	retromsg.frames = durationMs / 17;
 	environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &retromsg);
 }
-
-int throttle_state = RETRO_THROTTLE_NORMAL;
-float throttle_rate = 1.0f;
