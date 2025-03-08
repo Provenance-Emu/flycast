@@ -12,10 +12,10 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/shell/cmake")
 
 if(APPLE)
 	if(CMAKE_SYSTEM_NAME STREQUAL iOS)
-		set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum iOS deployment version")
+		set(CMAKE_OSX_DEPLOYMENT_TARGET "17.0" CACHE STRING "Minimum iOS deployment version")
 		set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "")
 	elseif(CMAKE_SYSTEM_NAME STREQUAL tvOS)
-		set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum tvOS deployment version")
+		set(CMAKE_OSX_DEPLOYMENT_TARGET "17.0" CACHE STRING "Minimum tvOS deployment version")
 		set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "")
 	else()
 		set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS deployment version")
@@ -226,7 +226,7 @@ else()
 	add_executable(${PROJECT_NAME} core/emulator.cpp)
 endif()
 
-set_target_properties(${PROJECT_NAME} PROPERTIES 
+set_target_properties(${PROJECT_NAME} PROPERTIES
 		CMAKE_CXX_STANDARD 20
 		CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -1056,7 +1056,8 @@ target_sources(${PROJECT_NAME} PRIVATE
 		core/hw/sh4/sh4_rom.h
 		core/hw/sh4/sh4_sched.cpp
 		core/hw/sh4/sh4_sched.h
-		core/hw/sh4/storeq.cpp)
+		core/hw/sh4/storeq.cpp
+		core/hw/sh4/interpr/sh4_neon.cpp)
 
 cmrc_add_resources(flycast-resources
 		WHENCE resources
@@ -1433,6 +1434,7 @@ if(USE_VULKAN)
 			core/rend/vulkan/oit/oit_renderpass.h
 			core/rend/vulkan/oit/oit_shaders.cpp
 			core/rend/vulkan/oit/oit_shaders.h
+			core/rend/vulkan/oit/oit_buffer.cpp
 			core/rend/vulkan/adreno.cpp
 			core/rend/vulkan/buffer.cpp
 			core/rend/vulkan/buffer.h
@@ -1457,7 +1459,14 @@ if(USE_VULKAN)
 			core/rend/vulkan/overlay.h
 			core/rend/vulkan/vulkan_context.h
 			core/rend/vulkan/vulkan.h
-			core/rend/vulkan/vulkan_renderer.cpp)
+			core/rend/vulkan/vulkan_renderer.cpp
+			core/rend/vulkan/vertex_neon.cpp
+			core/rend/vulkan/texture_neon.cpp
+			core/rend/vulkan/uniform_neon.cpp
+			core/rend/vulkan/pixel_neon.cpp)
+
+	# Add compile definition to enable NEON optimizations
+	target_compile_definitions(${PROJECT_NAME} PRIVATE USE_NEON_OPTIMIZATIONS)
 	if(LIBRETRO)
 		target_sources(${PROJECT_NAME} PRIVATE
 				core/rend/vulkan/vk_context_lr.cpp
