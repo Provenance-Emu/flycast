@@ -191,8 +191,23 @@ void retro_audio_upload(void)
 	// Debug output to check if we're getting audio samples
 	DEBUG_LOG(AUDIO, "Audio upload: %d frames", (int)num_frames);
 
-	if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+	// In sync mode, use a larger buffer size to reduce CPU overhead
+	if (throttle_state == RETRO_THROTTLE_NORMAL)
+	{
+		// Use a larger buffer size in sync mode
+		static const size_t MAX_FRAMES_PER_BATCH = 1024;
+
+		// Send audio in larger batches
+		size_t frames_sent = 0;
+		while (frames_sent < num_frames)
+		{
+			size_t frames_to_send = std::min(MAX_FRAMES_PER_BATCH, num_frames - frames_sent);
+			audio_batch_cb(audio_buffer.data() + frames_sent * 2, frames_to_send);
+			frames_sent += frames_to_send;
+		}
+	}
+	else if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
+			 throttle_state == RETRO_THROTTLE_FAST_FORWARD)
 	{
 		// In unthrottled mode, use time stretching or sample dropping
 		if (!use_timestretch)
