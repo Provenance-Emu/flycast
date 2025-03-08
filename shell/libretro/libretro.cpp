@@ -1177,61 +1177,14 @@ static void update_variables(bool first_startup)
 		else
 			use_timestretch = false;
 	}
-
-	var.key = CORE_OPTION_NAME "_use_audio_thread";
-	if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-	{
-		// Just store the value but don't use it yet
-		bool use_audio_thread = !strcmp(var.value, "enabled");
-	}
-
-	var.key = CORE_OPTION_NAME "_use_audio_prediction";
-	if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-	{
-		// Just store the value but don't use it yet
-		bool use_audio_prediction = !strcmp(var.value, "enabled");
-	}
-
-	var.key = CORE_OPTION_NAME "_use_adaptive_audio_quality";
-	if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-	{
-		// Just store the value but don't use it yet
-		bool use_adaptive_audio_quality = !strcmp(var.value, "enabled");
-	}
-
-	var.key = CORE_OPTION_NAME "_use_gpu_audio_processing";
-	if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-	{
-		// Just store the value but don't use it yet
-		bool use_gpu_audio_processing = !strcmp(var.value, "enabled");
-	}
 }
 
 // Add these declarations at the top of the file
-static const int MAX_RENDER_AHEAD_FRAMES = 3;
-static int cpu_run_ahead_frames = 0;
-static const int MAX_CPU_RUN_AHEAD = 5;
-static std::mutex render_ahead_mutex;
+static const int MAX_RENDER_AHEAD_FRAMES = 2;
+static std::vector<u32> render_ahead_buffer[MAX_RENDER_AHEAD_FRAMES];
 static int render_ahead_buffer_pos = 0;
 static int render_ahead_buffer_filled = 0;
-
-// Add a function to process CPU frames ahead of rendering
-static void process_cpu_frames_ahead(int num_frames)
-{
-    // Process CPU frames ahead of rendering
-    for (int i = 0; i < num_frames && cpu_run_ahead_frames < MAX_CPU_RUN_AHEAD; i++)
-    {
-        // Run the CPU for one frame
-        try {
-            // Use run_cpu_frame instead of run_cpu_frame_with_audio_prediction
-            emu.run_cpu_frame();
-            cpu_run_ahead_frames++;
-        } catch (const FlycastException& e) {
-            ERROR_LOG(COMMON, "CPU run-ahead error: %s", e.what());
-            break;
-        }
-    }
-}
+static std::mutex render_ahead_mutex;
 
 void retro_run()
 {
@@ -1286,10 +1239,6 @@ void retro_run()
             // Decrement the buffer count
             render_ahead_buffer_filled--;
             render_ahead_buffer_pos = (render_ahead_buffer_pos + 1) % MAX_RENDER_AHEAD_FRAMES;
-
-            // If CPU is not too far ahead, process more CPU frames
-            if (cpu_run_ahead_frames < MAX_CPU_RUN_AHEAD)
-                process_cpu_frames_ahead(1);
         }
 
         // Always try to fill the render-ahead buffer
@@ -1297,57 +1246,25 @@ void retro_run()
             // Render as many frames as needed to fill the buffer
             while (render_ahead_buffer_filled < MAX_RENDER_AHEAD_FRAMES)
             {
-                // If we have CPU frames ahead, render one of them
-                if (cpu_run_ahead_frames > 0)
-                {
-                    // Render a frame from the CPU run-ahead buffer
-                    bool frame_rendered = emu.render_from_cpu_ahead();
-                    cpu_run_ahead_frames--;
+                // Render a new frame
+                bool frame_rendered = emu.render();
 
-                    if (frame_rendered)
-                    {
-                        // Store the frame in the buffer
-                        render_ahead_buffer_filled++;
-                    }
+                if (frame_rendered)
+                {
+                    // Store the frame in the buffer
+                    int next_pos = (render_ahead_buffer_pos + render_ahead_buffer_filled) % MAX_RENDER_AHEAD_FRAMES;
+                    // Copy the framebuffer to the render-ahead buffer
+                    // This is a simplified example - actual implementation depends on your rendering method
+                    // render_ahead_buffer[next_pos] = current_framebuffer_copy();
+
+                    render_ahead_buffer_filled++;
                 }
                 else
                 {
-                    // No CPU frames ahead, render normally
-                    bool frame_rendered = emu.render();
-
-                    if (frame_rendered)
-                    {
-                        // Store the frame in the buffer
-                        render_ahead_buffer_filled++;
-                    }
-                    else
-                    {
-                        // No new frame was rendered, so stop trying
-                        break;
-                    }
+                    // No new frame was rendered, so stop trying
+                    break;
                 }
             }
-
-            // If the render buffer is full, process more CPU frames ahead
-            if (render_ahead_buffer_filled >= MAX_RENDER_AHEAD_FRAMES)
-            {
-                // Run CPU ahead more aggressively
-                process_cpu_frames_ahead(3);
-
-                // Process audio less frequently to reduce overhead
-                static int audio_counter = 0;
-                if (++audio_counter >= 3)
-                {
-                    retro_audio_upload();
-                    audio_counter = 0;
-                }
-            }
-            else
-            {
-                // Always process audio to maintain quality
-                retro_audio_upload();
-            }
-
         } catch (const FlycastException& e) {
             ERROR_LOG(COMMON, "%s", e.what());
             os_notify(e.what(), 5000);
@@ -1356,17 +1273,65 @@ void retro_run()
     }
     else
     {
-        // In unthrottled mode, reset CPU run-ahead counter
-        cpu_run_ahead_frames = 0;
+        // In unthrottled mode, just render normally
+        try {
+            if (config::ThreadedRendering)
+            {
+                // Measure performance and adjust frame skipping
+                static u64 last_frame_time = 0;
+                static int skip_counter = 0;
+                static int skip_frames = 0;
 
-        // ... existing unthrottled mode code ...
+                u64 current_time = sh4_sched_now64();
+                if (last_frame_time != 0)
+                {
+                    u64 frame_time = current_time - last_frame_time;
+                    float target_frame_time = 1000000.0f / 60.0f; // 60 fps in microseconds
 
-        // In unthrottled mode, process audio less frequently
-        static int audio_counter = 0;
-        if (++audio_counter >= 2)
-        {
-            retro_audio_upload();
-            audio_counter = 0;
+                    // Adjust frame skipping based on performance
+                    if (frame_time > target_frame_time * 1.2f)
+                    {
+                        // We're running slow, increase frame skipping
+                        skip_frames = std::min(4, skip_frames + 1);
+                    }
+                    else if (frame_time < target_frame_time * 0.8f && skip_frames > 0)
+                    {
+                        // We're running fast, decrease frame skipping
+                        skip_frames = std::max(0, skip_frames - 1);
+                    }
+                }
+
+                last_frame_time = current_time;
+
+                // Apply frame skipping
+                bool should_skip = (skip_counter % (skip_frames + 1)) != 0;
+                skip_counter = (skip_counter + 1) % 5;
+
+                // Render with frame skipping
+                if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
+                {
+                    for (int i = 0; i < 5 && is_dupe; i++)
+                        is_dupe = !emu.render();
+                }
+            }
+            else
+            {
+                startTime = sh4_sched_now64();
+                // Define should_skip for non-threaded rendering too
+                bool should_skip = false;
+                if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
+                    emu.render();
+                else
+                    is_dupe = true;
+            }
+
+            // Send the frame to the frontend
+            video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
+
+        } catch (const FlycastException& e) {
+            ERROR_LOG(COMMON, "%s", e.what());
+            os_notify(e.what(), 5000);
+            environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
         }
     }
 
@@ -1374,6 +1339,9 @@ void retro_run()
     if (isOpenGL(config::RendererType))
         glsm_ctl(GLSM_CTL_STATE_UNBIND, nullptr);
 #endif
+
+    // Always process audio regardless of throttle state
+    retro_audio_upload();
 
     first_run = false;
 
