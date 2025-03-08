@@ -346,9 +346,20 @@ void Sh4_int_Run()
 
 	while (sh4_int_bCpuRun)
 	{
-		// Apply CPU frequency scaling to the batch size
-		int scaled_batch_size = (int)(CYCLE_BATCH_SIZE * sh4_cpu_timescale);
-		scaled_batch_size = std::max(1000, std::min(30000, scaled_batch_size));
+		// Apply CPU frequency scaling to the batch size, but with a more efficient approach
+		int scaled_batch_size;
+
+		// Use a lookup table approach for common scaling factors to avoid expensive calculations
+		if (sh4_cpu_timescale >= 1.4f)
+			scaled_batch_size = 25000;  // Very fast
+		else if (sh4_cpu_timescale >= 1.1f)
+			scaled_batch_size = 15000;  // Fast
+		else if (sh4_cpu_timescale >= 0.9f)
+			scaled_batch_size = 10000;  // Normal
+		else if (sh4_cpu_timescale >= 0.7f)
+			scaled_batch_size = 8000;   // Slow
+		else
+			scaled_batch_size = 5000;   // Very slow
 
 		// Process in larger batches for better efficiency
 		for (int i = 0; i < scaled_batch_size && sh4_int_bCpuRun; i++)
@@ -370,8 +381,9 @@ void Sh4_int_Run()
 			}
 		}
 
-		// Allow other threads to run
-		std::this_thread::yield();
+		// Allow other threads to run, but only if we're not running at full speed
+		if (sh4_cpu_timescale < 0.9f)
+			std::this_thread::yield();
 	}
 }
 
