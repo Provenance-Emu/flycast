@@ -1770,6 +1770,62 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "enabled"
    },
+   {
+      CORE_OPTION_NAME "_use_audio_thread",
+      "Use Audio Thread",
+      "Process audio in a separate thread to improve performance.",
+      NULL,
+      NULL,
+      "performance",
+      {
+         { "enabled", NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
+      CORE_OPTION_NAME "_use_audio_prediction",
+      "Use Audio Prediction",
+      "Predict audio for CPU run-ahead to improve performance.",
+      NULL,
+      NULL,
+      "performance",
+      {
+         { "enabled", NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
+      CORE_OPTION_NAME "_use_adaptive_audio_quality",
+      "Adaptive Audio Quality",
+      "Dynamically adjust audio quality based on CPU load.",
+      NULL,
+      NULL,
+      "performance",
+      {
+         { "enabled", NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
+      CORE_OPTION_NAME "_use_gpu_audio_processing",
+      "GPU Audio Processing",
+      "Use GPU for audio processing (if supported).",
+      NULL,
+      NULL,
+      "performance",
+      {
+         { "enabled", NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
    { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
 };
 

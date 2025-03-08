@@ -15,6 +15,49 @@ std::vector<AudioBackend *> *AudioBackend::backends;
 static bool audio_recording_started;
 static bool eight_khz;
 
+// Add audio prediction for CPU run-ahead
+class AudioPredictor {
+private:
+	static const int HISTORY_SIZE = 16;
+	std::array<s16, HISTORY_SIZE> left_history;
+	std::array<s16, HISTORY_SIZE> right_history;
+	int history_pos = 0;
+
+public:
+	void addSample(s16 l, s16 r) {
+		left_history[history_pos] = l;
+		right_history[history_pos] = r;
+		history_pos = (history_pos + 1) % HISTORY_SIZE;
+	}
+
+	// Predict the next N audio samples based on recent history
+	void predictSamples(int count, std::vector<s16>& output) {
+		output.resize(count * 2);
+
+		// Simple linear prediction
+		s16 l_delta = 0, r_delta = 0;
+
+		if (history_pos > 1) {
+			int prev = (history_pos - 1 + HISTORY_SIZE) % HISTORY_SIZE;
+			int prev2 = (history_pos - 2 + HISTORY_SIZE) % HISTORY_SIZE;
+			l_delta = left_history[prev] - left_history[prev2];
+			r_delta = right_history[prev] - right_history[prev2];
+		}
+
+		s16 last_l = left_history[(history_pos - 1 + HISTORY_SIZE) % HISTORY_SIZE];
+		s16 last_r = right_history[(history_pos - 1 + HISTORY_SIZE) % HISTORY_SIZE];
+
+		for (int i = 0; i < count; i++) {
+			last_l += l_delta;
+			last_r += r_delta;
+			output[i*2] = last_l;
+			output[i*2+1] = last_r;
+		}
+	}
+};
+
+static AudioPredictor audio_predictor;
+
 AudioBackend *AudioBackend::getBackend(const std::string& slug)
 {
 	if (backends == nullptr)
@@ -157,4 +200,17 @@ static void registerForEvents()
 	EventManager::listen(Event::LoadState, callback);
 }
 
+// Use this in the CPU run-ahead function
+bool Emulator::run_cpu_frame_with_audio_prediction() {
+	// Run the CPU for one frame
+	bool result = run_cpu_frame();
 
+	// Predict audio for the next frame
+	std::vector<s16> predicted_audio;
+	audio_predictor.predictSamples(1764, predicted_audio); // 44100/25 samples
+
+	// Store the predicted audio for later use
+	predicted_audio_buffer = predicted_audio;
+
+	return result;
+}

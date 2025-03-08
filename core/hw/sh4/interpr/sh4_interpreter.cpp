@@ -22,6 +22,10 @@ Sh4Interpreter *Sh4Interpreter::Instance;
 // Add this declaration at the top of the file with other global variables
 static bool sh4_int_bCpuRun = false;
 
+// Increase the batch size for sync mode
+static const int CYCLE_BATCH_SIZE_NORMAL = 10000;
+static const int CYCLE_BATCH_SIZE_SYNC = 50000;  // Much larger batch size for sync mode
+
 void Sh4Interpreter::ExecuteOpcode(u16 op)
 {
 	if (ctx->sr.FD == 1 && OpDesc[op]->IsFloatingPoint())
@@ -212,19 +216,13 @@ void Sh4_int_Run()
 {
 	sh4_int_bCpuRun = true;
 
-	// Use a larger cycle batch size for better performance
-	// In sync mode, use an even larger batch size
-	static const int CYCLE_BATCH_SIZE_NORMAL = 10000;
-	static const int CYCLE_BATCH_SIZE_SYNC = 30000;
+	// Use a much larger cycle batch size for better performance
+	static const int CYCLE_BATCH_SIZE = 50000;
 
 	while (sh4_int_bCpuRun)
 	{
-		// Determine batch size based on throttle state
-		int batch_size = (throttle_state == RETRO_THROTTLE_NORMAL) ?
-						  CYCLE_BATCH_SIZE_SYNC : CYCLE_BATCH_SIZE_NORMAL;
-
 		// Process in larger batches for better efficiency
-		for (int i = 0; i < batch_size && sh4_int_bCpuRun; i++)
+		for (int i = 0; i < CYCLE_BATCH_SIZE && sh4_int_bCpuRun; i++)
 		{
 			try {
 				// Use the existing ExecuteOpcode function
@@ -236,15 +234,16 @@ void Sh4_int_Run()
 				::Do_Exception(ex.epc, ex.expEvn);
 			}
 
-			// Check if we need to update the system
-			if (Sh4Interpreter::Instance->UpdateSystem()) {
+			// Check if we need to update the system less frequently
+			if ((i & 0xFF) == 0 && Sh4Interpreter::Instance->UpdateSystem()) {
 				// System updated, might need to break the batch
 				break;
 			}
 		}
 
-		// Allow other threads to run
-		std::this_thread::yield();
+		// Allow other threads to run but don't yield too often
+		if (throttle_state != RETRO_THROTTLE_NORMAL)
+			std::this_thread::yield();
 	}
 }
 
