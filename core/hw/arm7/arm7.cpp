@@ -522,88 +522,302 @@ template void DYNACALL MSR_do<1>(u32 v);
 #endif	// FEAT_AREC != DYNAREC_NONE
 
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
-// Optimized flag calculation for logical operations
-static inline void updateNZFlagsNeon(u32 value)
+// Optimized flag operations for common ARM instructions
+static inline void updateFlagsNeon(u32 result)
 {
-	// Simple implementation without NEON intrinsics
-	Z_FLAG = (value == 0);
-	N_FLAG = (value & 0x80000000) != 0;
+    N_FLAG = (result & 0x80000000) != 0;
+    Z_FLAG = (result == 0);
 }
 
-// Optimized ADD with flags
-static inline u32 addWithFlagsNeon(u32 a, u32 b)
+// Optimized logical operations
+static inline u32 logicalOpNeon(u32 op, u32 a, u32 b)
 {
-	uint32_t result;
-	uint32_t carry_out;
-	uint32_t overflow;
+    u32 result;
 
-	__asm__ volatile(
-		"adds %w[result], %w[a], %w[b]\n"
-		"cset %w[carry], cs\n"
-		"cset %w[overflow], vs\n"
-		: [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
-		: [a] "r" (a), [b] "r" (b)
-		: "cc"
-	);
+    switch(op) {
+        case 0: // AND
+            result = a & b;
+            break;
+        case 1: // EOR
+            result = a ^ b;
+            break;
+        case 12: // ORR
+            result = a | b;
+            break;
+        case 14: // BIC
+            result = a & (~b);
+            break;
+        case 15: // MVN
+            result = ~b;
+            break;
+        default:
+            result = 0;
+            break;
+    }
 
-	N_FLAG = (result & 0x80000000) != 0;
-	Z_FLAG = (result == 0);
-	C_FLAG = (carry_out != 0);
-	V_FLAG = (overflow != 0);
-
-	return result;
+    updateFlagsNeon(result);
+    return result;
 }
 
-// Optimized SUB with flags
-static inline u32 subWithFlagsNeon(u32 a, u32 b)
+// Optimized arithmetic operations with flags
+static inline u32 arithmeticOpNeon(u32 op, u32 a, u32 b)
 {
-	uint32_t result;
-	uint32_t carry_out;
-	uint32_t overflow;
+    u32 result;
+    u32 carry_out;
+    u32 overflow;
 
-	__asm__ volatile(
-		"subs %w[result], %w[a], %w[b]\n"
-		"cset %w[carry], cs\n"
-		"cset %w[overflow], vs\n"
-		: [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
-		: [a] "r" (a), [b] "r" (b)
-		: "cc"
-	);
+    switch(op) {
+        case 2: // SUB
+            __asm__ volatile(
+                "subs %w[result], %w[a], %w[b]\n"
+                "cset %w[carry], cs\n"
+                "cset %w[overflow], vs\n"
+                : [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
+                : [a] "r" (a), [b] "r" (b)
+                : "cc"
+            );
+            break;
+        case 4: // ADD
+            __asm__ volatile(
+                "adds %w[result], %w[a], %w[b]\n"
+                "cset %w[carry], cs\n"
+                "cset %w[overflow], vs\n"
+                : [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
+                : [a] "r" (a), [b] "r" (b)
+                : "cc"
+            );
+            break;
+        case 5: // ADC
+            __asm__ volatile(
+                "rmif %[c_flag], #1, #1\n" // Set carry flag based on C_FLAG
+                "adcs %w[result], %w[a], %w[b]\n"
+                "cset %w[carry], cs\n"
+                "cset %w[overflow], vs\n"
+                : [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
+                : [a] "r" (a), [b] "r" (b), [c_flag] "r" ((u32)C_FLAG)
+                : "cc"
+            );
+            break;
+        case 6: // SBC
+            __asm__ volatile(
+                "rmif %[c_flag], #1, #1\n" // Set carry flag based on C_FLAG
+                "sbcs %w[result], %w[a], %w[b]\n"
+                "cset %w[carry], cs\n"
+                "cset %w[overflow], vs\n"
+                : [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
+                : [a] "r" (a), [b] "r" (b), [c_flag] "r" ((u32)C_FLAG)
+                : "cc"
+            );
+            break;
+        default:
+            result = 0;
+            carry_out = 0;
+            overflow = 0;
+            break;
+    }
 
-	N_FLAG = (result & 0x80000000) != 0;
-	Z_FLAG = (result == 0);
-	C_FLAG = (carry_out != 0);
-	V_FLAG = (overflow != 0);
+    N_FLAG = (result & 0x80000000) != 0;
+    Z_FLAG = (result == 0);
+    C_FLAG = (carry_out != 0);
+    V_FLAG = (overflow != 0);
 
-	return result;
+    return result;
 }
 
-// Optimized memory access with direct assembly
-static inline u32 memReadNeon(u32 address)
+// Optimized memory operations
+static inline u32 memReadOptimized(u32 address)
 {
-	u32 value;
-	address &= ARAM_MASK;
+    address &= ARAM_MASK;
+    u32 value;
 
-	__asm__ volatile(
-		"ldr %w[value], [%[addr]]\n"
-		: [value] "=r" (value)
-		: [addr] "r" (&aica_ram[address])
-		: "memory"
-	);
+    __asm__ volatile(
+        "ldr %w[value], [%[addr]]\n"
+        : [value] "=r" (value)
+        : [addr] "r" (&aica_ram[address])
+        : "memory"
+    );
 
-	return value;
+    return value;
 }
 
-static inline void memWriteNeon(u32 address, u32 value)
+static inline void memWriteOptimized(u32 address, u32 value)
 {
-	address &= ARAM_MASK;
+    address &= ARAM_MASK;
 
-	__asm__ volatile(
-		"str %w[value], [%[addr]]\n"
-		:
-		: [value] "r" (value), [addr] "r" (&aica_ram[address])
-		: "memory"
-	);
+    __asm__ volatile(
+        "str %w[value], [%[addr]]\n"
+        :
+        : [value] "r" (value), [addr] "r" (&aica_ram[address])
+        : "memory"
+    );
+}
+
+// Optimized condition check
+static inline bool checkConditionOptimized(u32 condition)
+{
+    bool result;
+
+    switch(condition) {
+        case 0: // EQ
+            result = Z_FLAG;
+            break;
+        case 1: // NE
+            result = !Z_FLAG;
+            break;
+        case 2: // CS/HS
+            result = C_FLAG;
+            break;
+        case 3: // CC/LO
+            result = !C_FLAG;
+            break;
+        case 4: // MI
+            result = N_FLAG;
+            break;
+        case 5: // PL
+            result = !N_FLAG;
+            break;
+        case 6: // VS
+            result = V_FLAG;
+            break;
+        case 7: // VC
+            result = !V_FLAG;
+            break;
+        case 8: // HI
+            result = C_FLAG && !Z_FLAG;
+            break;
+        case 9: // LS
+            result = !C_FLAG || Z_FLAG;
+            break;
+        case 10: // GE
+            result = (N_FLAG == V_FLAG);
+            break;
+        case 11: // LT
+            result = (N_FLAG != V_FLAG);
+            break;
+        case 12: // GT
+            result = !Z_FLAG && (N_FLAG == V_FLAG);
+            break;
+        case 13: // LE
+            result = Z_FLAG || (N_FLAG != V_FLAG);
+            break;
+        case 14: // AL
+            result = true;
+            break;
+        default:
+            result = false;
+            break;
+    }
+
+    return result;
+}
+
+// Optimized shift operations
+static inline u32 shiftOptimized(u32 value, u32 type, u32 amount, bool& carry)
+{
+    u32 result;
+    u32 carry_out;
+
+    switch(type) {
+        case 0: // LSL
+            if (amount == 0) {
+                return value;
+            }
+            else if (amount < 32) {
+                __asm__ volatile(
+                    "lsl %w[result], %w[value], %w[amount]\n"
+                    "ubfx %w[carry], %w[value], %w[carry_bit], #1\n"
+                    : [result] "=r" (result), [carry] "=r" (carry_out)
+                    : [value] "r" (value), [amount] "r" (amount),
+                      [carry_bit] "r" (32 - amount)
+                    :
+                );
+            }
+            else if (amount == 32) {
+                result = 0;
+                carry_out = value & 1;
+            }
+            else {
+                result = 0;
+                carry_out = 0;
+            }
+            break;
+
+        case 1: // LSR
+            if (amount == 0) {
+                return value;
+            }
+            else if (amount < 32) {
+                __asm__ volatile(
+                    "lsr %w[result], %w[value], %w[amount]\n"
+                    "ubfx %w[carry], %w[value], %w[carry_bit], #1\n"
+                    : [result] "=r" (result), [carry] "=r" (carry_out)
+                    : [value] "r" (value), [amount] "r" (amount),
+                      [carry_bit] "r" (amount - 1)
+                    :
+                );
+            }
+            else if (amount == 32) {
+                result = 0;
+                carry_out = (value >> 31) & 1;
+            }
+            else {
+                result = 0;
+                carry_out = 0;
+            }
+            break;
+
+        case 2: // ASR
+            if (amount == 0) {
+                return value;
+            }
+            else if (amount < 32) {
+                __asm__ volatile(
+                    "asr %w[result], %w[value], %w[amount]\n"
+                    "ubfx %w[carry], %w[value], %w[carry_bit], #1\n"
+                    : [result] "=r" (result), [carry] "=r" (carry_out)
+                    : [value] "r" (value), [amount] "r" (amount),
+                      [carry_bit] "r" (amount - 1)
+                    :
+                );
+            }
+            else {
+                // ASR by 32 or more gives all 1s or all 0s depending on sign bit
+                result = (value & 0x80000000) ? 0xFFFFFFFF : 0;
+                carry_out = (value >> 31) & 1;
+            }
+            break;
+
+        case 3: // ROR
+            if (amount == 0) {
+                return value;
+            }
+            else {
+                amount &= 0x1F; // ROR is always modulo 32
+                if (amount == 0) {
+                    result = value;
+                    carry_out = (value >> 31) & 1;
+                }
+                else {
+                    __asm__ volatile(
+                        "ror %w[result], %w[value], %w[amount]\n"
+                        "ubfx %w[carry], %w[value], %w[carry_bit], #1\n"
+                        : [result] "=r" (result), [carry] "=r" (carry_out)
+                        : [value] "r" (value), [amount] "r" (amount),
+                          [carry_bit] "r" (amount - 1)
+                        :
+                    );
+                }
+            }
+            break;
+
+        default:
+            result = value;
+            carry_out = 0;
+            break;
+    }
+
+    carry = carry_out != 0;
+    return result;
 }
 #endif
 
