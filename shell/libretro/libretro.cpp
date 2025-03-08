@@ -1179,13 +1179,6 @@ static void update_variables(bool first_startup)
 	}
 }
 
-// Add these declarations at the top of the file
-static const int MAX_RENDER_AHEAD_FRAMES = 2;
-static std::vector<u32> render_ahead_buffer[MAX_RENDER_AHEAD_FRAMES];
-static int render_ahead_buffer_pos = 0;
-static int render_ahead_buffer_filled = 0;
-static std::mutex render_ahead_mutex;
-
 void retro_run()
 {
     bool updated = false;
@@ -1221,124 +1214,68 @@ void retro_run()
         settings.input.fastForwardMode = fastforward;
 
     is_dupe = true;
-
-    // In sync mode, use render-ahead to improve performance
-    if (throttle_state == RETRO_THROTTLE_NORMAL && !fastforward)
-    {
-        std::lock_guard<std::mutex> lock(render_ahead_mutex);
-
-        // If we have frames in the render-ahead buffer, use them
-        if (render_ahead_buffer_filled > 0)
+    try {
+        if (config::ThreadedRendering)
         {
-            // Use a frame from the buffer
-            is_dupe = false;
+            // Measure performance and adjust frame skipping
+            static u64 last_frame_time = 0;
+            static int skip_counter = 0;
+            static int skip_frames = 0;
 
-            // Send the frame to the frontend
-            video_cb(RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
-
-            // Decrement the buffer count
-            render_ahead_buffer_filled--;
-            render_ahead_buffer_pos = (render_ahead_buffer_pos + 1) % MAX_RENDER_AHEAD_FRAMES;
-        }
-
-        // Always try to fill the render-ahead buffer
-        try {
-            // Render as many frames as needed to fill the buffer
-            while (render_ahead_buffer_filled < MAX_RENDER_AHEAD_FRAMES)
+            u64 current_time = sh4_sched_now64();
+            if (last_frame_time != 0)
             {
-                // Render a new frame
-                bool frame_rendered = emu.render();
+                u64 frame_time = current_time - last_frame_time;
+                float target_frame_time = 1000000.0f / 60.0f; // 60 fps in microseconds
 
-                if (frame_rendered)
+                // Adjust frame skipping based on performance
+                if (frame_time > target_frame_time * 1.2f)
                 {
-                    // Store the frame in the buffer
-                    int next_pos = (render_ahead_buffer_pos + render_ahead_buffer_filled) % MAX_RENDER_AHEAD_FRAMES;
-                    // Copy the framebuffer to the render-ahead buffer
-                    // This is a simplified example - actual implementation depends on your rendering method
-                    // render_ahead_buffer[next_pos] = current_framebuffer_copy();
-
-                    render_ahead_buffer_filled++;
+                    // We're running slow, increase frame skipping
+                    skip_frames = std::min(4, skip_frames + 1);
                 }
-                else
+                else if (frame_time < target_frame_time * 0.8f && skip_frames > 0)
                 {
-                    // No new frame was rendered, so stop trying
-                    break;
+                    // We're running fast, decrease frame skipping
+                    skip_frames = std::max(0, skip_frames - 1);
                 }
             }
-        } catch (const FlycastException& e) {
-            ERROR_LOG(COMMON, "%s", e.what());
-            os_notify(e.what(), 5000);
-            environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-        }
-    }
-    else
-    {
-        // In unthrottled mode, just render normally
-        try {
-            if (config::ThreadedRendering)
+
+            last_frame_time = current_time;
+
+            // Apply frame skipping
+            bool should_skip = (skip_counter % (skip_frames + 1)) != 0;
+            skip_counter = (skip_counter + 1) % 5;
+
+            // Render with frame skipping
+            if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
             {
-                // Measure performance and adjust frame skipping
-                static u64 last_frame_time = 0;
-                static int skip_counter = 0;
-                static int skip_frames = 0;
-
-                u64 current_time = sh4_sched_now64();
-                if (last_frame_time != 0)
-                {
-                    u64 frame_time = current_time - last_frame_time;
-                    float target_frame_time = 1000000.0f / 60.0f; // 60 fps in microseconds
-
-                    // Adjust frame skipping based on performance
-                    if (frame_time > target_frame_time * 1.2f)
-                    {
-                        // We're running slow, increase frame skipping
-                        skip_frames = std::min(4, skip_frames + 1);
-                    }
-                    else if (frame_time < target_frame_time * 0.8f && skip_frames > 0)
-                    {
-                        // We're running fast, decrease frame skipping
-                        skip_frames = std::max(0, skip_frames - 1);
-                    }
-                }
-
-                last_frame_time = current_time;
-
-                // Apply frame skipping
-                bool should_skip = (skip_counter % (skip_frames + 1)) != 0;
-                skip_counter = (skip_counter + 1) % 5;
-
-                // Render with frame skipping
-                if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
-                {
-                    for (int i = 0; i < 5 && is_dupe; i++)
-                        is_dupe = !emu.render();
-                }
+                for (int i = 0; i < 5 && is_dupe; i++)
+                    is_dupe = !emu.render();
             }
+        }
+        else
+        {
+            startTime = sh4_sched_now64();
+            // Define should_skip for non-threaded rendering too
+            bool should_skip = false;
+            if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
+                emu.render();
             else
-            {
-                startTime = sh4_sched_now64();
-                // Define should_skip for non-threaded rendering too
-                bool should_skip = false;
-                if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
-                    emu.render();
-                else
-                    is_dupe = true;
-            }
-
-            // Send the frame to the frontend
-            video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
-
-        } catch (const FlycastException& e) {
-            ERROR_LOG(COMMON, "%s", e.what());
-            os_notify(e.what(), 5000);
-            environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+                is_dupe = true;
         }
+    } catch (const FlycastException& e) {
+        ERROR_LOG(COMMON, "%s", e.what());
+        os_notify(e.what(), 5000);
+        environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
     }
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
     if (isOpenGL(config::RendererType))
         glsm_ctl(GLSM_CTL_STATE_UNBIND, nullptr);
 #endif
+
+    video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
 
     // Always process audio regardless of throttle state
     retro_audio_upload();

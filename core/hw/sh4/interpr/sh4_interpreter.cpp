@@ -13,7 +13,6 @@
 #include "../sh4_cache.h"
 #include "debug/gdb_server.h"
 #include "../sh4_cycles.h"
-#include "throttle.h"
 
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
 #include <arm_neon.h>
@@ -341,18 +340,12 @@ void Sh4_int_Run()
 	sh4_int_bCpuRun = true;
 
 	// Use a larger cycle batch size for better performance
-	// In sync mode, use an even larger batch size
-	static const int CYCLE_BATCH_SIZE_NORMAL = 10000;
-	static const int CYCLE_BATCH_SIZE_SYNC = 30000;
+	static const int CYCLE_BATCH_SIZE = 10000;
 
 	while (sh4_int_bCpuRun)
 	{
-		// Determine batch size based on throttle state
-		int batch_size = (throttle_state == RETRO_THROTTLE_NORMAL) ?
-						  CYCLE_BATCH_SIZE_SYNC : CYCLE_BATCH_SIZE_NORMAL;
-
 		// Process in larger batches for better efficiency
-		for (int i = 0; i < batch_size && sh4_int_bCpuRun; i++)
+		for (int i = 0; i < CYCLE_BATCH_SIZE && sh4_int_bCpuRun; i++)
 		{
 			try {
 				// Use the existing ExecuteOpcode function

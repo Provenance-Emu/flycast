@@ -170,7 +170,7 @@ void audio_thread_func()
 
 			// Process audio (time stretching, etc.)
 			if (use_timestretch && (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-								   throttle_state == RETRO_THROTTLE_FAST_FORWARD))
+				throttle_state == RETRO_THROTTLE_FAST_FORWARD))
 			{
 				// Time stretching code would go here
 			}
@@ -343,10 +343,10 @@ void retro_audio_upload(void)
 		audio_batch_cb(audio_out_buffer, num_frames);
 	}
 	else if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-			 throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
 	{
 		// In unthrottled mode, drop more samples with NEON
-		size_t output_frames = 0;
+			size_t output_frames = 0;
 
 		// Use NEON to process and drop samples
 		for (size_t i = 0; i < num_frames; i += 8)
@@ -361,11 +361,11 @@ void retro_audio_upload(void)
 			// Keep only every 8th sample
 			audio_out_buffer[output_frames * 2] = vgetq_lane_s16(stereo_samples.val[0], 0);
 			audio_out_buffer[output_frames * 2 + 1] = vgetq_lane_s16(stereo_samples.val[1], 0);
-			output_frames++;
-		}
+					output_frames++;
+				}
 
-		if (output_frames > 0)
-			audio_batch_cb(audio_out_buffer, output_frames);
+			if (output_frames > 0)
+				audio_batch_cb(audio_out_buffer, output_frames);
 	}
 	else
 	{
