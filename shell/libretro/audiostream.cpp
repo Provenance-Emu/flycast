@@ -262,22 +262,22 @@ void WriteSample(s16 r, s16 l)
 
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
 	// In throttled mode, downsample audio to reduce CPU load
-	if (throttle_state == RETRO_THROTTLE_NORMAL)
-	{
-		// Only process every other sample
-		static bool skip_sample = false;
-		skip_sample = !skip_sample;
-		if (skip_sample)
-			return;
-	}
-	else if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-			 throttle_state == RETRO_THROTTLE_FAST_FORWARD)
-	{
-		// In unthrottled mode, drop even more samples
-		static int sample_counter = 0;
-		if (++sample_counter % 4 != 0) // Keep only 1/4 of samples
-			return;
-	}
+	// if (throttle_state == RETRO_THROTTLE_NORMAL)
+	// {
+	// 	// Only process every other sample
+	// 	static bool skip_sample = false;
+	// 	skip_sample = !skip_sample;
+	// 	if (skip_sample)
+	// 		return;
+	// }
+	// else if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
+	// 		 throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+	// {
+	// 	// In unthrottled mode, drop even more samples
+	// 	static int sample_counter = 0;
+	// 	if (++sample_counter % 4 != 0) // Keep only 1/4 of samples
+	// 		return;
+	// }
 
 	// Check for buffer overflow
 	if (audio_buffer.size() < audio_buffer_idx + 2)
