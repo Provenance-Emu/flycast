@@ -1742,6 +1742,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "100%",
    },
+   {
+      CORE_OPTION_NAME "_use_timestretch",
+      "Use Time Stretching for Audio",
+      NULL,
+      "When enabled, audio will be time-stretched when running at non-standard speeds.",
+      NULL,
+      "performance",
+      {
+         { "enabled", NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
    { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
 };
 
