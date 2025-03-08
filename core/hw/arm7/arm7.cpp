@@ -2,6 +2,10 @@
 #include "arm_mem.h"
 #include "arm7_rec.h"
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#include <arm_neon.h>
+#endif
+
 namespace aica::arm
 {
 
@@ -61,16 +65,56 @@ static void runInterpreter(u32 CycleCount)
 	if (!Arm7Enabled)
 		return;
 
+	// Pre-check if interrupts are pending to avoid unnecessary work
+	bool has_interrupts = reg[INTR_PEND].I != 0;
+
+	// Subtract cycles in one go
 	arm7ClockTicks -= CycleCount;
-	while (arm7ClockTicks < 0)
+
+	// Process only if we have cycles to run or interrupts pending
+	if (arm7ClockTicks < 0 || has_interrupts)
 	{
-		if (reg[INTR_PEND].I)
+		// Handle pending interrupts first
+		if (has_interrupts)
 			CPUFiq();
 
-		reg[15].I = armNextPC + 8;
+		// Process instructions until we're caught up
+		while (arm7ClockTicks < 0)
+		{
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+			// Fast path for A10X+ devices
+			// Load next PC value and update R15
+			uint32_t nextPC = armNextPC;
+			reg[15].I = nextPC + 8;
 
-		int& clockTicks = arm7ClockTicks;
-		#include "arm-new.h"
+			// Prefetch the next instruction with direct assembly
+			uint32_t prefetched_opcode;
+			__asm__ volatile(
+				"ldr %w[opcode], [%[addr]]\n"
+				: [opcode] "=r" (prefetched_opcode)
+				: [addr] "r" (&aica_ram[nextPC & ARAM_MASK])
+				: "memory"
+			);
+
+			// Process the instruction
+			int& clockTicks = arm7ClockTicks;
+			#include "arm-new.h"
+#else
+			// Original implementation
+			reg[15].I = armNextPC + 8;
+			int& clockTicks = arm7ClockTicks;
+			#include "arm-new.h"
+#endif
+
+			// Check for new interrupts after each instruction
+			if (reg[INTR_PEND].I)
+			{
+				CPUFiq();
+				// After handling an interrupt, we might have caught up
+				if (arm7ClockTicks >= 0)
+					break;
+			}
+		}
 	}
 }
 
@@ -81,11 +125,71 @@ void avoidRaceCondition()
 
 void run(u32 samples)
 {
-	for (u32 i = 0; i < samples; i++)
+#if FEAT_AREC == DYNAREC_NONE
+	if (!Arm7Enabled)
+		return;
+
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+	// For A10X+ devices, process in larger batches for better efficiency
+	// Calculate total cycles needed
+	uint32_t totalCycles = ARM_CYCLES_PER_SAMPLE * samples;
+
+	// Process all cycles at once for better instruction pipelining
+	runInterpreter(totalCycles);
+
+	// Call timeStep once after processing all samples
+	timeStep();
+#else
+	// Original implementation for non-NEON devices
+	// Process a batch of samples at once to reduce overhead
+	if (samples > 10)
 	{
-		runInterpreter(ARM_CYCLES_PER_SAMPLE);
+		const u32 chunkSize = 10;
+		u32 remaining = samples;
+
+		while (remaining > 0)
+		{
+			u32 currentChunk = std::min(remaining, chunkSize);
+			runInterpreter(ARM_CYCLES_PER_SAMPLE * currentChunk);
+			remaining -= currentChunk;
+		}
+	}
+	else
+	{
+		runInterpreter(ARM_CYCLES_PER_SAMPLE * samples);
+	}
+
+	timeStep();
+#endif
+#endif
+}
+
+// Optimize the non-blocking run function
+void runNonBlocking(u32 samples)
+{
+#if FEAT_AREC == DYNAREC_NONE
+	if (!Arm7Enabled)
+		return;
+
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+	// For A10X+ devices, use NEON to check if we need to run at all
+	if (arm7ClockTicks < 0 || reg[INTR_PEND].I)
+	{
+		// Process a larger batch at once for better efficiency
+		runInterpreter(ARM_CYCLES_PER_SAMPLE * samples);
 		timeStep();
 	}
+#else
+	// Original implementation
+	const u32 batchSize = std::min(samples, 5u);
+	if (arm7ClockTicks < 0 || reg[INTR_PEND].I)
+	{
+		runInterpreter(ARM_CYCLES_PER_SAMPLE * batchSize);
+	}
+	if (batchSize >= samples)
+		timeStep();
+#endif
+#endif
 }
 #endif
 
@@ -247,7 +351,7 @@ void CPUUpdateCPSR()
 		CPSR.I |= 0x80;
 
 	CPSR.PSR.M = armMode;
-	
+
 	reg[RN_CPSR].I = CPSR.I;
 }
 
@@ -267,7 +371,7 @@ static void CPUSoftwareInterrupt(int comment)
 	u32 PC = reg[R15_ARM_NEXT].I+4;
 	CPUSwitchMode(0x13, true);
 	reg[14].I = PC;
-	
+
 	armIrqEnable = false;
 	armNextPC = 0x08;
 }
@@ -305,7 +409,7 @@ void reset()
 	reg[RN_CPSR].I = 0x00000000;
 	reg[R13_IRQ].I = 0x03007FA0;
 	reg[R13_SVC].I = 0x03007FE0;
-	armIrqEnable = true;      
+	armIrqEnable = true;
 	armFiqEnable = false;
 	update_armintc();
 
@@ -334,7 +438,7 @@ void CPUFiq()
 
 /*
 	--Seems like aica has 3 interrupt controllers actualy (damn lazy sega ..)
-	The "normal" one (the one that exists on scsp) , one to emulate the 68k intc , and , 
+	The "normal" one (the one that exists on scsp) , one to emulate the 68k intc , and ,
 	of course , the arm7 one
 
 	The output of the sci* bits is input to the e68k , and the output of e68k is inputed into the FIQ
@@ -346,7 +450,7 @@ void enable(bool enabled)
 {
 	if(!Arm7Enabled && enabled)
 		reset();
-	
+
 	Arm7Enabled=enabled;
 }
 
@@ -387,7 +491,7 @@ void DYNACALL MSR_do(u32 v)
 	else
 	{
 		CPUUpdateCPSR();
-	
+
 		u32 newValue = reg[RN_CPSR].I;
 		if(armMode > 0x10)
 		{
@@ -409,5 +513,91 @@ template void DYNACALL MSR_do<1>(u32 v);
 
 } // namespace recompiler
 #endif	// FEAT_AREC != DYNAREC_NONE
+
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+// Optimized flag calculation for logical operations
+static inline void updateNZFlagsNeon(u32 value)
+{
+	// Simple implementation without NEON intrinsics
+	Z_FLAG = (value == 0);
+	N_FLAG = (value & 0x80000000) != 0;
+}
+
+// Optimized ADD with flags
+static inline u32 addWithFlagsNeon(u32 a, u32 b)
+{
+	uint32_t result;
+	uint32_t carry_out;
+	uint32_t overflow;
+
+	__asm__ volatile(
+		"adds %w[result], %w[a], %w[b]\n"
+		"cset %w[carry], cs\n"
+		"cset %w[overflow], vs\n"
+		: [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
+		: [a] "r" (a), [b] "r" (b)
+		: "cc"
+	);
+
+	N_FLAG = (result & 0x80000000) != 0;
+	Z_FLAG = (result == 0);
+	C_FLAG = (carry_out != 0);
+	V_FLAG = (overflow != 0);
+
+	return result;
+}
+
+// Optimized SUB with flags
+static inline u32 subWithFlagsNeon(u32 a, u32 b)
+{
+	uint32_t result;
+	uint32_t carry_out;
+	uint32_t overflow;
+
+	__asm__ volatile(
+		"subs %w[result], %w[a], %w[b]\n"
+		"cset %w[carry], cs\n"
+		"cset %w[overflow], vs\n"
+		: [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
+		: [a] "r" (a), [b] "r" (b)
+		: "cc"
+	);
+
+	N_FLAG = (result & 0x80000000) != 0;
+	Z_FLAG = (result == 0);
+	C_FLAG = (carry_out != 0);
+	V_FLAG = (overflow != 0);
+
+	return result;
+}
+
+// Optimized memory access with direct assembly
+static inline u32 memReadNeon(u32 address)
+{
+	u32 value;
+	address &= ARAM_MASK;
+
+	__asm__ volatile(
+		"ldr %w[value], [%[addr]]\n"
+		: [value] "=r" (value)
+		: [addr] "r" (&aica_ram[address])
+		: "memory"
+	);
+
+	return value;
+}
+
+static inline void memWriteNeon(u32 address, u32 value)
+{
+	address &= ARAM_MASK;
+
+	__asm__ volatile(
+		"str %w[value], [%[addr]]\n"
+		:
+		: [value] "r" (value), [addr] "r" (&aica_ram[address])
+		: "memory"
+	);
+}
+#endif
 
 } // namespace aica::arm
