@@ -60,7 +60,8 @@ int arm7ClockTicks;
 
 #if FEAT_AREC == DYNAREC_NONE
 
-static void runInterpreter(u32 CycleCount)
+// Optimized version of runInterpreter for ARM64 processors
+static void runInterpreterNeon(u32 CycleCount)
 {
 	if (!Arm7Enabled)
 		return;
@@ -81,30 +82,25 @@ static void runInterpreter(u32 CycleCount)
 		// Process instructions until we're caught up
 		while (arm7ClockTicks < 0)
 		{
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-			// Fast path for A10X+ devices
 			// Load next PC value and update R15
 			uint32_t nextPC = armNextPC;
 			reg[15].I = nextPC + 8;
 
 			// Prefetch the next instruction with direct assembly
-			uint32_t prefetched_opcode;
+			uint32_t prefetched;
 			__asm__ volatile(
-				"ldr %w[opcode], [%[addr]]\n"
-				: [opcode] "=r" (prefetched_opcode)
+				"ldr %w[result], [%[addr]]\n"
+				: [result] "=r" (prefetched)
 				: [addr] "r" (&aica_ram[nextPC & ARAM_MASK])
 				: "memory"
 			);
 
+			// We don't actually use the prefetched value directly,
+			// it's just for improving memory access patterns
+
 			// Process the instruction
 			int& clockTicks = arm7ClockTicks;
 			#include "arm-new.h"
-#else
-			// Original implementation
-			reg[15].I = armNextPC + 8;
-			int& clockTicks = arm7ClockTicks;
-			#include "arm-new.h"
-#endif
 
 			// Check for new interrupts after each instruction
 			if (reg[INTR_PEND].I)
@@ -118,29 +114,55 @@ static void runInterpreter(u32 CycleCount)
 	}
 }
 
+// Add this before the run function
 void avoidRaceCondition()
 {
-	arm7ClockTicks = std::min(arm7ClockTicks, -50);
+    arm7ClockTicks = std::min(arm7ClockTicks, -50);
 }
 
+// Optimized version of run for ARM64 processors
 void run(u32 samples)
 {
 #if FEAT_AREC == DYNAREC_NONE
 	if (!Arm7Enabled)
 		return;
 
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-	// For A10X+ devices, process in larger batches for better efficiency
 	// Calculate total cycles needed
 	uint32_t totalCycles = ARM_CYCLES_PER_SAMPLE * samples;
 
 	// Process all cycles at once for better instruction pipelining
-	runInterpreter(totalCycles);
+	runInterpreterNeon(totalCycles);
 
 	// Call timeStep once after processing all samples
 	timeStep();
+#endif
+}
+
+// Optimized version of runNonBlocking for ARM64 processors
+void runNonBlocking(u32 samples)
+{
+#if FEAT_AREC == DYNAREC_NONE
+	if (!Arm7Enabled)
+		return;
+
+	// Check if we need to run at all
+	if (arm7ClockTicks < 0 || reg[INTR_PEND].I)
+	{
+		// Process a larger batch at once for better efficiency
+		runInterpreterNeon(ARM_CYCLES_PER_SAMPLE * samples);
+		timeStep();
+	}
+#endif
+}
+
 #else
-	// Original implementation for non-NEON devices
+// Original implementation of run
+void run(u32 samples)
+{
+#if FEAT_AREC == DYNAREC_NONE
+	if (!Arm7Enabled)
+		return;
+
 	// Process a batch of samples at once to reduce overhead
 	if (samples > 10)
 	{
@@ -161,26 +183,15 @@ void run(u32 samples)
 
 	timeStep();
 #endif
-#endif
 }
 
-// Optimize the non-blocking run function
+// Original implementation of runNonBlocking
 void runNonBlocking(u32 samples)
 {
 #if FEAT_AREC == DYNAREC_NONE
 	if (!Arm7Enabled)
 		return;
 
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-	// For A10X+ devices, use NEON to check if we need to run at all
-	if (arm7ClockTicks < 0 || reg[INTR_PEND].I)
-	{
-		// Process a larger batch at once for better efficiency
-		runInterpreter(ARM_CYCLES_PER_SAMPLE * samples);
-		timeStep();
-	}
-#else
-	// Original implementation
 	const u32 batchSize = std::min(samples, 5u);
 	if (arm7ClockTicks < 0 || reg[INTR_PEND].I)
 	{
@@ -188,7 +199,6 @@ void runNonBlocking(u32 samples)
 	}
 	if (batchSize >= samples)
 		timeStep();
-#endif
 #endif
 }
 #endif
