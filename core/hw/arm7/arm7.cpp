@@ -1,7 +1,6 @@
 #include "arm7.h"
 #include "arm_mem.h"
 #include "arm7_rec.h"
-#include "throttle.h"
 
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
 #include <arm_neon.h>
@@ -154,18 +153,12 @@ void run(u32 samples)
 	DEBUG_LOG(AUDIO, "ARM7 processing %d audio samples", samples);
 
 	// Process in larger batches for better efficiency
-	// In sync mode, use an even larger batch size
-	static const u32 BATCH_SIZE_NORMAL = 32;
-	static const u32 BATCH_SIZE_SYNC = 64;
-
-	// Determine batch size based on throttle state
-	u32 batch_size = (throttle_state == RETRO_THROTTLE_NORMAL) ?
-					  BATCH_SIZE_SYNC : BATCH_SIZE_NORMAL;
+	static const u32 BATCH_SIZE = 32;
 
 	// Process samples in batches
-	for (u32 i = 0; i < samples; i += batch_size)
+	for (u32 i = 0; i < samples; i += BATCH_SIZE)
 	{
-		u32 batch_samples = std::min(batch_size, samples - i);
+		u32 batch_samples = std::min(BATCH_SIZE, samples - i);
 		uint32_t totalCycles = ARM_CYCLES_PER_SAMPLE * batch_samples;
 
 		// Process all cycles at once for better instruction pipelining
