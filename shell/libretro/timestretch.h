@@ -35,12 +35,14 @@ public:
             return framesToCopy;
         }
 
-        // Simple implementation for fast-forward: just drop samples
+        // For unthrottled mode, we need to be more aggressive with sample dropping
         if (mStretchFactor < 0.5f)
         {
-            int outputFrames = 0;
-            int skipFactor = 2;  // Skip every other sample
+            // Calculate skip factor based on stretch factor
+            // Lower stretch factor = more samples skipped
+            int skipFactor = std::max(2, static_cast<int>(1.0f / mStretchFactor));
 
+            int outputFrames = 0;
             for (int i = 0; i < inputFrames && outputFrames < maxOutputFrames; i += skipFactor)
             {
                 for (int ch = 0; ch < mChannels; ch++)
@@ -51,12 +53,13 @@ public:
             return outputFrames;
         }
 
-        // For slow motion, duplicate samples
+        // For slow motion, we duplicate samples
         if (mStretchFactor > 1.5f)
         {
-            int outputFrames = 0;
-            int dupFactor = 2;  // Duplicate each sample
+            // Calculate duplication factor based on stretch factor
+            int dupFactor = std::max(2, static_cast<int>(mStretchFactor));
 
+            int outputFrames = 0;
             for (int i = 0; i < inputFrames && outputFrames < maxOutputFrames; i++)
             {
                 for (int dup = 0; dup < dupFactor && outputFrames < maxOutputFrames; dup++)
@@ -70,7 +73,7 @@ public:
             return outputFrames;
         }
 
-        // Default case: simple linear interpolation
+        // For moderate speed changes, use simple linear interpolation
         return processLinearInterpolation(input, inputFrames, output, maxOutputFrames);
     }
 

@@ -140,38 +140,57 @@ void retro_audio_upload(void)
 
 	size_t num_frames = audio_buffer_idx >> 1;
 
-	/* When running in unthrottled mode, use time stretching */
-	if (use_timestretch && (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-		throttle_state == RETRO_THROTTLE_FAST_FORWARD))
+	/* When running in unthrottled mode, use time stretching or sample dropping */
+	if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
+		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
 	{
-		// Set stretch factor based on throttle state
-		float stretch_factor = 0.5f; // Default to double speed
-
-		if (throttle_rate > 0.0f && throttle_rate < 10.0f)
-			stretch_factor = 1.0f / throttle_rate;
-
-		timeStretcher.setStretchFactor(stretch_factor);
-
-		// Copy audio buffer to a temporary buffer for processing
-		std::vector<s16> temp_buffer(audio_buffer.begin(), audio_buffer.begin() + audio_buffer_idx);
-
-		// Process audio through time stretcher
-		int stretched_frames = timeStretcher.process(
-			temp_buffer.data(),
-			num_frames,
-			(s16*)audio_out_buffer,
-			audio_buffer.size() / 2);
-
-		// Use the stretched audio
-		if (stretched_frames > 0)
+		// In unthrottled mode, we need to be more aggressive with sample dropping
+		if (!use_timestretch)
 		{
-			// Send the processed audio directly to the frontend
-			audio_batch_cb(audio_out_buffer, stretched_frames);
+			// Simple sample dropping - keep only 1/4 of the samples
+			size_t output_frames = 0;
+			for (size_t i = 0; i < num_frames; i += 4)
+			{
+				if (i < num_frames)
+				{
+					audio_out_buffer[output_frames * 2] = audio_buffer[i * 2];
+					audio_out_buffer[output_frames * 2 + 1] = audio_buffer[i * 2 + 1];
+					output_frames++;
+				}
+			}
 
-			// Reset audio buffer
+			if (output_frames > 0)
+				audio_batch_cb(audio_out_buffer, output_frames);
+
 			audio_buffer_idx = 0;
 			drop_samples = false;
 			return;
+		}
+		else
+		{
+			// Use time stretching
+			float stretch_factor = 0.25f; // Very aggressive for unthrottled mode
+
+			if (throttle_rate > 0.0f && throttle_rate < 10.0f)
+				stretch_factor = 1.0f / throttle_rate;
+
+			timeStretcher.setStretchFactor(stretch_factor);
+
+			// Process audio through time stretcher
+			int stretched_frames = timeStretcher.process(
+				(s16*)audio_buffer.data(),
+				num_frames,
+				(s16*)audio_out_buffer,
+				audio_buffer.size() / 2);
+
+			if (stretched_frames > 0)
+			{
+				audio_batch_cb(audio_out_buffer, stretched_frames);
+
+				audio_buffer_idx = 0;
+				drop_samples = false;
+				return;
+			}
 		}
 	}
 
@@ -233,11 +252,8 @@ void retro_audio_upload(void)
 			vsync_swap_interval_conter = 0;
 	}
 
-	// Copy audio buffer to output buffer
-	memcpy(audio_out_buffer, audio_buffer.data(), audio_buffer_idx * sizeof(s16));
-
-	// Send audio to frontend
-	audio_batch_cb(audio_out_buffer, num_frames);
+	// For normal mode, send audio directly
+	audio_batch_cb(audio_buffer.data(), num_frames);
 
 	/* Reset audio buffer */
 	audio_buffer_idx = 0;
