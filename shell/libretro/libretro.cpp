@@ -18,6 +18,7 @@
 #include <cstdarg>
 #include <math.h>
 #include "types.h"
+#include "throttle.h"
 #ifndef _WIN32
 #include <sys/time.h>
 #endif
@@ -65,6 +66,7 @@
 #include "version.h"
 #include "rend/transform_matrix.h"
 #include "oslib/oslib.h"
+#include "throttle.h"
 
 constexpr char slash = path_default_slash_c();
 
@@ -1159,6 +1161,16 @@ void retro_run()
 	if (devices_need_refresh)
 		refresh_devices(false);
 
+	// Check throttle state
+	struct retro_throttle_state throttle_state_info;
+	throttle_state_info.rate = 0.0f;
+
+	if (environ_cb(RETRO_ENVIRONMENT_GET_THROTTLE_STATE, &throttle_state_info))
+	{
+		throttle_state = throttle_state_info.mode;
+		throttle_rate = throttle_state_info.rate;
+	}
+
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 	if (isOpenGL(config::RendererType))
 		glsm_ctl(GLSM_CTL_STATE_BIND, nullptr);
@@ -1200,10 +1212,21 @@ void retro_run()
 
 	video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
 
-	if (!config::ThreadedRendering || config::LimitFPS)
-		retro_audio_upload();
-	else
+	// Adjust audio upload based on throttle state
+	if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
+		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+	{
+		// When unthrottled, we need to be more aggressive with audio buffer management
 		retro_audio_flush_buffer();
+	}
+	else if (!config::ThreadedRendering || config::LimitFPS)
+	{
+		retro_audio_upload();
+	}
+	else
+	{
+		retro_audio_flush_buffer();
+	}
 
 	first_run = false;
 }
@@ -3709,3 +3732,6 @@ void os_notify(const char *msg, int durationMs, const char *details)
 	retromsg.frames = durationMs / 17;
 	environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &retromsg);
 }
+
+int throttle_state = RETRO_THROTTLE_NORMAL;
+float throttle_rate = 1.0f;

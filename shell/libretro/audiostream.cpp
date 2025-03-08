@@ -18,11 +18,16 @@
 #include "cfg/option.h"
 #include "audio/audiostream.h"
 #include "emulator.h"
+#include "throttle.h"
 
 #include <libretro.h>
 
 #include <vector>
 #include <mutex>
+
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#include <arm_neon.h>
+#endif
 
 /* Detect output refresh rate changes by monitoring
  * the last 'VSYNC_SWAP_INTERVAL_FRAMES' frames:
@@ -209,6 +214,47 @@ void retro_audio_upload(void)
 	}
 }
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+void WriteSample(s16 r, s16 l)
+{
+	// Use a mutex to ensure thread safety
+	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
+
+	if (drop_samples)
+		return;
+
+	if (audio_buffer.size() < audio_buffer_idx + 2)
+	{
+		// Audio buffer overflow...
+		audio_buffer_idx = 0;
+		drop_samples = true;
+		return;
+	}
+
+	// When running unthrottled, add a small amount of noise to break up patterns
+	if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
+		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+	{
+		// Add a tiny bit of noise to break up patterns (very subtle)
+		static u32 noise_seed = 0x55555555;
+		noise_seed = noise_seed * 1664525 + 1013904223;
+		int noise_l = ((noise_seed >> 16) & 3) - 1; // -1, 0, or 1
+		noise_seed = noise_seed * 1664525 + 1013904223;
+		int noise_r = ((noise_seed >> 16) & 3) - 1; // -1, 0, or 1
+
+		// Store samples with noise
+		audio_buffer[audio_buffer_idx++] = l + noise_l;
+		audio_buffer[audio_buffer_idx++] = r + noise_r;
+	}
+	else
+	{
+		// Normal operation - store samples directly
+		audio_buffer[audio_buffer_idx++] = l;
+		audio_buffer[audio_buffer_idx++] = r;
+	}
+}
+#else
+// Original implementation
 void WriteSample(s16 r, s16 l)
 {
 	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
@@ -230,6 +276,7 @@ void WriteSample(s16 r, s16 l)
 	audio_buffer[audio_buffer_idx++] = l;
 	audio_buffer[audio_buffer_idx++] = r;
 }
+#endif
 
 void InitAudio()
 {
