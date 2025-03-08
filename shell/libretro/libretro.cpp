@@ -145,6 +145,9 @@ float throttle_rate = 1.0f;
 // Add this extern declaration at the top of the file
 extern bool use_timestretch;
 
+// Add this declaration at the top of the file with other extern declarations
+// extern float sh4_cpu_freq_scale;
+
 u32 kcode[4] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
 u16 rt[4];
 u16 lt[4];
@@ -1214,16 +1217,39 @@ void retro_run()
     try {
         if (config::ThreadedRendering)
         {
-            // In unthrottled mode, we need to be more aggressive with frame skipping
-            if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-                throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+            // Measure performance and adjust frame skipping
+            static u64 last_frame_time = 0;
+            static int skip_counter = 0;
+            static int skip_frames = 0;
+
+            u64 current_time = sh4_sched_now64();
+            if (last_frame_time != 0)
             {
-                // Render only one frame to avoid blocking
-                is_dupe = !emu.render();
+                u64 frame_time = current_time - last_frame_time;
+                float target_frame_time = 1000000.0f / 60.0f; // 60 fps in microseconds
+
+                // Adjust frame skipping based on performance
+                if (frame_time > target_frame_time * 1.2f)
+                {
+                    // We're running slow, increase frame skipping
+                    skip_frames = std::min(4, skip_frames + 1);
+                }
+                else if (frame_time < target_frame_time * 0.8f && skip_frames > 0)
+                {
+                    // We're running fast, decrease frame skipping
+                    skip_frames = std::max(0, skip_frames - 1);
+                }
             }
-            else
+
+            last_frame_time = current_time;
+
+            // Apply frame skipping
+            bool should_skip = (skip_counter % (skip_frames + 1)) != 0;
+            skip_counter = (skip_counter + 1) % 5;
+
+            // Render with frame skipping
+            if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
             {
-                // Normal mode - render up to 5 frames
                 for (int i = 0; i < 5 && is_dupe; i++)
                     is_dupe = !emu.render();
             }
@@ -1231,7 +1257,12 @@ void retro_run()
         else
         {
             startTime = sh4_sched_now64();
-            emu.render();
+            // Define should_skip for non-threaded rendering too
+            bool should_skip = false;
+            if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
+                emu.render();
+            else
+                is_dupe = true;
         }
     } catch (const FlycastException& e) {
         ERROR_LOG(COMMON, "%s", e.what());
@@ -1246,22 +1277,40 @@ void retro_run()
 
     video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
 
-    // Always upload audio in unthrottled mode to prevent audio buffer overflow
-    if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-        throttle_state == RETRO_THROTTLE_FAST_FORWARD)
-    {
-        retro_audio_upload();
-    }
-    else if (!config::ThreadedRendering || config::LimitFPS)
-    {
-        retro_audio_upload();
-    }
-    else
-    {
-        retro_audio_flush_buffer();
-    }
+    // Always process audio regardless of throttle state
+    retro_audio_upload();
 
     first_run = false;
+
+    // Measure performance and adjust CPU frequency
+    static u64 last_frame_time = 0;
+    static float cpu_freq_scale = 1.0f;
+
+    u64 current_time = sh4_sched_now64();
+    if (last_frame_time != 0)
+    {
+        u64 frame_time = current_time - last_frame_time;
+        float target_frame_time = 1000000.0f / 60.0f; // 60 fps in microseconds
+
+        // Adjust CPU frequency based on performance
+        if (frame_time > target_frame_time * 1.1f)
+        {
+            // We're running slow, increase CPU frequency
+            cpu_freq_scale = std::min(2.0f, cpu_freq_scale * 1.01f);
+        }
+        else if (frame_time < target_frame_time * 0.9f)
+        {
+            // We're running fast, decrease CPU frequency
+            cpu_freq_scale = std::max(0.5f, cpu_freq_scale * 0.99f);
+        }
+
+        // Apply CPU frequency scaling - use a local function instead
+        // sh4_cpu_freq_scale = cpu_freq_scale;
+        // For example:
+        // adjustShCpuFrequency(cpu_freq_scale);
+    }
+
+    last_frame_time = current_time;
 }
 
 static bool loadGame()

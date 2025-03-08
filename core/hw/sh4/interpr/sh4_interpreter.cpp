@@ -18,6 +18,9 @@ Sh4ICache icache;
 Sh4OCache ocache;
 Sh4Interpreter *Sh4Interpreter::Instance;
 
+// Add this declaration at the top of the file with other global variables
+static bool sh4_int_bCpuRun = false;
+
 void Sh4Interpreter::ExecuteOpcode(u16 op)
 {
 	if (ctx->sr.FD == 1 && OpDesc[op]->IsFloatingPoint())
@@ -201,4 +204,50 @@ void Sh4Interpreter::Term()
 Sh4Executor *Get_Sh4Interpreter()
 {
 	return new Sh4Interpreter();
+}
+
+// Then modify the Sh4_int_Run function
+void Sh4_int_Run()
+{
+	sh4_int_bCpuRun = true;
+
+	// Use a larger cycle batch size for better performance
+	static const int CYCLE_BATCH_SIZE = 10000;
+
+	while (sh4_int_bCpuRun)
+	{
+		// Process in larger batches for better efficiency
+		for (int i = 0; i < CYCLE_BATCH_SIZE && sh4_int_bCpuRun; i++)
+		{
+			try {
+				// Use the existing ExecuteOpcode function
+				u32 op = Sh4Interpreter::Instance->ReadNexOp();
+				Sh4Interpreter::Instance->ExecuteOpcode(op);
+			}
+			catch (SH4ThrownException& ex) {
+				// Call the Do_Exception function from the Sh4 core
+				::Do_Exception(ex.epc, ex.expEvn);
+			}
+
+			// Check if we need to update the system
+			if (Sh4Interpreter::Instance->UpdateSystem()) {
+				// System updated, might need to break the batch
+				break;
+			}
+		}
+
+		// Allow other threads to run
+		std::this_thread::yield();
+	}
+}
+
+bool Sh4Interpreter::UpdateSystem()
+{
+	if (ctx->cycle_counter <= 0)
+	{
+		ctx->cycle_counter += SH4_TIMESLICE;
+		UpdateSystem_INTC();
+		return true;
+	}
+	return false;
 }

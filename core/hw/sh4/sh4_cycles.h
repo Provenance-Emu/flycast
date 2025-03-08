@@ -82,3 +82,6 @@ private:
 	int memOps = 0;
 	Sh4Context *ctx = nullptr;
 };
+
+// Make it static to limit its scope
+static float sh4_cpu_freq_scale = 1.0f;

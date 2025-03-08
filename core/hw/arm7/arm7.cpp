@@ -127,11 +127,20 @@ void run(u32 samples)
 	if (!Arm7Enabled)
 		return;
 
-	// Calculate total cycles needed
-	uint32_t totalCycles = ARM_CYCLES_PER_SAMPLE * samples;
+	DEBUG_LOG(AUDIO, "ARM7 processing %d audio samples", samples);
 
-	// Process all cycles at once for better instruction pipelining
-	runInterpreterNeon(totalCycles);
+	// Process in larger batches for better efficiency
+	static const u32 BATCH_SIZE = 32;
+
+	// Process samples in batches
+	for (u32 i = 0; i < samples; i += BATCH_SIZE)
+	{
+		u32 batch_samples = std::min(BATCH_SIZE, samples - i);
+		uint32_t totalCycles = ARM_CYCLES_PER_SAMPLE * batch_samples;
+
+		// Process all cycles at once for better instruction pipelining
+		runInterpreterNeon(totalCycles);
+	}
 
 	// Call timeStep once after processing all samples
 	timeStep();

@@ -17,6 +17,10 @@ public:
 	void ExecuteDelayslot();
 	void ExecuteDelayslot_RTE();
 	Sh4Context *getContext() { return ctx; }
+	bool UpdateSystem();
+
+	void ExecuteOpcode(u16 op);
+	u16 ReadNexOp();
 
 	static Sh4Interpreter *Instance;
 
@@ -24,9 +28,6 @@ protected:
 	Sh4Context *ctx = nullptr;
 
 private:
-	void ExecuteOpcode(u16 op);
-	u16 ReadNexOp();
-
 	Sh4Cycles sh4cycles{CPU_RATIO};
 	// SH4 underclock factor when using the interpreter so that it's somewhat usable
 #ifdef STRICT_MODE
