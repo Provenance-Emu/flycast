@@ -125,3 +125,32 @@ void CommandPool::EndFrameAndWait()
 		WARN_LOG(RENDERER, "CommandPool::waitForCommandCompletion: waitForFences failed %d", (int)res);
 	inFlightObjects[index].clear();
 }
+
+std::vector<vk::CommandBuffer> CommandPool::AllocateBatch(int count, bool submitLast)
+{
+	std::vector<vk::CommandBuffer> cmdBuffers;
+	cmdBuffers.reserve(count);
+
+	// Check if we have enough free buffers
+	if (freeBuffers[index].size() < count)
+	{
+		// Allocate more buffers in a batch
+		int allocCount = std::max(8, count - (int)freeBuffers[index].size());
+		auto newBuffers = device.allocateCommandBuffersUnique(
+			vk::CommandBufferAllocateInfo(*commandPools[index], vk::CommandBufferLevel::ePrimary, allocCount));
+
+		for (auto& buffer : newBuffers)
+			freeBuffers[index].emplace_back(std::move(buffer));
+	}
+
+	// Get the buffers we need
+	for (int i = 0; i < count; i++)
+	{
+		inFlightBuffers[index].emplace_back(std::move(freeBuffers[index].back()));
+		cmdBuffers.push_back(*inFlightBuffers[index].back());
+		freeBuffers[index].pop_back();
+		lastBuffers.push_back(i == count - 1 && submitLast);
+	}
+
+	return cmdBuffers;
+}

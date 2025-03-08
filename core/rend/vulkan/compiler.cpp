@@ -25,6 +25,13 @@
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
+// Add these includes for directory operations
+#ifdef _WIN32
+#include <direct.h>  // For _mkdir on Windows
+#else
+#include <sys/stat.h>  // For mkdir on Unix-like systems
+#endif
+
 int ShaderCompiler::initCount;
 
 void ShaderCompiler::Init()
@@ -112,4 +119,67 @@ vk::UniqueShaderModule ShaderCompiler::Compile(vk::ShaderStageFlagBits shaderSta
 
 	return VulkanContext::Instance()->GetDevice().createShaderModuleUnique
 			(vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), shaderSPV));
+}
+
+// Add this helper function
+std::string getShaderCachePath(const std::string& filename)
+{
+    #ifdef __ANDROID__
+    return "/sdcard/flycast/shader_cache/" + filename;
+    #else
+    return "shader_cache/" + filename;
+    #endif
+}
+
+void ShaderCompiler::CacheShader(const std::string& key, const std::vector<uint32_t>& spirv)
+{
+    std::string cachePath = getShaderCachePath(key + ".spv");
+
+    // Create directory if it doesn't exist
+    std::string cacheDir = getShaderCachePath("");
+    #ifdef __ANDROID__
+    mkdir(cacheDir.c_str(), 0755);
+    #else
+    // On other platforms, try to create the directory
+    #ifdef _WIN32
+    _mkdir(cacheDir.c_str());
+    #else
+    mkdir(cacheDir.c_str(), 0755);
+    #endif
+    #endif
+
+    FILE *f = fopen(cachePath.c_str(), "wb");
+    if (f != nullptr)
+    {
+        fwrite(spirv.data(), sizeof(uint32_t), spirv.size(), f);
+        fclose(f);
+    }
+}
+
+bool ShaderCompiler::LoadCachedShader(const std::string& key, std::vector<uint32_t>& spirv)
+{
+    std::string cachePath = getShaderCachePath(key + ".spv");
+    FILE *f = fopen(cachePath.c_str(), "rb");
+    if (f == nullptr)
+        return false;
+
+    fseek(f, 0, SEEK_END);
+    size_t size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (size % sizeof(uint32_t) != 0)
+    {
+        fclose(f);
+        return false;
+    }
+
+    spirv.resize(size / sizeof(uint32_t));
+    if (fread(spirv.data(), sizeof(uint32_t), spirv.size(), f) != spirv.size())
+    {
+        fclose(f);
+        return false;
+    }
+
+    fclose(f);
+    return true;
 }

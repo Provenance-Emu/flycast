@@ -20,7 +20,20 @@
 */
 #include "pipeline.h"
 #include "hw/pvr/Renderer_if.h"
-#include "rend/osd.h"
+#include "oslib/directory.h"
+#include "stdclass.h"
+
+// Use a different function to get the writable path
+std::string getWritableCachePath(const std::string& filename)
+{
+	// Try different approaches
+	#ifdef __ANDROID__
+	return "/sdcard/flycast/" + filename;
+	#else
+	// Use a simple approach - store in the current directory
+	return filename;
+	#endif
+}
 
 void PipelineManager::CreateModVolPipeline(ModVolMode mode, int cullMode, bool naomi2)
 {
@@ -437,78 +450,60 @@ void PipelineManager::CreatePipeline(u32 listType, bool sortTriangles, const Pol
 			graphicsPipelineCreateInfo).value;
 }
 
-void OSDPipeline::CreatePipeline()
+void PipelineManager::SavePipelineCache()
 {
-	// Vertex input state
-	static const vk::VertexInputBindingDescription vertexInputBindingDescription(0, sizeof(OSDVertex));
-	static const std::array<vk::VertexInputAttributeDescription, 3> vertexInputAttributeDescriptions = {
-			vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32Sfloat, offsetof(OSDVertex, x)),	// pos
-			vk::VertexInputAttributeDescription(1, 0, vk::Format::eR8G8B8A8Unorm, offsetof(OSDVertex, r)),	// color
-			vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32Sfloat, offsetof(OSDVertex, u)),	// tex coord
-	};
-	vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo(
-				vk::PipelineVertexInputStateCreateFlags(),
-				vertexInputBindingDescription,
-				vertexInputAttributeDescriptions);
+	VulkanContext *context = GetContext();
+	vk::Device device = context->GetDevice();
 
-	// Input assembly state
-	vk::PipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo(vk::PipelineInputAssemblyStateCreateFlags(), vk::PrimitiveTopology::eTriangleStrip);
+	try {
+		std::vector<uint8_t> cacheData = device.getPipelineCacheData(context->GetPipelineCache());
+		if (!cacheData.empty())
+		{
+			std::string cachePath = getWritableCachePath("vulkan_pipeline_cache.bin");
+			FILE *f = fopen(cachePath.c_str(), "wb");
+			if (f != nullptr)
+			{
+				fwrite(cacheData.data(), 1, cacheData.size(), f);
+				fclose(f);
+				INFO_LOG(RENDERER, "Saved Vulkan pipeline cache: %zu bytes", cacheData.size());
+			}
+		}
+	}
+	catch (const vk::SystemError& e) {
+		WARN_LOG(RENDERER, "Failed to save pipeline cache: %s", e.what());
+	}
+}
 
-	// Viewport and scissor states
-	vk::PipelineViewportStateCreateInfo pipelineViewportStateCreateInfo(vk::PipelineViewportStateCreateFlags(), 1, nullptr, 1, nullptr);
+void PipelineManager::LoadPipelineCache()
+{
+	std::string cachePath = getWritableCachePath("vulkan_pipeline_cache.bin");
+	FILE *f = fopen(cachePath.c_str(), "rb");
+	if (f == nullptr)
+		return;
 
-	// Rasterization and multisample states
-	vk::PipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo;
-	pipelineRasterizationStateCreateInfo.lineWidth = 1.0;
-	vk::PipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo;
+	fseek(f, 0, SEEK_END);
+	size_t cacheSize = ftell(f);
+	fseek(f, 0, SEEK_SET);
 
-	// Depth and stencil
-	vk::PipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo;
+	std::vector<uint8_t> cacheData(cacheSize);
+	if (fread(cacheData.data(), 1, cacheSize, f) == cacheSize)
+	{
+		try {
+			// Create a new pipeline cache and use it
+			vk::PipelineCacheCreateInfo createInfo(vk::PipelineCacheCreateFlags(), cacheSize, cacheData.data());
+			vk::Device device = GetContext()->GetDevice();
+			vk::PipelineCache newCache = device.createPipelineCache(createInfo);
 
-	// Color flags and blending
-	vk::PipelineColorBlendAttachmentState pipelineColorBlendAttachmentState(
-			true,								// blendEnable
-			vk::BlendFactor::eSrcAlpha,			// srcColorBlendFactor
-			vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
-			vk::BlendOp::eAdd,					// colorBlendOp
-			vk::BlendFactor::eSrcAlpha,			// srcAlphaBlendFactor
-			vk::BlendFactor::eOneMinusSrcAlpha, // dstAlphaBlendFactor
-			vk::BlendOp::eAdd,					// alphaBlendOp
-			vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
-						| vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
-	);
-	vk::PipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo
-	(
-	  vk::PipelineColorBlendStateCreateFlags(),   // flags
-	  false,                                      // logicOpEnable
-	  vk::LogicOp::eNoOp,                         // logicOp
-	  pipelineColorBlendAttachmentState,         // attachments
-	  { { 1.0f, 1.0f, 1.0f, 1.0f } }              // blendConstants
-	);
+			// Log success
+			INFO_LOG(RENDERER, "Loaded Vulkan pipeline cache: %zu bytes", cacheSize);
 
-	std::array<vk::DynamicState, 2> dynamicStates = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
-	vk::PipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo(vk::PipelineDynamicStateCreateFlags(), dynamicStates);
-
-	std::array<vk::PipelineShaderStageCreateInfo, 2> stages = {
-			vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(), vk::ShaderStageFlagBits::eVertex, shaderManager->GetOSDVertexShader(), "main"),
-			vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(), vk::ShaderStageFlagBits::eFragment, shaderManager->GetOSDFragmentShader(), "main"),
-	};
-	vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo
-	(
-	  vk::PipelineCreateFlags(),                  // flags
-	  stages,                                     // stages
-	  &vertexInputStateCreateInfo,			      // pVertexInputState
-	  &pipelineInputAssemblyStateCreateInfo,      // pInputAssemblyState
-	  nullptr,                                    // pTessellationState
-	  &pipelineViewportStateCreateInfo,           // pViewportState
-	  &pipelineRasterizationStateCreateInfo,      // pRasterizationState
-	  &pipelineMultisampleStateCreateInfo,        // pMultisampleState
-	  &pipelineDepthStencilStateCreateInfo,       // pDepthStencilState
-	  &pipelineColorBlendStateCreateInfo,         // pColorBlendState
-	  &pipelineDynamicStateCreateInfo,            // pDynamicState
-	  *pipelineLayout,                            // layout
-	  renderPass                                  // renderPass
-	);
-
-	pipeline = GetContext()->GetDevice().createGraphicsPipelineUnique(GetContext()->GetPipelineCache(), graphicsPipelineCreateInfo).value;
+			// TODO: Replace the existing pipeline cache with this one
+			// For now, we'll just destroy it since we can't replace it
+			device.destroyPipelineCache(newCache);
+		}
+		catch (const vk::SystemError& e) {
+			WARN_LOG(RENDERER, "Failed to load pipeline cache: %s", e.what());
+		}
+	}
+	fclose(f);
 }

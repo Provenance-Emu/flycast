@@ -33,14 +33,7 @@ struct BufferData
 		buffer.reset();
 	}
 
-	void upload(u32 size, const void *data, u32 bufOffset = 0) const
-	{
-		verify(bufOffset + size <= bufferSize);
-
-		void* dataPtr = (u8 *)allocation.MapMemory() + bufOffset;
-		memcpy(dataPtr, data, size);
-		allocation.UnmapMemory();
-	}
+	void upload(u32 size, const void *data, u32 bufOffset = 0) const;
 
 	void upload(size_t count, const u32 *sizes, const void * const *data, u32 bufOffset = 0) const
 	{

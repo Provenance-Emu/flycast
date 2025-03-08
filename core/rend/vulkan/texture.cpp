@@ -23,8 +23,40 @@
 #include <algorithm>
 #include <memory>
 
-#ifdef __APPLE__
-#include <TargetConditionals.h>
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#include <arm_neon.h>
+void optimized_texture_upload(void* dst, const void* src, int width, int height, int stride)
+{
+	uint8_t *d = (uint8_t *)dst;
+	const uint8_t *s = (const uint8_t *)src;
+
+	for (int y = 0; y < height; y++)
+	{
+		const uint8_t *src_line = s + y * stride;
+		uint8_t *dst_line = d + y * width * 4;
+
+		// Process 4 pixels (16 bytes) at a time
+		for (int x = 0; x < width; x += 4)
+		{
+			if (x + 4 <= width)
+			{
+				uint8x16_t pixels = vld1q_u8(src_line + x * 4);
+				vst1q_u8(dst_line + x * 4, pixels);
+			}
+			else
+			{
+				// Handle remaining pixels
+				for (int i = 0; i < width - x; i++)
+				{
+					dst_line[x * 4 + i * 4 + 0] = src_line[x * 4 + i * 4 + 0];
+					dst_line[x * 4 + i * 4 + 1] = src_line[x * 4 + i * 4 + 1];
+					dst_line[x * 4 + i * 4 + 2] = src_line[x * 4 + i * 4 + 2];
+					dst_line[x * 4 + i * 4 + 3] = src_line[x * 4 + i * 4 + 3];
+				}
+			}
+		}
+	}
+}
 #endif
 
 void setImageLayout(vk::CommandBuffer const& commandBuffer, vk::Image image, vk::Format format, u32 mipmapLevels, vk::ImageLayout oldImageLayout, vk::ImageLayout newImageLayout)
@@ -246,22 +278,7 @@ void Texture::CreateImage(vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk:
 	image = device.createImageUnique(imageCreateInfo);
 
 	VmaAllocationCreateInfo allocCreateInfo = { VmaAllocationCreateFlags(), needsStaging ? VmaMemoryUsage::VMA_MEMORY_USAGE_GPU_ONLY : VmaMemoryUsage::VMA_MEMORY_USAGE_CPU_TO_GPU };
-#ifdef __APPLE__
-#if TARGET_OS_IOS
-	// iOS MoltenVK: Optimized texture allocation for FMV performance
-	if (!needsStaging) {
-		// For iOS unified memory, use mapped memory for better FMV performance
-		if (extent.width * extent.height > 512 * 512) {
-			// Large textures (likely FMV): Use dedicated allocation
-			allocCreateInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
-			allocCreateInfo.usage = VmaMemoryUsage::VMA_MEMORY_USAGE_GPU_ONLY;
-		} else {
-			// Small textures: Use mapped memory for efficiency
-			allocCreateInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_MAPPED_BIT;
-		}
-	}
-#endif
-#else
+#ifndef __APPLE__
 	if (!needsStaging)
 		allocCreateInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_MAPPED_BIT;
 #endif

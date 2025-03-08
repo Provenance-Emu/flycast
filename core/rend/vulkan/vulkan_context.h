@@ -196,6 +196,11 @@ public:
 	constexpr static int VENDOR_QUALCOMM = 0x5143;
 	constexpr static int VENDOR_MESA = 0x10005;
 
+	void RecreatePipelineCache(const vk::PipelineCacheCreateInfo& createInfo)
+	{
+		pipelineCache = device.createPipelineCacheUnique(createInfo);
+	}
+
 private:
 	void CreateSwapChain();
 	bool InitDevice();
