@@ -15,6 +15,82 @@
 #include "../sh4_cycles.h"
 #include "throttle.h"
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#include <arm_neon.h>
+
+// Use the optimized memory functions from sh4_mem.cpp
+extern u32 DYNACALL optimized_read32(u32 addr);
+extern void DYNACALL optimized_write32(u32 addr, u32 data);
+
+// Optimize floating point operations with NEON
+static inline float optimized_float_add(float a, float b)
+{
+	float32x2_t va = vdup_n_f32(a);
+	float32x2_t vb = vdup_n_f32(b);
+	float32x2_t result = vadd_f32(va, vb);
+	return vget_lane_f32(result, 0);
+}
+
+static inline float optimized_float_mul(float a, float b)
+{
+	float32x2_t va = vdup_n_f32(a);
+	float32x2_t vb = vdup_n_f32(b);
+	float32x2_t result = vmul_f32(va, vb);
+	return vget_lane_f32(result, 0);
+}
+
+// Optimize vector operations with NEON
+static inline void optimized_vector_mul(float *dst, const float *src, float factor, int count)
+{
+	float32x4_t vfactor = vdupq_n_f32(factor);
+
+	for (int i = 0; i < count; i += 4)
+	{
+		float32x4_t vsrc = vld1q_f32(src + i);
+		float32x4_t vresult = vmulq_f32(vsrc, vfactor);
+		vst1q_f32(dst + i, vresult);
+	}
+}
+
+// Optimize memory copy with NEON
+static inline void optimized_memcpy(void *dst, const void *src, size_t size)
+{
+	uint8_t *d = (uint8_t *)dst;
+	const uint8_t *s = (const uint8_t *)src;
+
+	// Handle small copies directly
+	if (size < 16)
+	{
+		for (size_t i = 0; i < size; i++)
+			d[i] = s[i];
+		return;
+	}
+
+	// Align to 16-byte boundary
+	size_t pre = (16 - (size_t)d) & 15;
+	if (pre > 0)
+	{
+		for (size_t i = 0; i < pre; i++)
+			d[i] = s[i];
+		d += pre;
+		s += pre;
+		size -= pre;
+	}
+
+	// Copy 16 bytes at a time
+	size_t main = size & ~15;
+	for (size_t i = 0; i < main; i += 16)
+	{
+		uint8x16_t v = vld1q_u8(s + i);
+		vst1q_u8(d + i, v);
+	}
+
+	// Copy remaining bytes
+	for (size_t i = main; i < size; i++)
+		d[i] = s[i];
+}
+#endif
+
 Sh4ICache icache;
 Sh4OCache ocache;
 Sh4Interpreter *Sh4Interpreter::Instance;
@@ -26,7 +102,59 @@ void Sh4Interpreter::ExecuteOpcode(u16 op)
 {
 	if (ctx->sr.FD == 1 && OpDesc[op]->IsFloatingPoint())
 		throw SH4ThrownException(ctx->pc - 2, Sh4Ex_FpuDisabled);
+
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+	// Use optimized execution for common opcodes
+	switch (op)
+	{
+		// Optimize memory access opcodes
+		case 0x2000: // MOV.B Rm,@Rn
+		case 0x2001: // MOV.W Rm,@Rn
+		case 0x2002: // MOV.L Rm,@Rn
+		{
+			u32 n = ((op >> 8) & 0xf);
+			u32 m = ((op >> 4) & 0xf);
+			u32 addr = ctx->r[n];
+			u32 data = ctx->r[m];
+
+			if ((op & 3) == 2) // MOV.L
+				optimized_write32(addr, data);
+			else
+				OpPtr[op](ctx, op); // Fall back for other sizes
+
+			sh4cycles.executeCycles(op);
+			return;
+		}
+
+		// Optimize floating point opcodes
+		case 0xF000: // FADD Rm,Rn
+		{
+			u32 n = ((op >> 8) & 0xf);
+			u32 m = ((op >> 4) & 0xf);
+			ctx->fr[n] = optimized_float_add(ctx->fr[n], ctx->fr[m]);
+			sh4cycles.executeCycles(op);
+			return;
+		}
+
+		case 0xF002: // FMUL Rm,Rn
+		{
+			u32 n = ((op >> 8) & 0xf);
+			u32 m = ((op >> 4) & 0xf);
+			ctx->fr[n] = optimized_float_mul(ctx->fr[n], ctx->fr[m]);
+			sh4cycles.executeCycles(op);
+			return;
+		}
+
+		default:
+			// Use standard execution for other opcodes
+			OpPtr[op](ctx, op);
+			break;
+	}
+#else
+	// Standard execution
 	OpPtr[op](ctx, op);
+#endif
+
 	sh4cycles.executeCycles(op);
 }
 
