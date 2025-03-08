@@ -2,19 +2,12 @@
 #include "arm_mem.h"
 #include "arm7_rec.h"
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#include <arm_neon.h>
+#endif
+
 namespace aica::arm
 {
-
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-// Forward declarations for optimized functions
-static inline void updateFlagsNeon(u32 result);
-static inline u32 logicalOpNeon(u32 op, u32 a, u32 b);
-static inline u32 arithmeticOpNeon(u32 op, u32 a, u32 b);
-static inline u32 memReadOptimized(u32 address);
-static inline void memWriteOptimized(u32 address, u32 value);
-static inline bool checkConditionOptimized(u32 condition);
-static inline u32 shiftOptimized(u32 value, u32 type, u32 amount, bool& carry);
-#endif
 
 #define CPUReadMemoryQuick(addr) (*(u32*)&aica_ram[(addr) & ARAM_MASK])
 #define CPUReadByte readMem<u8>
@@ -67,9 +60,7 @@ int arm7ClockTicks;
 
 #if FEAT_AREC == DYNAREC_NONE
 
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-// Fast path interpreter loop for ARM64 processors
-static void runInterpreterOptimized(u32 CycleCount)
+static void runInterpreter(u32 CycleCount)
 {
 	if (!Arm7Enabled)
 		return;
@@ -90,262 +81,30 @@ static void runInterpreterOptimized(u32 CycleCount)
 		// Process instructions until we're caught up
 		while (arm7ClockTicks < 0)
 		{
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+			// Fast path for A10X+ devices
 			// Load next PC value and update R15
 			uint32_t nextPC = armNextPC;
 			reg[15].I = nextPC + 8;
 
 			// Prefetch the next instruction with direct assembly
-			uint32_t opcode;
+			uint32_t prefetched_opcode;
 			__asm__ volatile(
 				"ldr %w[opcode], [%[addr]]\n"
-				: [opcode] "=r" (opcode)
+				: [opcode] "=r" (prefetched_opcode)
 				: [addr] "r" (&aica_ram[nextPC & ARAM_MASK])
 				: "memory"
 			);
 
-			// Fast path for common operations
-			uint32_t op_type = (opcode >> 24) & 0xF;
-
-			// Handle data processing instructions (most common)
-			if (op_type < 4)
-			{
-				// Check condition code first
-				uint32_t cond = (opcode >> 28) & 0xF;
-				if (checkConditionOptimized(cond))
-				{
-					// Data processing instruction
-					uint32_t op = (opcode >> 21) & 0xF;
-					uint32_t s_bit = (opcode >> 20) & 1;
-					uint32_t rn = (opcode >> 16) & 0xF;
-					uint32_t rd = (opcode >> 12) & 0xF;
-
-					// Get operand 2
-					uint32_t operand2;
-					bool carry = C_FLAG;
-
-					if (opcode & (1 << 25)) // Immediate operand
-					{
-						uint32_t imm = opcode & 0xFF;
-						uint32_t rot = ((opcode >> 8) & 0xF) * 2;
-						if (rot > 0)
-							operand2 = (imm >> rot) | (imm << (32 - rot));
-						else
-							operand2 = imm;
-					}
-					else // Register operand with optional shift
-					{
-						uint32_t rm = opcode & 0xF;
-						uint32_t shift_type = (opcode >> 5) & 3;
-						uint32_t shift_amount;
-
-						if (opcode & (1 << 4)) // Shift by register
-						{
-							shift_amount = reg[(opcode >> 8) & 0xF].I & 0xFF;
-						}
-						else // Shift by immediate
-						{
-							shift_amount = (opcode >> 7) & 0x1F;
-						}
-
-						operand2 = shiftOptimized(reg[rm].I, shift_type, shift_amount, carry);
-					}
-
-					// Execute operation based on opcode
-					uint32_t result;
-
-					switch (op)
-					{
-						case 0: // AND
-						case 1: // EOR
-						case 12: // ORR
-						case 14: // BIC
-						case 15: // MVN
-							result = logicalOpNeon(op, reg[rn].I, operand2);
-							if (s_bit)
-								C_FLAG = carry;
-							break;
-
-						case 2: // SUB
-						case 4: // ADD
-						case 5: // ADC
-						case 6: // SBC
-							result = arithmeticOpNeon(op, reg[rn].I, operand2);
-							break;
-
-						case 10: // CMP
-							arithmeticOpNeon(2, reg[rn].I, operand2); // SUB with flags
-							arm7ClockTicks -= 1;
-							continue;
-
-						case 11: // CMN
-							arithmeticOpNeon(4, reg[rn].I, operand2); // ADD with flags
-							arm7ClockTicks -= 1;
-							continue;
-
-						case 13: // MOV
-							result = operand2;
-							if (s_bit)
-							{
-								updateFlagsNeon(result);
-								C_FLAG = carry;
-							}
-							break;
-
-						default:
-							// Fall back to interpreter for other operations
-							int& clockTicks = arm7ClockTicks;
-							#include "arm-new.h"
-							continue;
-					}
-
-					// Write result to destination register
-					if (rd == 15)
-					{
-						armNextPC = result & ~3;
-						reg[15].I = armNextPC + 4;
-					}
-					else
-					{
-						reg[rd].I = result;
-					}
-
-					arm7ClockTicks -= 1;
-				}
-				else
-				{
-					// Condition failed, just consume a cycle
-					arm7ClockTicks -= 1;
-				}
-			}
-			else if (op_type == 5) // Branch
-			{
-				uint32_t cond = (opcode >> 28) & 0xF;
-				if (checkConditionOptimized(cond))
-				{
-					int32_t offset = (opcode & 0x00FFFFFF) << 2;
-					// Sign extend
-					if (offset & 0x02000000)
-						offset |= 0xFC000000;
-
-					// Check if it's BL (link)
-					if (opcode & (1 << 24))
-						reg[14].I = reg[15].I - 4;
-
-					armNextPC = reg[15].I + offset - 8;
-					reg[15].I = armNextPC + 8;
-				}
-
-				arm7ClockTicks -= 3; // Branches take 3 cycles
-			}
-			else if ((op_type == 4) && ((opcode & 0x0F000000) == 0x04000000)) // Single data transfer
-			{
-				uint32_t cond = (opcode >> 28) & 0xF;
-				if (checkConditionOptimized(cond))
-				{
-					uint32_t rn = (opcode >> 16) & 0xF;
-					uint32_t rd = (opcode >> 12) & 0xF;
-					uint32_t offset;
-
-					if (opcode & (1 << 25)) // Register offset
-					{
-						uint32_t rm = opcode & 0xF;
-						uint32_t shift_type = (opcode >> 5) & 3;
-						uint32_t shift_amount = (opcode >> 7) & 0x1F;
-						bool dummy;
-						offset = shiftOptimized(reg[rm].I, shift_type, shift_amount, dummy);
-					}
-					else // Immediate offset
-					{
-						offset = opcode & 0xFFF;
-					}
-
-					uint32_t address = reg[rn].I;
-					if (!(opcode & (1 << 23))) // Subtract offset
-						offset = -offset;
-
-					if (opcode & (1 << 24)) // Pre-indexed
-						address += offset;
-
-					if (opcode & (1 << 20)) // Load
-					{
-						if (opcode & (1 << 22)) // Byte
-							reg[rd].I = readMem<u8>(address);
-						else // Word
-							reg[rd].I = readMem<u32>(address);
-
-						if (rd == 15)
-						{
-							armNextPC = reg[15].I & ~3;
-							reg[15].I = armNextPC + 4;
-						}
-					}
-					else // Store
-					{
-						if (opcode & (1 << 22)) // Byte
-							writeMem<u8>(address, (u8)reg[rd].I);
-						else // Word
-							writeMem<u32>(address, reg[rd].I);
-					}
-
-					if (!(opcode & (1 << 24)) && (opcode & (1 << 21))) // Post-indexed with writeback
-						reg[rn].I += offset;
-
-					arm7ClockTicks -= (rd == 15) ? 5 : 3;
-				}
-				else
-				{
-					// Condition failed, just consume a cycle
-					arm7ClockTicks -= 1;
-				}
-			}
-			else
-			{
-				// Fall back to interpreter for other operations
-				int& clockTicks = arm7ClockTicks;
-				#include "arm-new.h"
-			}
-
-			// Check for new interrupts after each instruction
-			if (reg[INTR_PEND].I)
-			{
-				CPUFiq();
-				// After handling an interrupt, we might have caught up
-				if (arm7ClockTicks >= 0)
-					break;
-			}
-		}
-	}
-}
-#endif
-
-// Main interpreter function that selects the appropriate implementation
-static void runInterpreter(u32 CycleCount)
-{
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-	runInterpreterOptimized(CycleCount);
+			// Process the instruction
+			int& clockTicks = arm7ClockTicks;
+			#include "arm-new.h"
 #else
-	if (!Arm7Enabled)
-		return;
-
-	// Pre-check if interrupts are pending to avoid unnecessary work
-	bool has_interrupts = reg[INTR_PEND].I != 0;
-
-	// Subtract cycles in one go
-	arm7ClockTicks -= CycleCount;
-
-	// Process only if we have cycles to run or interrupts pending
-	if (arm7ClockTicks < 0 || has_interrupts)
-	{
-		// Handle pending interrupts first
-		if (has_interrupts)
-			CPUFiq();
-
-		// Process instructions until we're caught up
-		while (arm7ClockTicks < 0)
-		{
+			// Original implementation
 			reg[15].I = armNextPC + 8;
 			int& clockTicks = arm7ClockTicks;
 			#include "arm-new.h"
+#endif
 
 			// Check for new interrupts after each instruction
 			if (reg[INTR_PEND].I)
@@ -357,7 +116,6 @@ static void runInterpreter(u32 CycleCount)
 			}
 		}
 	}
-#endif
 }
 
 void avoidRaceCondition()
@@ -830,40 +588,26 @@ static inline u32 arithmeticOpNeon(u32 op, u32 a, u32 b)
             );
             break;
         case 5: // ADC
-            {
-                // Set carry flag manually using a simpler approach
-                u32 temp = 0;
-                if (C_FLAG)
-                    temp = 1;
-
-                __asm__ volatile(
-                    "adds %w[result], %w[a], %w[b]\n"
-                    "adcs %w[result], %w[result], %w[temp]\n"
-                    "cset %w[carry], cs\n"
-                    "cset %w[overflow], vs\n"
-                    : [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
-                    : [a] "r" (a), [b] "r" (b), [temp] "r" (temp)
-                    : "cc"
-                );
-            }
+            __asm__ volatile(
+                "rmif %[c_flag], #1, #1\n" // Set carry flag based on C_FLAG
+                "adcs %w[result], %w[a], %w[b]\n"
+                "cset %w[carry], cs\n"
+                "cset %w[overflow], vs\n"
+                : [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
+                : [a] "r" (a), [b] "r" (b), [c_flag] "r" ((u32)C_FLAG)
+                : "cc"
+            );
             break;
         case 6: // SBC
-            {
-                // Set carry flag manually using a simpler approach
-                u32 temp = 0;
-                if (!C_FLAG)
-                    temp = 1;
-
-                __asm__ volatile(
-                    "subs %w[result], %w[a], %w[b]\n"
-                    "sbcs %w[result], %w[result], %w[temp]\n"
-                    "cset %w[carry], cs\n"
-                    "cset %w[overflow], vs\n"
-                    : [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
-                    : [a] "r" (a), [b] "r" (b), [temp] "r" (temp)
-                    : "cc"
-                );
-            }
+            __asm__ volatile(
+                "rmif %[c_flag], #1, #1\n" // Set carry flag based on C_FLAG
+                "sbcs %w[result], %w[a], %w[b]\n"
+                "cset %w[carry], cs\n"
+                "cset %w[overflow], vs\n"
+                : [result] "=r" (result), [carry] "=r" (carry_out), [overflow] "=r" (overflow)
+                : [a] "r" (a), [b] "r" (b), [c_flag] "r" ((u32)C_FLAG)
+                : "cc"
+            );
             break;
         default:
             result = 0;
@@ -971,7 +715,7 @@ static inline bool checkConditionOptimized(u32 condition)
 static inline u32 shiftOptimized(u32 value, u32 type, u32 amount, bool& carry)
 {
     u32 result;
-    u32 carry_out = 0;
+    u32 carry_out;
 
     switch(type) {
         case 0: // LSL
@@ -979,8 +723,14 @@ static inline u32 shiftOptimized(u32 value, u32 type, u32 amount, bool& carry)
                 return value;
             }
             else if (amount < 32) {
-                result = value << amount;
-                carry_out = (value >> (32 - amount)) & 1;
+                __asm__ volatile(
+                    "lsl %w[result], %w[value], %w[amount]\n"
+                    "ubfx %w[carry], %w[value], %w[carry_bit], #1\n"
+                    : [result] "=r" (result), [carry] "=r" (carry_out)
+                    : [value] "r" (value), [amount] "r" (amount),
+                      [carry_bit] "r" (32 - amount)
+                    :
+                );
             }
             else if (amount == 32) {
                 result = 0;
@@ -997,8 +747,14 @@ static inline u32 shiftOptimized(u32 value, u32 type, u32 amount, bool& carry)
                 return value;
             }
             else if (amount < 32) {
-                result = value >> amount;
-                carry_out = (value >> (amount - 1)) & 1;
+                __asm__ volatile(
+                    "lsr %w[result], %w[value], %w[amount]\n"
+                    "ubfx %w[carry], %w[value], %w[carry_bit], #1\n"
+                    : [result] "=r" (result), [carry] "=r" (carry_out)
+                    : [value] "r" (value), [amount] "r" (amount),
+                      [carry_bit] "r" (amount - 1)
+                    :
+                );
             }
             else if (amount == 32) {
                 result = 0;
@@ -1015,8 +771,14 @@ static inline u32 shiftOptimized(u32 value, u32 type, u32 amount, bool& carry)
                 return value;
             }
             else if (amount < 32) {
-                result = (s32)value >> amount;
-                carry_out = (value >> (amount - 1)) & 1;
+                __asm__ volatile(
+                    "asr %w[result], %w[value], %w[amount]\n"
+                    "ubfx %w[carry], %w[value], %w[carry_bit], #1\n"
+                    : [result] "=r" (result), [carry] "=r" (carry_out)
+                    : [value] "r" (value), [amount] "r" (amount),
+                      [carry_bit] "r" (amount - 1)
+                    :
+                );
             }
             else {
                 // ASR by 32 or more gives all 1s or all 0s depending on sign bit
@@ -1036,8 +798,14 @@ static inline u32 shiftOptimized(u32 value, u32 type, u32 amount, bool& carry)
                     carry_out = (value >> 31) & 1;
                 }
                 else {
-                    result = (value >> amount) | (value << (32 - amount));
-                    carry_out = (value >> (amount - 1)) & 1;
+                    __asm__ volatile(
+                        "ror %w[result], %w[value], %w[amount]\n"
+                        "ubfx %w[carry], %w[value], %w[carry_bit], #1\n"
+                        : [result] "=r" (result), [carry] "=r" (carry_out)
+                        : [value] "r" (value), [amount] "r" (amount),
+                          [carry_bit] "r" (amount - 1)
+                        :
+                    );
                 }
             }
             break;
