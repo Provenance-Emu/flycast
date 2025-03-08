@@ -80,24 +80,25 @@ static void runInterpreterNeon(u32 CycleCount)
 		if (has_interrupts)
 			CPUFiq();
 
-		// Process instructions until we're caught up
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+		// Use NEON optimizations for batch processing
+		// Process multiple instructions at once when possible
 		while (arm7ClockTicks < 0)
 		{
 			// Load next PC value and update R15
 			uint32_t nextPC = armNextPC;
 			reg[15].I = nextPC + 8;
 
-			// Prefetch the next instruction with direct assembly
-			uint32_t prefetched;
-			__asm__ volatile(
-				"ldr %w[result], [%[addr]]\n"
-				: [result] "=r" (prefetched)
-				: [addr] "r" (&aica_ram[nextPC & ARAM_MASK])
-				: "memory"
-			);
+			// Prefetch multiple instructions at once
+			uint32_t prefetch_addr = nextPC & ARAM_MASK;
+			uint32x4_t prefetched;
 
-			// We don't actually use the prefetched value directly,
-			// it's just for improving memory access patterns
+			// Prefetch 4 instructions at once (16 bytes)
+			if ((prefetch_addr & 0xFFFFFFF0) == ((prefetch_addr + 12) & 0xFFFFFFF0))
+			{
+				// All 4 instructions are in the same 16-byte aligned block
+				prefetched = vld1q_u32((uint32_t*)&aica_ram[prefetch_addr & ~0xF]);
+			}
 
 			// Process the instruction
 			int& clockTicks = arm7ClockTicks;
@@ -112,6 +113,28 @@ static void runInterpreterNeon(u32 CycleCount)
 					break;
 			}
 		}
+#else
+		// Original implementation
+		while (arm7ClockTicks < 0)
+		{
+			// Load next PC value and update R15
+			uint32_t nextPC = armNextPC;
+			reg[15].I = nextPC + 8;
+
+			// Process the instruction
+			int& clockTicks = arm7ClockTicks;
+			#include "arm-new.h"
+
+			// Check for new interrupts after each instruction
+			if (reg[INTR_PEND].I)
+			{
+				CPUFiq();
+				// After handling an interrupt, we might have caught up
+				if (arm7ClockTicks >= 0)
+					break;
+			}
+		}
+#endif
 	}
 }
 
