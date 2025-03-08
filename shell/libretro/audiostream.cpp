@@ -19,6 +19,7 @@
 #include "audio/audiostream.h"
 #include "emulator.h"
 #include "throttle.h"
+#include "timestretch.h"
 
 #include <libretro.h>
 
@@ -64,6 +65,10 @@ static bool drop_samples = true;
 
 static int16_t *audio_out_buffer = nullptr;
 
+static TimeStretcher timeStretcher;
+static std::vector<s16> stretch_buffer;
+bool use_timestretch = true;
+
 void retro_audio_init(void)
 {
 	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
@@ -85,12 +90,16 @@ void retro_audio_init(void)
 	audio_batch_frames_max = std::numeric_limits<size_t>::max();
 
 	audio_out_buffer = (int16_t*)malloc(audio_buffer_size * sizeof(int16_t));
+	stretch_buffer.resize(audio_buffer_size);
 
 	drop_samples = false;
 
 	audio_samples_per_frame_avg = 0.0f;
 	vsync_swap_interval_last = 1;
 	vsync_swap_interval_conter = 0;
+
+	// Initialize time stretcher
+	timeStretcher = TimeStretcher(2, 1024);
 }
 
 void retro_audio_deinit(void)
@@ -124,23 +133,50 @@ void retro_audio_flush_buffer(void)
 
 void retro_audio_upload(void)
 {
-	audio_buffer_mutex.lock();
+	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
 
-	for (size_t i = 0; i < audio_buffer_idx; i++)
-		audio_out_buffer[i] = audio_buffer[i];
+	if (audio_buffer_idx == 0)
+		return;
 
 	size_t num_frames = audio_buffer_idx >> 1;
-	audio_buffer_idx = 0;
 
-	/* Uploading audio 'resets' the audio buffer
-	 * -> any 'drop samples' lock can be released */
-	drop_samples = false;
+	/* When running in unthrottled mode, use time stretching */
+	if (use_timestretch && (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
+		throttle_state == RETRO_THROTTLE_FAST_FORWARD))
+	{
+		// Set stretch factor based on throttle state
+		float stretch_factor = 0.5f; // Default to double speed
 
-	audio_buffer_mutex.unlock();
+		if (throttle_rate > 0.0f && throttle_rate < 10.0f)
+			stretch_factor = 1.0f / throttle_rate;
 
-	/* Attempt to detect changes in output refresh rate */
-	if (libretro_detect_vsync_swap_interval &&
-	    (num_frames > 0))
+		timeStretcher.setStretchFactor(stretch_factor);
+
+		// Copy audio buffer to a temporary buffer for processing
+		std::vector<s16> temp_buffer(audio_buffer.begin(), audio_buffer.begin() + audio_buffer_idx);
+
+		// Process audio through time stretcher
+		int stretched_frames = timeStretcher.process(
+			temp_buffer.data(),
+			num_frames,
+			(s16*)audio_out_buffer,
+			audio_buffer.size() / 2);
+
+		// Use the stretched audio
+		if (stretched_frames > 0)
+		{
+			// Send the processed audio directly to the frontend
+			audio_batch_cb(audio_out_buffer, stretched_frames);
+
+			// Reset audio buffer
+			audio_buffer_idx = 0;
+			drop_samples = false;
+			return;
+		}
+	}
+
+	/* Update vsync swap interval detection */
+	if (libretro_detect_vsync_swap_interval)
 	{
 		/* Simple running average (leaky-integrator) */
 		audio_samples_per_frame_avg = ((1.0f / (float)VSYNC_SWAP_INTERVAL_FRAMES) * (float)num_frames) +
@@ -197,21 +233,15 @@ void retro_audio_upload(void)
 			vsync_swap_interval_conter = 0;
 	}
 
-	int16_t *audio_out_buffer_ptr = audio_out_buffer;
-	while (num_frames > 0)
-	{
-		size_t frames_to_write = (num_frames > audio_batch_frames_max) ?
-				audio_batch_frames_max : num_frames;
-		size_t frames_written = audio_batch_cb(audio_out_buffer_ptr,
-				frames_to_write);
+	// Copy audio buffer to output buffer
+	memcpy(audio_out_buffer, audio_buffer.data(), audio_buffer_idx * sizeof(s16));
 
-		if ((frames_written < frames_to_write) &&
-			 (frames_written > 0))
-			audio_batch_frames_max = frames_written;
+	// Send audio to frontend
+	audio_batch_cb(audio_out_buffer, num_frames);
 
-		num_frames -= frames_to_write;
-		audio_out_buffer_ptr += frames_to_write << 1;
-	}
+	/* Reset audio buffer */
+	audio_buffer_idx = 0;
+	drop_samples = false;
 }
 
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
@@ -231,27 +261,9 @@ void WriteSample(s16 r, s16 l)
 		return;
 	}
 
-	// When running unthrottled, add a small amount of noise to break up patterns
-	if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
-	{
-		// Add a tiny bit of noise to break up patterns (very subtle)
-		static u32 noise_seed = 0x55555555;
-		noise_seed = noise_seed * 1664525 + 1013904223;
-		int noise_l = ((noise_seed >> 16) & 3) - 1; // -1, 0, or 1
-		noise_seed = noise_seed * 1664525 + 1013904223;
-		int noise_r = ((noise_seed >> 16) & 3) - 1; // -1, 0, or 1
-
-		// Store samples with noise
-		audio_buffer[audio_buffer_idx++] = l + noise_l;
-		audio_buffer[audio_buffer_idx++] = r + noise_r;
-	}
-	else
-	{
-		// Normal operation - store samples directly
-		audio_buffer[audio_buffer_idx++] = l;
-		audio_buffer[audio_buffer_idx++] = r;
-	}
+	// Store samples directly without noise
+	audio_buffer[audio_buffer_idx++] = l;
+	audio_buffer[audio_buffer_idx++] = r;
 }
 #else
 // Original implementation
