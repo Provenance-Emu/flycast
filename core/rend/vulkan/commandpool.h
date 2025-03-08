@@ -33,6 +33,7 @@ public:
 	void EndFrame();
 	void EndFrameAndWait();
 	vk::CommandBuffer Allocate(bool submitLast = false);
+	std::vector<vk::CommandBuffer> AllocateBatch(int count, bool submitLast = false);
 
 	int GetIndex() const {
 		return index;

@@ -27,6 +27,11 @@ public:
 	static void Init();
 	static void Term();
 	static vk::UniqueShaderModule Compile(vk::ShaderStageFlagBits shaderStage, std::string const& shaderText);
+
+	// Add these declarations
+	static void CacheShader(const std::string& key, const std::vector<uint32_t>& spirv);
+	static bool LoadCachedShader(const std::string& key, std::vector<uint32_t>& spirv);
+
 private:
 	static int initCount;
 };

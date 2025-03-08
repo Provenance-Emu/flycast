@@ -256,6 +256,9 @@ public:
 	vk::DescriptorSetLayout GetPerPolyDSLayout() const { return *perPolyLayout; }
 	vk::RenderPass GetRenderPass() const { return renderPass; }
 
+	void SavePipelineCache();
+	void LoadPipelineCache();
+
 private:
 	void CreateModVolPipeline(ModVolMode mode, int cullMode, bool naomi2);
 	void CreateDepthPassPipeline(int cullMode, bool naomi2);
@@ -324,7 +327,7 @@ private:
 				attributeDescriptionSize = std::size(vertexInputAttributeDescriptions) - 1;
 			}
 		}
-		
+
 
 
 		return vk::PipelineVertexInputStateCreateInfo(
