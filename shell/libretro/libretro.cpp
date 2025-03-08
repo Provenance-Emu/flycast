@@ -65,7 +65,7 @@
 #include "cfg/option.h"
 #include "version.h"
 #include "oslib/oslib.h"
-#include "timestretch.h"
+#include "throttle.h"
 
 constexpr char slash = path_default_slash_c();
 
@@ -137,16 +137,6 @@ static bool textureUpscaleEnabled = false;
 #endif
 static bool vmuScreenSettingsShown = true;
 static bool lightgunSettingsShown = true;
-
-
-int throttle_state = RETRO_THROTTLE_NORMAL;
-float throttle_rate = 1.0f;
-
-// Add this extern declaration at the top of the file
-extern bool use_timestretch;
-
-// Add this declaration at the top of the file with other extern declarations
-// extern float sh4_cpu_freq_scale;
 
 u32 kcode[4] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
 u16 rt[4];
@@ -1168,55 +1158,46 @@ static void update_variables(bool first_startup)
 		// must *not* be changed once a game is started
 		config::EmulateBBA.override(emulateBba);
 	}
-
-	var.key = CORE_OPTION_NAME "_use_timestretch";
-	if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-	{
-		if (!strcmp(var.value, "enabled"))
-			use_timestretch = true;
-		else
-			use_timestretch = false;
-	}
 }
 
 void retro_run()
 {
-    bool updated = false;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
-        update_variables(false);
+	bool updated = false;
+	if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
+		update_variables(false);
 
-    if (devices_need_refresh)
-        refresh_devices(false);
+	if (devices_need_refresh)
+		refresh_devices(false);
 
-    // Check throttle state
-    struct retro_throttle_state throttle_state_info;
-    throttle_state_info.rate = 0.0f;
+	// Check throttle state
+	struct retro_throttle_state throttle_state_info;
+	throttle_state_info.rate = 0.0f;
 
-    if (environ_cb(RETRO_ENVIRONMENT_GET_THROTTLE_STATE, &throttle_state_info))
-    {
-        throttle_state = throttle_state_info.mode;
-        throttle_rate = throttle_state_info.rate;
-    }
+	if (environ_cb(RETRO_ENVIRONMENT_GET_THROTTLE_STATE, &throttle_state_info))
+	{
+		throttle_state = throttle_state_info.mode;
+		throttle_rate = throttle_state_info.rate;
+	}
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-    if (isOpenGL(config::RendererType))
-        glsm_ctl(GLSM_CTL_STATE_BIND, nullptr);
+	if (isOpenGL(config::RendererType))
+		glsm_ctl(GLSM_CTL_STATE_BIND, nullptr);
 #endif
 
-    // On the first call, we start the emulator
-    if (first_run)
-        emu.start();
+	// On the first call, we start the emulator
+	if (first_run)
+		emu.start();
 
-    poll_cb();
-    os_UpdateInputState();
-    bool fastforward = false;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_FASTFORWARDING, &fastforward))
-        settings.input.fastForwardMode = fastforward;
+	poll_cb();
+	os_UpdateInputState();
+	bool fastforward = false;
+	if (environ_cb(RETRO_ENVIRONMENT_GET_FASTFORWARDING, &fastforward))
+		settings.input.fastForwardMode = fastforward;
 
-    is_dupe = true;
-    try {
-        if (config::ThreadedRendering)
-        {
+	is_dupe = true;
+	try {
+		if (config::ThreadedRendering)
+		{
             // Measure performance and adjust frame skipping
             static u64 last_frame_time = 0;
             static int skip_counter = 0;
@@ -1250,37 +1231,37 @@ void retro_run()
             // Render with frame skipping
             if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
             {
-                for (int i = 0; i < 5 && is_dupe; i++)
-                    is_dupe = !emu.render();
-            }
+			for (int i = 0; i < 5 && is_dupe; i++)
+				is_dupe = !emu.render();
+		}
         }
-        else
-        {
-            startTime = sh4_sched_now64();
+		else
+		{
+			startTime = sh4_sched_now64();
             // Define should_skip for non-threaded rendering too
             bool should_skip = false;
             if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
-                emu.render();
+			emu.render();
             else
                 is_dupe = true;
-        }
-    } catch (const FlycastException& e) {
-        ERROR_LOG(COMMON, "%s", e.what());
-        os_notify(e.what(), 5000);
-        environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-    }
+		}
+	} catch (const FlycastException& e) {
+		ERROR_LOG(COMMON, "%s", e.what());
+		os_notify(e.what(), 5000);
+		environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+	}
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-    if (isOpenGL(config::RendererType))
-        glsm_ctl(GLSM_CTL_STATE_UNBIND, nullptr);
+	if (isOpenGL(config::RendererType))
+		glsm_ctl(GLSM_CTL_STATE_UNBIND, nullptr);
 #endif
 
-    video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
+	video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
 
     // Always process audio regardless of throttle state
     retro_audio_upload();
 
-    first_run = false;
+	first_run = false;
 
     // Measure performance and adjust CPU frequency
     static u64 last_frame_time = 0;
@@ -3843,3 +3824,6 @@ void os_notify(const char *msg, int durationMs, const char *details)
 	retromsg.frames = durationMs / 17;
 	environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &retromsg);
 }
+
+int throttle_state = RETRO_THROTTLE_NORMAL;
+float throttle_rate = 1.0f;

@@ -1,8 +1,6 @@
 #pragma once
 
-#include <libretro.h>
-
-// Throttle state definitions - only define if not already defined in libretro.h
+// Throttle state definitions
 #ifndef RETRO_THROTTLE_NONE
 #define RETRO_THROTTLE_NONE      0
 #endif
@@ -33,17 +31,6 @@
 
 #ifndef RETRO_THROTTLE_UNBLOCKED
 #define RETRO_THROTTLE_UNBLOCKED    7
-#endif
-
-// Define the throttle state struct if not already defined
-#ifndef RETRO_ENVIRONMENT_GET_THROTTLE_STATE
-#define RETRO_ENVIRONMENT_GET_THROTTLE_STATE 56
-
-struct retro_throttle_state
-{
-   uint32_t mode;
-   float rate;
-};
 #endif
 
 // Global throttle state variables
