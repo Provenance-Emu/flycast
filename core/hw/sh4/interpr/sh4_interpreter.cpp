@@ -14,6 +14,8 @@
 #include "debug/gdb_server.h"
 #include "../sh4_cycles.h"
 
+float sh4_cpu_timescale = 1.0f;
+
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
 #include <arm_neon.h>
 
@@ -344,8 +346,12 @@ void Sh4_int_Run()
 
 	while (sh4_int_bCpuRun)
 	{
+		// Apply CPU frequency scaling to the batch size
+		int scaled_batch_size = (int)(CYCLE_BATCH_SIZE * sh4_cpu_timescale);
+		scaled_batch_size = std::max(1000, std::min(30000, scaled_batch_size));
+
 		// Process in larger batches for better efficiency
-		for (int i = 0; i < CYCLE_BATCH_SIZE && sh4_int_bCpuRun; i++)
+		for (int i = 0; i < scaled_batch_size && sh4_int_bCpuRun; i++)
 		{
 			try {
 				// Use the existing ExecuteOpcode function

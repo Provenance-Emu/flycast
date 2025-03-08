@@ -44,3 +44,6 @@ static inline f64 fixNaN64(f64 f)
 #endif
 	return f;
 }
+
+// Add this declaration to the header file
+extern float sh4_cpu_timescale;

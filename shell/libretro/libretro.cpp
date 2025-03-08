@@ -51,6 +51,7 @@
 #endif
 #include "emulator.h"
 #include "hw/sh4/sh4_mem.h"
+#include "hw/sh4/sh4_core.h"
 #include "hw/sh4/sh4_sched.h"
 #include "keyboard_map.h"
 #include "hw/maple/maple_cfg.h"
@@ -66,6 +67,7 @@
 #include "version.h"
 #include "oslib/oslib.h"
 #include "throttle.h"
+#include <chrono>
 
 constexpr char slash = path_default_slash_c();
 
@@ -1160,24 +1162,65 @@ static void update_variables(bool first_startup)
 	}
 }
 
+// Add these declarations at the top of the file, before any function definitions
+static u64 frame_timing_last_time = 0;
+static float frame_timing_smoothed = 1.0f / 60.0f; // Start with 60fps assumption
+static float frame_timing_speed = 1.0f;
+
 void retro_run()
 {
-	bool updated = false;
-	if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
-		update_variables(false);
+    bool updated = false;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
+        update_variables(false);
 
-	if (devices_need_refresh)
-		refresh_devices(false);
+    if (devices_need_refresh)
+        refresh_devices(false);
 
-	// Check throttle state
-	struct retro_throttle_state throttle_state_info;
-	throttle_state_info.rate = 0.0f;
+    // Check throttle state
+    struct retro_throttle_state throttle_state_info;
+    throttle_state_info.rate = 0.0f;
 
-	if (environ_cb(RETRO_ENVIRONMENT_GET_THROTTLE_STATE, &throttle_state_info))
-	{
-		throttle_state = throttle_state_info.mode;
-		throttle_rate = throttle_state_info.rate;
-	}
+    if (environ_cb(RETRO_ENVIRONMENT_GET_THROTTLE_STATE, &throttle_state_info))
+    {
+        throttle_state = throttle_state_info.mode;
+        throttle_rate = throttle_state_info.rate;
+    }
+
+    // Measure frame time
+    u64 frame_timing_current = sh4_sched_now64();
+    if (frame_timing_last_time != 0)
+    {
+        float frame_time = (frame_timing_current - frame_timing_last_time) / 1000000.0f;
+        // Smooth the frame time to avoid jitter
+        frame_timing_smoothed = frame_timing_smoothed * 0.9f + frame_time * 0.1f;
+
+        // Calculate target frame time (60fps by default)
+        float target_frame_time = 1.0f / 60.0f;
+
+        // Adjust emulation speed based on frame time
+        if (throttle_state == RETRO_THROTTLE_NONE || throttle_state == RETRO_THROTTLE_UNBLOCKED)
+        {
+            // In normal mode, try to maintain 60fps
+            frame_timing_speed = target_frame_time / (frame_timing_smoothed > 0 ? frame_timing_smoothed : target_frame_time);
+
+            // Limit speed factor to reasonable range
+            frame_timing_speed = std::max(0.5f, std::min(1.5f, frame_timing_speed));
+        }
+        else if (throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+        {
+            // In fast-forward, use the throttle rate
+            frame_timing_speed = throttle_rate > 0 ? throttle_rate : 2.0f;
+        }
+        else
+        {
+            // Default to normal speed
+            frame_timing_speed = 1.0f;
+        }
+
+        // Apply emulation speed to SH4 CPU
+        sh4_cpu_timescale = frame_timing_speed;
+    }
+    frame_timing_last_time = frame_timing_current;
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 	if (isOpenGL(config::RendererType))
@@ -1229,7 +1272,7 @@ void retro_run()
             skip_counter = (skip_counter + 1) % 5;
 
             // Render with frame skipping
-            if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
+            if (!should_skip || (throttle_state != RETRO_THROTTLE_NONE && throttle_state != RETRO_THROTTLE_UNBLOCKED))
             {
 			for (int i = 0; i < 5 && is_dupe; i++)
 				is_dupe = !emu.render();
@@ -1240,7 +1283,7 @@ void retro_run()
 			startTime = sh4_sched_now64();
             // Define should_skip for non-threaded rendering too
             bool should_skip = false;
-            if (!should_skip || throttle_state != RETRO_THROTTLE_NORMAL)
+            if (!should_skip || (throttle_state != RETRO_THROTTLE_NONE && throttle_state != RETRO_THROTTLE_UNBLOCKED))
 			emu.render();
             else
                 is_dupe = true;
@@ -1264,13 +1307,13 @@ void retro_run()
 	first_run = false;
 
     // Measure performance and adjust CPU frequency
-    static u64 last_frame_time = 0;
+    static u64 last_perf_time = 0;
     static float cpu_freq_scale = 1.0f;
 
-    u64 current_time = sh4_sched_now64();
-    if (last_frame_time != 0)
+    u64 perf_time = sh4_sched_now64();
+    if (last_perf_time != 0)
     {
-        u64 frame_time = current_time - last_frame_time;
+        u64 frame_time = perf_time - last_perf_time;
         float target_frame_time = 1000000.0f / 60.0f; // 60 fps in microseconds
 
         // Adjust CPU frequency based on performance
@@ -1291,7 +1334,7 @@ void retro_run()
         // adjustShCpuFrequency(cpu_freq_scale);
     }
 
-    last_frame_time = current_time;
+    last_perf_time = perf_time;
 }
 
 static bool loadGame()
@@ -3825,5 +3868,5 @@ void os_notify(const char *msg, int durationMs, const char *details)
 	environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &retromsg);
 }
 
-int throttle_state = RETRO_THROTTLE_NORMAL;
+int throttle_state = RETRO_THROTTLE_NONE;
 float throttle_rate = 1.0f;
