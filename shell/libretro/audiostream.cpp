@@ -193,52 +193,56 @@ static std::atomic<size_t>& getReadPos() {
 	return read_pos;
 }
 
+// Simplified audio buffer
+static std::vector<int16_t> simple_audio_buffer;
+static size_t simple_audio_idx = 0;
+static std::mutex simple_audio_mutex;
+
+void WriteSample(s16 r, s16 l)
+{
+	std::lock_guard<std::mutex> lock(simple_audio_mutex);
+
+	// Ensure buffer is large enough
+	if (simple_audio_buffer.size() < simple_audio_idx + 2)
+		simple_audio_buffer.resize(simple_audio_idx + 4096);
+
+	// Store samples
+	simple_audio_buffer[simple_audio_idx++] = l;
+	simple_audio_buffer[simple_audio_idx++] = r;
+}
+
+void retro_audio_upload(void)
+{
+	std::lock_guard<std::mutex> lock(simple_audio_mutex);
+
+	if (simple_audio_idx == 0)
+		return;
+
+	size_t frames = simple_audio_idx / 2;
+	audio_batch_cb(simple_audio_buffer.data(), frames);
+
+	// Reset buffer
+	simple_audio_idx = 0;
+}
+
 void retro_audio_init(void)
 {
-	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
-
-	// Start with a reasonable buffer size
-	audio_buffer.resize(optimal_buffer_size);
-	audio_buffer_idx = 0;
-	audio_batch_frames_max = std::numeric_limits<size_t>::max();
-
-	audio_out_buffer = (int16_t*)malloc(optimal_buffer_size * sizeof(int16_t));
-
-	drop_samples = false;
-
-	audio_samples_per_frame_avg = 0.0f;
-	vsync_swap_interval_last = 1;
-	vsync_swap_interval_conter = 0;
-	buffer_fullness = 0.5f;
+	std::lock_guard<std::mutex> lock(simple_audio_mutex);
+	simple_audio_buffer.resize(44100); // 1 second of audio at 44.1kHz
+	simple_audio_idx = 0;
 }
 
 void retro_audio_deinit(void)
 {
-	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
-
-	audio_buffer.clear();
-	audio_buffer_idx = 0;
-
-	if (audio_out_buffer != nullptr)
-		free(audio_out_buffer);
-
-	audio_out_buffer = nullptr;
-
-	drop_samples = true;
-
-	audio_samples_per_frame_avg = 0.0f;
-	vsync_swap_interval_last = 1;
-	vsync_swap_interval_conter = 0;
+	std::lock_guard<std::mutex> lock(simple_audio_mutex);
+	simple_audio_buffer.clear();
+	simple_audio_idx = 0;
 }
 
 void retro_audio_flush_buffer(void)
 {
-	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
-	audio_buffer_idx = 0;
-
-	/* We are manually 'resetting' the audio buffer
-	 * -> any 'drop samples' lock can be released */
-	drop_samples = false;
+	std::lock_guard<std::mutex> lock(simple_audio_mutex);
+	simple_audio_idx = 0;
 }
 
 // NEON-optimized audio processing functions
@@ -264,92 +268,6 @@ static void process_audio_samples_neon(s16 *output, const s16 *input, int count)
 	}
 }
 #endif
-
-void WriteSample(s16 r, s16 l)
-{
-	// Use a lock-free approach for better performance
-	static const size_t BUFFER_SIZE = 4096;
-	static s16 temp_buffer[BUFFER_SIZE];
-	static std::atomic<size_t> write_pos(0);
-	static std::atomic<size_t> read_pos(0);
-
-	// Check if buffer is full
-	size_t next_write_pos = (write_pos + 2) % BUFFER_SIZE;
-	if (next_write_pos == read_pos)
-		return; // Buffer full, drop sample
-
-	// Write sample to buffer
-	temp_buffer[write_pos] = l;
-	temp_buffer[write_pos + 1] = r;
-	write_pos = next_write_pos;
-}
-
-void retro_audio_upload(void)
-{
-	// Define max_frames if it's not already defined
-	static const size_t max_frames = 2048; // Reasonable limit
-
-	// Copy from temp buffer to audio buffer without locking
-	size_t frames_copied = 0;
-	static std::atomic<size_t>& read_pos = getReadPos();
-	static std::atomic<size_t>& write_pos = getWritePos();
-
-	while (read_pos != write_pos && frames_copied < max_frames)
-	{
-		static s16* temp_buffer = getTempBuffer();
-		audio_buffer[frames_copied * 2] = temp_buffer[read_pos];
-		audio_buffer[frames_copied * 2 + 1] = temp_buffer[read_pos + 1];
-		read_pos = (read_pos + 2) % BUFFER_SIZE;
-		frames_copied++;
-	}
-
-	// Calculate buffer fullness (0.0 - 1.0)
-	size_t buffer_used = (write_pos - read_pos + BUFFER_SIZE) % BUFFER_SIZE;
-	buffer_fullness = 0.9f * buffer_fullness + 0.1f * ((float)buffer_used / BUFFER_SIZE);
-
-	// Adjust buffer size based on performance and throttle state
-	if (throttle_state == RETRO_THROTTLE_NONE || throttle_state == RETRO_THROTTLE_UNBLOCKED)
-	{
-		// In normal mode, use a larger buffer for stability
-		if (buffer_fullness > 0.8f)
-		{
-			// Buffer is getting full, might need to increase size
-			optimal_buffer_size = std::min(optimal_buffer_size * 1.1f, (float)(44100 / 30) * 2 * 5);
-			if (audio_buffer.size() < optimal_buffer_size)
-				audio_buffer.resize(optimal_buffer_size);
-		}
-		else if (buffer_fullness < 0.2f && optimal_buffer_size > (44100 / 60) * 2 * 2)
-		{
-			// Buffer is mostly empty, decrease size to reduce latency
-			optimal_buffer_size = std::max(optimal_buffer_size * 0.9f, (float)(44100 / 60) * 2 * 2);
-			// Don't resize down immediately to avoid reallocations
-		}
-	}
-	else if (throttle_state == RETRO_THROTTLE_FAST_FORWARD)
-	{
-		// In fast-forward, use a smaller buffer to reduce latency
-		optimal_buffer_size = (44100 / 60) * 2 * 2;
-		// Don't resize down immediately to avoid reallocations
-	}
-
-	// Process and send to frontend
-	if (frames_copied > 0)
-	{
-		// Apply dynamic resampling based on throttle state
-		if (throttle_state == RETRO_THROTTLE_FAST_FORWARD && frames_copied > 8)
-		{
-			// In fast-forward, downsample by 2x
-			for (size_t i = 0; i < frames_copied / 2; i++)
-			{
-				audio_buffer[i * 2] = audio_buffer[i * 4];
-				audio_buffer[i * 2 + 1] = audio_buffer[i * 4 + 1];
-			}
-			frames_copied /= 2;
-		}
-
-		audio_batch_cb(audio_buffer.data(), frames_copied);
-	}
-}
 
 void InitAudio()
 {

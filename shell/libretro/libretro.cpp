@@ -308,6 +308,18 @@ void retro_set_environment(retro_environment_t cb)
 			{ 0 },
 	};
 	environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
+
+	// Log the audio callback status
+	bool audio_callback_supported = false;
+	if (environ_cb(RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK, NULL))
+	{
+		audio_callback_supported = true;
+		DEBUG_LOG(AUDIO, "Audio callback is supported by the frontend");
+	}
+	else
+	{
+		DEBUG_LOG(AUDIO, "Audio callback is NOT supported by the frontend");
+	}
 }
 
 static void retro_keyboard_event(bool down, unsigned keycode, uint32_t character, uint16_t key_modifiers);
