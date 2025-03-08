@@ -170,33 +170,46 @@ void audio_thread_func()
 	}
 }
 
+// Add these variables at the top with other globals
+static float buffer_fullness = 0.5f;
+static size_t optimal_buffer_size = (44100 / 60) * 2 * 3; // 3 frames worth at 60Hz
+
+// Add these declarations at the top of the file (before any function definitions)
+static const size_t BUFFER_SIZE = 4096;
+static s16 temp_buffer[BUFFER_SIZE];
+static std::atomic<size_t> write_pos(0);
+static std::atomic<size_t> read_pos(0);
+
+// Add these helper functions before they're used
+static s16* getTempBuffer() {
+	return temp_buffer;
+}
+
+static std::atomic<size_t>& getWritePos() {
+	return write_pos;
+}
+
+static std::atomic<size_t>& getReadPos() {
+	return read_pos;
+}
+
 void retro_audio_init(void)
 {
 	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
 
-	/* Worst case is 25 fps content with an audio sample rate
-	 * of 44.1 kHz -> 1764 stereo samples
-	 * But flycast can stop rendering for arbitrary lengths of
-	 * time, leading to multiple 'frames' worth of audio being
-	 * uploaded in retro_run(). We therefore require some leniency,
-	 * but must limit the total number of samples that can be
-	 * uploaded since the libretro frontend can 'hang' if too
-	 * many samples are sent during a single call of retro_run().
-	 * We therefore (arbitrarily) choose to allow up to 10 frames
-	 * worth of 'worst case' stereo samples... */
-	size_t audio_buffer_size = (44100 / 25) * 2 * 10;
-
-	audio_buffer.resize(audio_buffer_size);
+	// Start with a reasonable buffer size
+	audio_buffer.resize(optimal_buffer_size);
 	audio_buffer_idx = 0;
 	audio_batch_frames_max = std::numeric_limits<size_t>::max();
 
-	audio_out_buffer = (int16_t*)malloc(audio_buffer_size * sizeof(int16_t));
+	audio_out_buffer = (int16_t*)malloc(optimal_buffer_size * sizeof(int16_t));
 
 	drop_samples = false;
 
 	audio_samples_per_frame_avg = 0.0f;
 	vsync_swap_interval_last = 1;
 	vsync_swap_interval_conter = 0;
+	buffer_fullness = 0.5f;
 }
 
 void retro_audio_deinit(void)
@@ -254,120 +267,88 @@ static void process_audio_samples_neon(s16 *output, const s16 *input, int count)
 
 void WriteSample(s16 r, s16 l)
 {
-	// Use a mutex to ensure thread safety
-	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
+	// Use a lock-free approach for better performance
+	static const size_t BUFFER_SIZE = 4096;
+	static s16 temp_buffer[BUFFER_SIZE];
+	static std::atomic<size_t> write_pos(0);
+	static std::atomic<size_t> read_pos(0);
 
-	if (drop_samples)
-		return;
+	// Check if buffer is full
+	size_t next_write_pos = (write_pos + 2) % BUFFER_SIZE;
+	if (next_write_pos == read_pos)
+		return; // Buffer full, drop sample
 
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-	// In throttled mode, downsample audio to reduce CPU load
-	// if (throttle_state == RETRO_THROTTLE_NORMAL)
-	// {
-	// 	// Only process every other sample
-	// 	static bool skip_sample = false;
-	// 	skip_sample = !skip_sample;
-	// 	if (skip_sample)
-	// 		return;
-	// }
-	// else if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-	// 		 throttle_state == RETRO_THROTTLE_FAST_FORWARD)
-	// {
-	// 	// In unthrottled mode, drop even more samples
-	// 	static int sample_counter = 0;
-	// 	if (++sample_counter % 4 != 0) // Keep only 1/4 of samples
-	// 		return;
-	// }
-
-	// Check for buffer overflow
-	if (audio_buffer.size() < audio_buffer_idx + 2)
-	{
-		// Audio buffer overflow...
-		audio_buffer_idx = 0;
-		drop_samples = true;
-		return;
-	}
-
-	// Store samples directly without volume scaling
-	audio_buffer[audio_buffer_idx++] = l;
-	audio_buffer[audio_buffer_idx++] = r;
-#else
-	// Check for buffer overflow
-	if (audio_buffer.size() < audio_buffer_idx + 2)
-	{
-		// Audio buffer overflow...
-		audio_buffer_idx = 0;
-		drop_samples = true;
-		return;
-	}
-
-	// Store samples
-	audio_buffer[audio_buffer_idx++] = l;
-	audio_buffer[audio_buffer_idx++] = r;
-#endif
+	// Write sample to buffer
+	temp_buffer[write_pos] = l;
+	temp_buffer[write_pos + 1] = r;
+	write_pos = next_write_pos;
 }
 
 void retro_audio_upload(void)
 {
-	audio_buffer_mutex.lock();
+	// Define max_frames if it's not already defined
+	static const size_t max_frames = 2048; // Reasonable limit
 
-	for (size_t i = 0; i < audio_buffer_idx; i++)
-		audio_out_buffer[i] = audio_buffer[i];
+	// Copy from temp buffer to audio buffer without locking
+	size_t frames_copied = 0;
+	static std::atomic<size_t>& read_pos = getReadPos();
+	static std::atomic<size_t>& write_pos = getWritePos();
 
-	size_t num_frames = audio_buffer_idx >> 1;
-
-	// Debug output to check if we're getting audio samples
-	DEBUG_LOG(AUDIO, "Audio upload: %d frames", (int)num_frames);
-
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-	// In sync mode, use a larger buffer size and process less frequently
-	if (throttle_state == RETRO_THROTTLE_NORMAL)
+	while (read_pos != write_pos && frames_copied < max_frames)
 	{
-		// Use NEON to process audio
-		process_audio_samples_neon(audio_out_buffer, audio_buffer.data(), num_frames);
-		audio_batch_cb(audio_out_buffer, num_frames);
+		static s16* temp_buffer = getTempBuffer();
+		audio_buffer[frames_copied * 2] = temp_buffer[read_pos];
+		audio_buffer[frames_copied * 2 + 1] = temp_buffer[read_pos + 1];
+		read_pos = (read_pos + 2) % BUFFER_SIZE;
+		frames_copied++;
 	}
-	else if (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+
+	// Calculate buffer fullness (0.0 - 1.0)
+	size_t buffer_used = (write_pos - read_pos + BUFFER_SIZE) % BUFFER_SIZE;
+	buffer_fullness = 0.9f * buffer_fullness + 0.1f * ((float)buffer_used / BUFFER_SIZE);
+
+	// Adjust buffer size based on performance and throttle state
+	if (throttle_state == RETRO_THROTTLE_NONE || throttle_state == RETRO_THROTTLE_UNBLOCKED)
 	{
-		// In unthrottled mode, drop more samples with NEON
-		size_t output_frames = 0;
-
-		// Use NEON to process and drop samples
-		for (size_t i = 0; i < num_frames; i += 8)
+		// In normal mode, use a larger buffer for stability
+		if (buffer_fullness > 0.8f)
 		{
-			// Load 8 stereo samples (16 values)
-			int16x8x2_t stereo_samples;
-			if (i + 8 <= num_frames)
-				stereo_samples = vld2q_s16(audio_buffer.data() + i * 2);
-			else
-				break;
+			// Buffer is getting full, might need to increase size
+			optimal_buffer_size = std::min(optimal_buffer_size * 1.1f, (float)(44100 / 30) * 2 * 5);
+			if (audio_buffer.size() < optimal_buffer_size)
+				audio_buffer.resize(optimal_buffer_size);
+		}
+		else if (buffer_fullness < 0.2f && optimal_buffer_size > (44100 / 60) * 2 * 2)
+		{
+			// Buffer is mostly empty, decrease size to reduce latency
+			optimal_buffer_size = std::max(optimal_buffer_size * 0.9f, (float)(44100 / 60) * 2 * 2);
+			// Don't resize down immediately to avoid reallocations
+		}
+	}
+	else if (throttle_state == RETRO_THROTTLE_FAST_FORWARD)
+	{
+		// In fast-forward, use a smaller buffer to reduce latency
+		optimal_buffer_size = (44100 / 60) * 2 * 2;
+		// Don't resize down immediately to avoid reallocations
+	}
 
-			// Keep only every 8th sample
-			audio_out_buffer[output_frames * 2] = vgetq_lane_s16(stereo_samples.val[0], 0);
-			audio_out_buffer[output_frames * 2 + 1] = vgetq_lane_s16(stereo_samples.val[1], 0);
-			output_frames++;
+	// Process and send to frontend
+	if (frames_copied > 0)
+	{
+		// Apply dynamic resampling based on throttle state
+		if (throttle_state == RETRO_THROTTLE_FAST_FORWARD && frames_copied > 8)
+		{
+			// In fast-forward, downsample by 2x
+			for (size_t i = 0; i < frames_copied / 2; i++)
+			{
+				audio_buffer[i * 2] = audio_buffer[i * 4];
+				audio_buffer[i * 2 + 1] = audio_buffer[i * 4 + 1];
+			}
+			frames_copied /= 2;
 		}
 
-		if (output_frames > 0)
-			audio_batch_cb(audio_out_buffer, output_frames);
+		audio_batch_cb(audio_buffer.data(), frames_copied);
 	}
-	else
-	{
-		// In normal mode, send audio directly
-		audio_batch_cb(audio_buffer.data(), num_frames);
-	}
-#else
-	// Send audio directly
-	audio_batch_cb(audio_buffer.data(), num_frames);
-#endif
-
-	// Reset audio buffer
-	audio_buffer_idx = 0;
-	drop_samples = false;
-
-	// Release the mutex
-	audio_buffer_mutex.unlock();
 }
 
 void InitAudio()
