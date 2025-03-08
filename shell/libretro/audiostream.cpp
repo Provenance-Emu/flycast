@@ -174,15 +174,17 @@ void audio_thread_func()
 static float buffer_fullness = 0.5f;
 static size_t optimal_buffer_size = (44100 / 60) * 2 * 3; // 3 frames worth at 60Hz
 
-// Add these declarations at the top of the file (before any function definitions)
-static const size_t BUFFER_SIZE = 4096;
-static s16 temp_buffer[BUFFER_SIZE];
+// Define a single consistent buffer size
+#define AUDIO_BUFFER_SIZE 8192
+
+// Global audio buffer variables
+static s16 audio_ring_buffer[AUDIO_BUFFER_SIZE];
 static std::atomic<size_t> write_pos(0);
 static std::atomic<size_t> read_pos(0);
 
-// Add these helper functions before they're used
+// Helper functions to access the audio buffer
 static s16* getTempBuffer() {
-	return temp_buffer;
+	return audio_ring_buffer;
 }
 
 static std::atomic<size_t>& getWritePos() {
@@ -193,56 +195,87 @@ static std::atomic<size_t>& getReadPos() {
 	return read_pos;
 }
 
-// Simplified audio buffer
-static std::vector<int16_t> simple_audio_buffer;
-static size_t simple_audio_idx = 0;
-static std::mutex simple_audio_mutex;
-
 void WriteSample(s16 r, s16 l)
 {
-	std::lock_guard<std::mutex> lock(simple_audio_mutex);
+	// Calculate next write position
+	size_t current_write = write_pos.load(std::memory_order_relaxed);
+	size_t next_write = (current_write + 2) % AUDIO_BUFFER_SIZE;
 
-	// Ensure buffer is large enough
-	if (simple_audio_buffer.size() < simple_audio_idx + 2)
-		simple_audio_buffer.resize(simple_audio_idx + 4096);
+	// Check if buffer is full
+	size_t current_read = read_pos.load(std::memory_order_acquire);
+	if (next_write == current_read)
+		return; // Buffer full, drop sample
 
-	// Store samples
-	simple_audio_buffer[simple_audio_idx++] = l;
-	simple_audio_buffer[simple_audio_idx++] = r;
+	// Write sample to buffer
+	audio_ring_buffer[current_write] = l;
+	audio_ring_buffer[current_write + 1] = r;
+
+	// Update write position
+	write_pos.store(next_write, std::memory_order_release);
 }
 
 void retro_audio_upload(void)
 {
-	std::lock_guard<std::mutex> lock(simple_audio_mutex);
+	// Get current positions
+	size_t current_write = write_pos.load(std::memory_order_acquire);
+	size_t current_read = read_pos.load(std::memory_order_relaxed);
 
-	if (simple_audio_idx == 0)
+	// Calculate available frames
+	size_t available;
+	if (current_write >= current_read)
+		available = (current_write - current_read) / 2;
+	else
+		available = (AUDIO_BUFFER_SIZE - current_read + current_write) / 2;
+
+	if (available == 0)
 		return;
 
-	size_t frames = simple_audio_idx / 2;
-	audio_batch_cb(simple_audio_buffer.data(), frames);
+	// Limit to a reasonable batch size
+	size_t frames_to_process = std::min(available, (size_t)1024);
 
-	// Reset buffer
-	simple_audio_idx = 0;
+	// Copy to a contiguous buffer for processing
+	static s16 temp_buffer[2048];
+	size_t frames_copied = 0;
+
+	while (frames_copied < frames_to_process)
+	{
+		// Copy from ring buffer to temp buffer
+		size_t frames_to_copy = std::min(frames_to_process - frames_copied,
+										(AUDIO_BUFFER_SIZE - current_read) / 2);
+
+		memcpy(temp_buffer + frames_copied * 2,
+			   audio_ring_buffer + current_read,
+			   frames_to_copy * 4);
+
+		// Update read position
+		current_read = (current_read + frames_to_copy * 2) % AUDIO_BUFFER_SIZE;
+		frames_copied += frames_to_copy;
+	}
+
+	// Update read position atomically
+	read_pos.store(current_read, std::memory_order_release);
+
+	// Send to frontend
+	if (frames_copied > 0)
+		audio_batch_cb(temp_buffer, frames_copied);
 }
 
 void retro_audio_init(void)
 {
-	std::lock_guard<std::mutex> lock(simple_audio_mutex);
-	simple_audio_buffer.resize(44100); // 1 second of audio at 44.1kHz
-	simple_audio_idx = 0;
+	// Initialize ring buffer
+	for (size_t i = 0; i < AUDIO_BUFFER_SIZE; i++)
+		audio_ring_buffer[i] = 0;
+
+	write_pos.store(0, std::memory_order_relaxed);
+	read_pos.store(0, std::memory_order_relaxed);
 }
 
 void retro_audio_deinit(void)
 {
-	std::lock_guard<std::mutex> lock(simple_audio_mutex);
-	simple_audio_buffer.clear();
-	simple_audio_idx = 0;
 }
 
 void retro_audio_flush_buffer(void)
 {
-	std::lock_guard<std::mutex> lock(simple_audio_mutex);
-	simple_audio_idx = 0;
 }
 
 // NEON-optimized audio processing functions

@@ -1253,52 +1253,21 @@ void retro_run()
 	try {
 		if (config::ThreadedRendering)
 		{
-            // Measure performance and adjust frame skipping
-            static u64 last_frame_time = 0;
+            // Use a simpler approach to frame skipping
             static int skip_counter = 0;
-            static int skip_frames = 0;
+            bool should_skip = (skip_counter++ % 3) == 0;  // Skip every 3rd frame
 
-            u64 current_time = sh4_sched_now64();
-            if (last_frame_time != 0)
+            if (!should_skip)
             {
-                u64 frame_time = current_time - last_frame_time;
-                float target_frame_time = 1000000.0f / 60.0f; // 60 fps in microseconds
-
-                // Adjust frame skipping based on performance
-                if (frame_time > target_frame_time * 1.2f)
-                {
-                    // We're running slow, increase frame skipping
-                    skip_frames = std::min(4, skip_frames + 1);
-                }
-                else if (frame_time < target_frame_time * 0.8f && skip_frames > 0)
-                {
-                    // We're running fast, decrease frame skipping
-                    skip_frames = std::max(0, skip_frames - 1);
-                }
+                // Render frame without excessive checking
+                is_dupe = !emu.render();
             }
-
-            last_frame_time = current_time;
-
-            // Apply frame skipping
-            bool should_skip = (skip_counter % (skip_frames + 1)) != 0;
-            skip_counter = (skip_counter + 1) % 5;
-
-            // Render with frame skipping
-            if (!should_skip || (throttle_state != RETRO_THROTTLE_NONE && throttle_state != RETRO_THROTTLE_UNBLOCKED))
-            {
-			for (int i = 0; i < 5 && is_dupe; i++)
-				is_dupe = !emu.render();
-		}
         }
 		else
 		{
 			startTime = sh4_sched_now64();
-            // Define should_skip for non-threaded rendering too
-            bool should_skip = false;
-            if (!should_skip || (throttle_state != RETRO_THROTTLE_NONE && throttle_state != RETRO_THROTTLE_UNBLOCKED))
-			emu.render();
-            else
-                is_dupe = true;
+            // Render directly without frame skipping in non-threaded mode
+            emu.render();
 		}
 	} catch (const FlycastException& e) {
 		ERROR_LOG(COMMON, "%s", e.what());
