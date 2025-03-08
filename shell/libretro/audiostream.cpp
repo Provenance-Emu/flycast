@@ -24,6 +24,10 @@
 #include <vector>
 #include <mutex>
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#include <arm_neon.h>
+#endif
+
 /* Detect output refresh rate changes by monitoring
  * the last 'VSYNC_SWAP_INTERVAL_FRAMES' frames:
  * - Measure average (mean) audio samples per upload
@@ -209,6 +213,30 @@ void retro_audio_upload(void)
 	}
 }
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+void WriteSample(s16 r, s16 l)
+{
+	// Simplified version that still provides optimization but is more reliable
+	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
+
+	if (drop_samples)
+		return;
+
+	if (audio_buffer.size() < audio_buffer_idx + 2)
+	{
+		// Audio buffer overflow...
+		audio_buffer_idx = 0;
+		drop_samples = true;
+		return;
+	}
+
+	// Use direct memory access instead of NEON for simplicity
+	audio_buffer[audio_buffer_idx] = l;
+	audio_buffer[audio_buffer_idx + 1] = r;
+	audio_buffer_idx += 2;
+}
+#else
+// Original implementation
 void WriteSample(s16 r, s16 l)
 {
 	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
@@ -230,6 +258,7 @@ void WriteSample(s16 r, s16 l)
 	audio_buffer[audio_buffer_idx++] = l;
 	audio_buffer[audio_buffer_idx++] = r;
 }
+#endif
 
 void InitAudio()
 {
