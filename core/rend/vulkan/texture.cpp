@@ -23,6 +23,42 @@
 #include <algorithm>
 #include <memory>
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#include <arm_neon.h>
+void optimized_texture_upload(void* dst, const void* src, int width, int height, int stride)
+{
+	uint8_t *d = (uint8_t *)dst;
+	const uint8_t *s = (const uint8_t *)src;
+
+	for (int y = 0; y < height; y++)
+	{
+		const uint8_t *src_line = s + y * stride;
+		uint8_t *dst_line = d + y * width * 4;
+
+		// Process 4 pixels (16 bytes) at a time
+		for (int x = 0; x < width; x += 4)
+		{
+			if (x + 4 <= width)
+			{
+				uint8x16_t pixels = vld1q_u8(src_line + x * 4);
+				vst1q_u8(dst_line + x * 4, pixels);
+			}
+			else
+			{
+				// Handle remaining pixels
+				for (int i = 0; i < width - x; i++)
+				{
+					dst_line[x * 4 + i * 4 + 0] = src_line[x * 4 + i * 4 + 0];
+					dst_line[x * 4 + i * 4 + 1] = src_line[x * 4 + i * 4 + 1];
+					dst_line[x * 4 + i * 4 + 2] = src_line[x * 4 + i * 4 + 2];
+					dst_line[x * 4 + i * 4 + 3] = src_line[x * 4 + i * 4 + 3];
+				}
+			}
+		}
+	}
+}
+#endif
+
 void setImageLayout(vk::CommandBuffer const& commandBuffer, vk::Image image, vk::Format format, u32 mipmapLevels, vk::ImageLayout oldImageLayout, vk::ImageLayout newImageLayout)
 {
 	static const float scopeColor[4] = { 0.75f, 0.75f, 0.0f, 1.0f };

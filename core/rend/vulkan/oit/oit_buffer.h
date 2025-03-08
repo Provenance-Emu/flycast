@@ -24,6 +24,13 @@
 
 #include <memory>
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#include <arm_neon.h>
+
+// Just declare the function
+void optimized_clear_abuffer(uint32_t* buffer, size_t size);
+#endif
+
 class OITBuffers
 {
 public:

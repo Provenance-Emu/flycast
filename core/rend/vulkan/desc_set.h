@@ -71,6 +71,31 @@ public:
 		descSetsInFlight.clear();
 	}
 
+	void allocBatch(std::vector<vk::DescriptorSet>& descSets, int count)
+	{
+		if (descSets.size() >= count)
+			return;
+
+		if (this->descSets.size() < count - descSets.size())
+		{
+			// Allocate in larger chunks for better performance
+			int allocSize = std::max(allocChunk, count - (int)descSets.size());
+			std::vector<vk::DescriptorSetLayout> layouts(allocSize, layout);
+			auto newSets = VulkanContext::Instance()->GetDevice().allocateDescriptorSetsUnique(
+					vk::DescriptorSetAllocateInfo(VulkanContext::Instance()->GetDescriptorPool(), layouts));
+
+			for (auto& set : newSets)
+				this->descSets.emplace_back(std::move(set));
+		}
+
+		while (descSets.size() < count && !this->descSets.empty())
+		{
+			descSets.push_back(*this->descSets.back());
+			descSetsInFlight[index].emplace_back(std::move(this->descSets.back()));
+			this->descSets.pop_back();
+		}
+	}
+
 private:
 	vk::DescriptorSetLayout layout;
 	std::vector<vk::UniqueDescriptorSet> descSets;

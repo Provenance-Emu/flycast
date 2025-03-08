@@ -21,6 +21,47 @@
 #include "buffer.h"
 #include "vulkan_context.h"
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#include <arm_neon.h>
+
+void optimized_buffer_copy(void* dst, const void* src, size_t size)
+{
+    uint8_t *d = (uint8_t *)dst;
+    const uint8_t *s = (const uint8_t *)src;
+
+    // Handle small copies directly
+    if (size < 16)
+    {
+        for (size_t i = 0; i < size; i++)
+            d[i] = s[i];
+        return;
+    }
+
+    // Align to 16-byte boundary
+    size_t pre = (16 - (size_t)d) & 15;
+    if (pre > 0)
+    {
+        for (size_t i = 0; i < pre; i++)
+            d[i] = s[i];
+        d += pre;
+        s += pre;
+        size -= pre;
+    }
+
+    // Copy 16 bytes at a time
+    size_t main = size & ~15;
+    for (size_t i = 0; i < main; i += 16)
+    {
+        uint8x16_t v = vld1q_u8(s + i);
+        vst1q_u8(d + i, v);
+    }
+
+    // Copy remaining bytes
+    for (size_t i = main; i < size; i++)
+        d[i] = s[i];
+}
+#endif
+
 BufferData::BufferData(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags propertyFlags)
 	: bufferSize(size), m_usage(usage)
 {
@@ -56,4 +97,17 @@ BufferPacker::BufferPacker()
 {
 	uniformAlignment = VulkanContext::Instance()->GetUniformBufferAlignment();
 	storageAlignment = VulkanContext::Instance()->GetStorageBufferAlignment();
+}
+
+void BufferData::upload(u32 size, const void *data, u32 bufOffset) const
+{
+    verify(bufOffset + size <= bufferSize);
+
+    void* dataPtr = (u8 *)allocation.MapMemory() + bufOffset;
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+    optimized_buffer_copy(dataPtr, data, size);
+#else
+    memcpy(dataPtr, data, size);
+#endif
+    allocation.UnmapMemory();
 }
