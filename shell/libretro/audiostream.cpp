@@ -19,7 +19,6 @@
 #include "audio/audiostream.h"
 #include "emulator.h"
 #include "throttle.h"
-#include "timestretch.h"
 
 #include <libretro.h>
 
@@ -68,9 +67,6 @@ static bool drop_samples = true;
 
 static int16_t *audio_out_buffer = nullptr;
 
-static TimeStretcher timeStretcher;
-static std::vector<s16> stretch_buffer;
-bool use_timestretch = true;
 
 // Add a separate thread for audio processing
 static std::thread audio_thread;
@@ -168,13 +164,6 @@ void audio_thread_func()
 			// Release the lock while processing audio
 			lock.unlock();
 
-			// Process audio (time stretching, etc.)
-			if (use_timestretch && (throttle_state == RETRO_THROTTLE_UNBLOCKED ||
-				throttle_state == RETRO_THROTTLE_FAST_FORWARD))
-			{
-				// Time stretching code would go here
-			}
-
 			// Send audio to frontend
 			audio_batch_cb(local_buffer.data(), num_frames);
 		}
@@ -202,16 +191,12 @@ void retro_audio_init(void)
 	audio_batch_frames_max = std::numeric_limits<size_t>::max();
 
 	audio_out_buffer = (int16_t*)malloc(audio_buffer_size * sizeof(int16_t));
-	stretch_buffer.resize(audio_buffer_size);
 
 	drop_samples = false;
 
 	audio_samples_per_frame_avg = 0.0f;
 	vsync_swap_interval_last = 1;
 	vsync_swap_interval_conter = 0;
-
-	// Initialize time stretcher
-	timeStretcher = TimeStretcher(2, 1024);
 }
 
 void retro_audio_deinit(void)
@@ -324,10 +309,10 @@ void WriteSample(s16 r, s16 l)
 
 void retro_audio_upload(void)
 {
-	const std::lock_guard<std::mutex> lock(audio_buffer_mutex);
+	audio_buffer_mutex.lock();
 
-	if (audio_buffer_idx == 0)
-		return;
+	for (size_t i = 0; i < audio_buffer_idx; i++)
+		audio_out_buffer[i] = audio_buffer[i];
 
 	size_t num_frames = audio_buffer_idx >> 1;
 
@@ -346,7 +331,7 @@ void retro_audio_upload(void)
 		throttle_state == RETRO_THROTTLE_FAST_FORWARD)
 	{
 		// In unthrottled mode, drop more samples with NEON
-			size_t output_frames = 0;
+		size_t output_frames = 0;
 
 		// Use NEON to process and drop samples
 		for (size_t i = 0; i < num_frames; i += 8)
@@ -361,11 +346,11 @@ void retro_audio_upload(void)
 			// Keep only every 8th sample
 			audio_out_buffer[output_frames * 2] = vgetq_lane_s16(stereo_samples.val[0], 0);
 			audio_out_buffer[output_frames * 2 + 1] = vgetq_lane_s16(stereo_samples.val[1], 0);
-					output_frames++;
-				}
+			output_frames++;
+		}
 
-			if (output_frames > 0)
-				audio_batch_cb(audio_out_buffer, output_frames);
+		if (output_frames > 0)
+			audio_batch_cb(audio_out_buffer, output_frames);
 	}
 	else
 	{
@@ -380,6 +365,9 @@ void retro_audio_upload(void)
 	// Reset audio buffer
 	audio_buffer_idx = 0;
 	drop_samples = false;
+
+	// Release the mutex
+	audio_buffer_mutex.unlock();
 }
 
 void InitAudio()
