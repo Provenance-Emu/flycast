@@ -243,19 +243,48 @@ void Texture::Init(u32 width, u32 height, vk::Format format, u32 dataSize, bool 
 			: vk::ImageTiling::eLinear;
 // Check if we can use linear tiling for small textures (performance improvement)
 #ifdef __APPLE__
-	// MoltenVK 1.2.11+ has improved texture handling
-	static bool checkedMoltenVKVersion = false;
+	// MoltenVK configuration check
+	static bool checkedMoltenVKConfig = false;
 	static bool canUseLinearTiling = false;
-	if (!checkedMoltenVKVersion) {
+	static bool usingMetalArgumentBuffers = false;
+	
+	if (!checkedMoltenVKConfig) {
+		// Check if we're using Metal argument buffers
+		// This is detected by checking for both VK_EXT_METAL_OBJECTS_EXTENSION_NAME and 
+		// VK_KHR_portability_subset extensions
+		const auto deviceExtensionProperties = VulkanContext::Instance()->GetPhysicalDevice().enumerateDeviceExtensionProperties();
+		bool hasMetalObjects = false;
+		bool hasPortabilitySubset = false;
+		
+		for (const auto& property : deviceExtensionProperties) {
+			if (strcmp(property.extensionName, VK_EXT_METAL_OBJECTS_EXTENSION_NAME) == 0)
+				hasMetalObjects = true;
+			if (strcmp(property.extensionName, "VK_KHR_portability_subset") == 0)
+				hasPortabilitySubset = true;
+		}
+		
+		usingMetalArgumentBuffers = hasMetalObjects && hasPortabilitySubset;
+		
 		// For MoltenVK 1.2.11+, we can use linear tiling for small textures
 		// This is a performance improvement but was causing corruption in older versions
-		// Since we're targeting MoltenVK 1.2.11+, enable this optimization
 		canUseLinearTiling = true;
-		checkedMoltenVKVersion = true;
+		
+		// But if using Metal argument buffers, be more conservative
+		if (usingMetalArgumentBuffers) {
+			// For Metal argument buffers, only use linear tiling for very small textures
+			// to avoid potential issues during scene transitions
+			INFO_LOG(RENDERER, "Using conservative texture settings for MoltenVK with Metal argument buffers");
+		}
+		
+		checkedMoltenVKConfig = true;
 	}
 	
-	if (canUseLinearTiling && height <= 32
-			&& dataSize / height <= 64
+	// Size thresholds for linear tiling
+	const int maxHeight = usingMetalArgumentBuffers ? 16 : 32;
+	const int maxWidthBytes = usingMetalArgumentBuffers ? 32 : 64;
+	
+	if (canUseLinearTiling && height <= maxHeight
+			&& dataSize / height <= maxWidthBytes
 			&& !mipmapped
 			&& (formatProperties.linearTilingFeatures & vk::FormatFeatureFlagBits::eSampledImage) == vk::FormatFeatureFlagBits::eSampledImage)
 		imageTiling = vk::ImageTiling::eLinear;
@@ -296,7 +325,40 @@ void Texture::CreateImage(vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk:
 	image = device.createImageUnique(imageCreateInfo);
 
 	VmaAllocationCreateInfo allocCreateInfo = { VmaAllocationCreateFlags(), needsStaging ? VmaMemoryUsage::VMA_MEMORY_USAGE_GPU_ONLY : VmaMemoryUsage::VMA_MEMORY_USAGE_CPU_TO_GPU };
-#ifndef __APPLE__
+
+#ifdef __APPLE__
+	// Check if we're using Metal argument buffers
+	static bool checkedMoltenVKConfig = false;
+	static bool usingMetalArgumentBuffers = false;
+	
+	if (!checkedMoltenVKConfig) {
+		// Check for Metal argument buffers by looking for required extensions
+		const auto deviceExtensionProperties = VulkanContext::Instance()->GetPhysicalDevice().enumerateDeviceExtensionProperties();
+		bool hasMetalObjects = false;
+		bool hasPortabilitySubset = false;
+		
+		for (const auto& property : deviceExtensionProperties) {
+			if (strcmp(property.extensionName, VK_EXT_METAL_OBJECTS_EXTENSION_NAME) == 0)
+				hasMetalObjects = true;
+			if (strcmp(property.extensionName, "VK_KHR_portability_subset") == 0)
+				hasPortabilitySubset = true;
+		}
+		
+		usingMetalArgumentBuffers = hasMetalObjects && hasPortabilitySubset;
+		checkedMoltenVKConfig = true;
+	}
+	
+	// For MoltenVK with Metal argument buffers, use more conservative allocation strategy
+	if (usingMetalArgumentBuffers) {
+		// Use dedicated memory for textures to prevent fragmentation issues
+		allocCreateInfo.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+		
+		// For non-staging textures, ensure they're mapped for more reliable access
+		if (!needsStaging) {
+			allocCreateInfo.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		}
+	}
+#else
 	if (!needsStaging)
 		allocCreateInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_MAPPED_BIT;
 #endif
@@ -307,7 +369,7 @@ void Texture::CreateImage(vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk:
 	imageView = device.createImageViewUnique(imageViewCreateInfo);
 #ifdef VK_DEBUG
 	char name[128];
-	sprintf(name, "texture @ %x", startAddress);
+	snprintf(name, sizeof(name), "texture @ %x", startAddress);
 	VulkanContext::Instance()->setObjectName(image.get(), name);
 	VulkanContext::Instance()->setObjectName(imageView.get(), name);
 #endif

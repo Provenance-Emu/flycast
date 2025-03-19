@@ -438,7 +438,19 @@ bool VulkanContext::InitDevice()
 		// MoltenVK 1.2.11+ requires proper handling of metal objects extension
 		const bool metalObjectsSupported = tryAddDeviceExtension(VK_EXT_METAL_OBJECTS_EXTENSION_NAME);
 		// Add portability subset extension for MoltenVK compatibility
-		tryAddDeviceExtension("VK_KHR_portability_subset");
+		const bool portabilitySubsetSupported = tryAddDeviceExtension("VK_KHR_portability_subset");
+		
+		// Check if we're using MoltenVK with Metal argument buffers
+		using MetalArgumentBuffersFlag = bool;
+		static MetalArgumentBuffersFlag usingMetalArgumentBuffers = false;
+		
+		// Detect MoltenVK with Metal argument buffers
+		if (metalObjectsSupported && portabilitySubsetSupported) {
+			// For MoltenVK 1.2.11+ with Metal argument buffers, we need to adjust our memory management
+			// This helps prevent crashes during scene transitions
+			usingMetalArgumentBuffers = true;
+			NOTICE_LOG(RENDERER, "Detected MoltenVK with Metal argument buffers support");
+		}
 #endif
 #ifdef VK_DEBUG
 		tryAddDeviceExtension(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
