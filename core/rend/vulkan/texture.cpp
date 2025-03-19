@@ -241,8 +241,26 @@ void Texture::Init(u32 width, u32 height, vk::Format format, u32 dataSize, bool 
 			== vk::FormatFeatureFlagBits::eSampledImage
 			? vk::ImageTiling::eOptimal
 			: vk::ImageTiling::eLinear;
-#ifndef __APPLE__
-	// Texture corruption with moltenvk. Perf improvement on other platforms
+// Check if we can use linear tiling for small textures (performance improvement)
+#ifdef __APPLE__
+	// MoltenVK 1.2.11+ has improved texture handling
+	static bool checkedMoltenVKVersion = false;
+	static bool canUseLinearTiling = false;
+	if (!checkedMoltenVKVersion) {
+		// For MoltenVK 1.2.11+, we can use linear tiling for small textures
+		// This is a performance improvement but was causing corruption in older versions
+		// Since we're targeting MoltenVK 1.2.11+, enable this optimization
+		canUseLinearTiling = true;
+		checkedMoltenVKVersion = true;
+	}
+	
+	if (canUseLinearTiling && height <= 32
+			&& dataSize / height <= 64
+			&& !mipmapped
+			&& (formatProperties.linearTilingFeatures & vk::FormatFeatureFlagBits::eSampledImage) == vk::FormatFeatureFlagBits::eSampledImage)
+		imageTiling = vk::ImageTiling::eLinear;
+#else
+	// Performance improvement on other platforms
 	if (height <= 32
 			&& dataSize / height <= 64
 			&& !mipmapped
