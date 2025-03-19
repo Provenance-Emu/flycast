@@ -78,20 +78,48 @@ BufferData::BufferData(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::Memo
 #ifdef __APPLE__
 		// MoltenVK memory management improvements for 1.2.11+
 		allocInfo.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
-		// MoltenVK 1.2.11+ has improved host coherent memory support, but we still need to be careful
-		// Only disable host coherent if we're not using a recent MoltenVK version
-		// This check can be removed once minimum MoltenVK version is 1.2.11+
-		static bool checkedMoltenVKVersion = false;
+		
+		// Check for Metal argument buffers configuration
+		static bool checkedMoltenVKConfig = false;
 		static bool useHostCoherent = false;
-		if (!checkedMoltenVKVersion) {
-			// Get device properties to check if we're using MoltenVK
-			// In older Vulkan versions, we can check for Apple GPU
-			vk::PhysicalDeviceProperties props = VulkanContext::Instance()->GetPhysicalDevice().getProperties();
-			
-			// Check if we're on Apple platform - assume it's MoltenVK
+		static bool usingMetalArgumentBuffers = false;
+		
+		if (!checkedMoltenVKConfig) {
 			// For MoltenVK 1.2.11+, we should allow host coherent memory
 			useHostCoherent = true;
-			checkedMoltenVKVersion = true;
+			
+			// Check if we're using Metal argument buffers
+			// This is detected in vulkan_context.cpp when initializing device extensions
+			// We can detect it by checking for both VK_EXT_METAL_OBJECTS_EXTENSION_NAME and 
+			// VK_KHR_portability_subset extensions
+			const auto deviceExtensionProperties = VulkanContext::Instance()->GetPhysicalDevice().enumerateDeviceExtensionProperties();
+			bool hasMetalObjects = false;
+			bool hasPortabilitySubset = false;
+			
+			for (const auto& property : deviceExtensionProperties) {
+				if (strcmp(property.extensionName, VK_EXT_METAL_OBJECTS_EXTENSION_NAME) == 0)
+					hasMetalObjects = true;
+				if (strcmp(property.extensionName, "VK_KHR_portability_subset") == 0)
+					hasPortabilitySubset = true;
+			}
+			
+			usingMetalArgumentBuffers = hasMetalObjects && hasPortabilitySubset;
+			
+			if (usingMetalArgumentBuffers) {
+				// When using Metal argument buffers, we need to be more conservative
+				// with memory allocations to prevent crashes during scene transitions
+				INFO_LOG(RENDERER, "Using conservative memory allocation for MoltenVK with Metal argument buffers");
+				
+				// Use additional safety flags for Metal argument buffers
+				allocInfo.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+				
+				// For larger buffers, use host visible memory to reduce GPU memory pressure
+				if (size > 1024 * 1024) { // 1MB threshold
+					allocInfo.preferredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+				}
+			}
+			
+			checkedMoltenVKConfig = true;
 		}
 		
 		if (!useHostCoherent) {
