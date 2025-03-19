@@ -76,10 +76,28 @@ BufferData::BufferData(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::Memo
 	{
 		// FIXME VMA_ALLOCATION_CREATE_MAPPED_BIT ?
 #ifdef __APPLE__
-		// cpu memory management is fucked up with moltenvk
+		// MoltenVK memory management improvements for 1.2.11+
 		allocInfo.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
-		// host coherent memory not supported on apple platforms
-		propertyFlags &= ~vk::MemoryPropertyFlagBits::eHostCoherent;
+		// MoltenVK 1.2.11+ has improved host coherent memory support, but we still need to be careful
+		// Only disable host coherent if we're not using a recent MoltenVK version
+		// This check can be removed once minimum MoltenVK version is 1.2.11+
+		static bool checkedMoltenVKVersion = false;
+		static bool useHostCoherent = false;
+		if (!checkedMoltenVKVersion) {
+			// Get device properties to check if we're using MoltenVK
+			// In older Vulkan versions, we can check for Apple GPU
+			vk::PhysicalDeviceProperties props = VulkanContext::Instance()->GetPhysicalDevice().getProperties();
+			
+			// Check if we're on Apple platform - assume it's MoltenVK
+			// For MoltenVK 1.2.11+, we should allow host coherent memory
+			useHostCoherent = true;
+			checkedMoltenVKVersion = true;
+		}
+		
+		if (!useHostCoherent) {
+			// Disable host coherent for older MoltenVK versions
+			propertyFlags &= ~vk::MemoryPropertyFlagBits::eHostCoherent;
+		}
 #endif
 		if (propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible)
 		{

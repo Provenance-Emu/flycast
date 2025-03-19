@@ -325,7 +325,14 @@ void YUV_reset()
 template<typename T>
 T DYNACALL pvr_read32p(u32 addr)
 {
-	return *(T *)&vram[pvr_map32(addr) & ~(sizeof(T) - 1)];
+	u32 mapped_addr = pvr_map32(addr) & ~(sizeof(T) - 1);
+	if (mapped_addr <= VRAM_MASK) // Ensure address is within bounds
+		return *(T *)&vram[mapped_addr];
+	else
+	{
+		INFO_LOG(MEMORY, "%08x: VRAM read out of bounds (mapped to %08x)", addr, mapped_addr);
+		return T{}; // Return default-initialized value
+	}
 }
 template u8 pvr_read32p<u8>(u32 addr);
 template u16 pvr_read32p<u16>(u32 addr);
@@ -346,7 +353,11 @@ void DYNACALL pvr_write32p(u32 addr, T data)
 	if (vaddr >= fb_watch_addr_start && vaddr < fb_watch_addr_end)
 		fb_dirty = true;
 
-	*(T *)&vram[pvr_map32(addr)] = data;
+	u32 mapped_addr = pvr_map32(addr);
+	if (mapped_addr <= VRAM_MASK) // Ensure address is within bounds
+		*(T *)&vram[mapped_addr] = data;
+	else
+		INFO_LOG(MEMORY, "%08x: VRAM write out of bounds (mapped to %08x)", addr, mapped_addr);
 }
 template void pvr_write32p<u8, false>(u32 addr, u8 data);
 template void pvr_write32p<u8, true>(u32 addr, u8 data);
@@ -415,6 +426,9 @@ static u32 pvr_map32(u32 offset32)
 	rv |= (offset32 & offset_bits) * 2;
 
 	rv |= bank * 4;
+	
+	// Ensure we don't exceed VRAM bounds
+	rv &= VRAM_MASK;
 	
 	return rv;
 }

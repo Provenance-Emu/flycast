@@ -210,12 +210,12 @@ bool VulkanContext::InitInstance(const char** extensions, uint32_t extensions_co
 		VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
 #endif
 		bool vulkan11 = false;
-		if (VULKAN_HPP_DEFAULT_DISPATCHER.vkEnumerateInstanceVersion != nullptr)
-		{
+//		if (VULKAN_HPP_DEFAULT_DISPATCHER.vkEnumerateInstanceVersion != nullptr)
+//		{
 			const u32 apiVersion = vk::enumerateInstanceVersion();
 
 			vulkan11 = (apiVersion >= VK_API_VERSION_1_1);
-		}
+//		}
 
 		vk::ApplicationInfo applicationInfo("Flycast", 1, "Flycast", 1, vulkan11 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0);
 		std::vector<const char *> vext;
@@ -495,7 +495,10 @@ bool VulkanContext::InitDevice()
 		tryAddDeviceExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
 #endif
 #ifdef VK_USE_PLATFORM_METAL_EXT
-		tryAddDeviceExtension(VK_EXT_METAL_OBJECTS_EXTENSION_NAME);
+		// MoltenVK 1.2.11+ requires proper handling of metal objects extension
+		const bool metalObjectsSupported = tryAddDeviceExtension(VK_EXT_METAL_OBJECTS_EXTENSION_NAME);
+		// Add portability subset extension for MoltenVK compatibility
+		tryAddDeviceExtension("VK_KHR_portability_subset");
 #endif
 #ifdef VK_DEBUG
 		tryAddDeviceExtension(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
@@ -986,8 +989,14 @@ bool VulkanContext::init()
 	vk::AndroidSurfaceCreateInfoKHR createInfo(vk::AndroidSurfaceCreateFlagsKHR(), (struct ANativeWindow*)window);
 	surface = instance->createAndroidSurfaceKHRUnique(createInfo);
 #elif defined(VK_USE_PLATFORM_METAL_EXT)
+	// MoltenVK 1.2.11+ requires proper handling of Metal surface creation
 	vk::MetalSurfaceCreateInfoEXT createInfo(vk::MetalSurfaceCreateFlagsEXT(), window);
-	surface = instance->createMetalSurfaceEXTUnique(createInfo);
+	try {
+		surface = instance->createMetalSurfaceEXTUnique(createInfo);
+	} catch (vk::SystemError& e) {
+		ERROR_LOG(RENDERER, "Failed to create Metal surface: %s", e.what());
+		return false;
+	}
 #else
 #error "Unknown Vulkan platform"
 #endif

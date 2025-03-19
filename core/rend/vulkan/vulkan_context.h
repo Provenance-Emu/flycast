@@ -198,7 +198,7 @@ public:
 
 	void RecreatePipelineCache(const vk::PipelineCacheCreateInfo& createInfo)
 	{
-		pipelineCache = device.createPipelineCacheUnique(createInfo);
+        pipelineCache = device->createPipelineCacheUnique(createInfo);
 	}
 
 private:
