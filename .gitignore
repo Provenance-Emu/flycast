@@ -20,3 +20,4 @@ core/deps/glslang/
 .cache/
 compile_commands.json
 CMakeUserPresets.json
+.qodo
