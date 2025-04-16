@@ -10,6 +10,7 @@ IOS_MIN_VERSION="15.0"
 IOS="ON"
 SYSTEM_NAME="iOS"
 RUN_BUILD="ON"
+ENABLE_FC_PROFILER="OFF"
 
 # Initialize flags
 C_FLAGS="-arch ${ARCH} \
@@ -69,7 +70,8 @@ print_usage() {
   echo "  --append-c-flags=FLAGS    Append flags to CMAKE_C_FLAGS"
   echo "  --append-cxx-flags=FLAGS  Append flags to CMAKE_CXX_FLAGS"
   echo "  --append-linker-flags=FLAGS Append flags to CMAKE_EXE_LINKER_FLAGS"
-  echo "  --run-build=ON|OFF        Run make after configuration (default: OFF)"
+  echo "  --run-build=[ON|OFF]        Whether to run the build after configuration (default: ${RUN_BUILD})"
+  echo "  --enable-fc-profiler=[ON|OFF] Enable the Flycast profiler (default: ${ENABLE_FC_PROFILER})"
   echo "  --help                    Display this help message"
   echo
   echo "Examples:"
@@ -142,6 +144,10 @@ while [[ $# -gt 0 ]]; do
       print_usage
       exit 0
       ;;
+    --enable-fc-profiler=*)
+      ENABLE_FC_PROFILER="${1#*=}"
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
       echo "Use --help for usage information"
@@ -164,7 +170,8 @@ CMAKE_CMD="cmake -B ${BUILD_DIR} \
   -DCMAKE_C_FLAGS=\"${C_FLAGS}\" \
   -DCMAKE_CXX_FLAGS=\"${CXX_FLAGS}\" \
   -DIOS=${IOS} \
-  -DCMAKE_SYSTEM_NAME=${SYSTEM_NAME}"
+  -DCMAKE_SYSTEM_NAME=${SYSTEM_NAME} \
+  -DENABLE_FC_PROFILER=${ENABLE_FC_PROFILER}"
 
 # Add linker flags if provided
 if [ -n "$LINKER_FLAGS" ]; then
