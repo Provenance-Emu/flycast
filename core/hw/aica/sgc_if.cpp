@@ -27,6 +27,7 @@
 #include "hw/gdrom/gdrom_if.h"
 #include "cfg/option.h"
 #include "serialize.h"
+#include "audio_profiler.h"
 
 #include <algorithm>
 #include <cmath>
@@ -130,6 +131,8 @@ static T FPMul(T a, T b, int bits) {
 
 static void VolumePan(SampleType value, u32 vol, u32 pan, SampleType& outl, SampleType& outr)
 {
+	PROFILE_AUDIO("VolumePan");
+	
 	SampleType temp = FPMul(value, volume_lut[vol], 15);
 	SampleType Sc = FPMul(temp, volume_lut[0xF - (pan & 0xF)], 15);
 	if (pan & 0x10)
@@ -556,6 +559,8 @@ struct ChannelEx
 
 	SampleType InterpolateSample()
 	{
+		PROFILE_AUDIO("ChannelEx::InterpolateSample");
+		
 		SampleType rv;
 		u32 fp=step.fp;
 		rv=FPMul(s0,(s32)(1024-fp),10);
@@ -566,6 +571,8 @@ struct ChannelEx
 
 	bool Step(SampleType& oLeft, SampleType& oRight, SampleType& oDsp)
 	{
+		PROFILE_AUDIO("ChannelEx::Step");
+		
 		if (!enabled)
 		{
 			oLeft=oRight=oDsp=0;
@@ -656,6 +663,8 @@ struct ChannelEx
 
 	static void StepAll(SampleType& mixl, SampleType& mixr)
 	{
+		PROFILE_AUDIO("ChannelEx::StepAll");
+		
 		// Process channels in batches with different priorities
 		
 		// Counter to track which BGM frames to process
@@ -1013,6 +1022,8 @@ struct ChannelEx
 
 static SampleType DecodeADPCM(u32 sample,s32 prev,s32& quant)
 {
+	PROFILE_AUDIO("DecodeADPCM");
+	
 	s32 sign=1-2*(sample/8);
 
 	u32 data=sample&7;
@@ -1032,6 +1043,8 @@ static SampleType DecodeADPCM(u32 sample,s32 prev,s32& quant)
 template<s32 PCMS,bool last>
 void StepDecodeSample(ChannelEx* ch,u32 CA)
 {
+	PROFILE_AUDIO("StepDecodeSample");
+	
 	if (!last && PCMS<2)
 		return ;
 
@@ -1115,16 +1128,19 @@ void StepDecodeSample(ChannelEx* ch,u32 CA)
 	ch->s1=s1;
 }
 
-
-
 template<s32 PCMS>
 void StepDecodeSampleInitial(ChannelEx* ch)
 {
+	PROFILE_AUDIO("StepDecodeSampleInitial");
+	
 	StepDecodeSample<PCMS,true>(ch,0);
 }
+
 template<s32 PCMS,u32 LPCTL,u32 LPSLNK>
 void StreamStep(ChannelEx* ch)
 {
+	PROFILE_AUDIO("StreamStep");
+	
 	ch->step.full += (ch->update_rate * ch->lfo.plfo_step.full) >> 10;
 	fp_22_10 sp=ch->step;
 	ch->step.ip=0;
@@ -1447,10 +1463,17 @@ void init()
 	ChannelEx::initAll();
 	beep.init();
 	dsp::init();
+	
+	// Enable audio profiling
+	ENABLE_AUDIO_PROFILING();
 }
 
 void term()
 {
+	// Print audio profiling results before terminating
+	PRINT_AUDIO_PROFILE();
+	DISABLE_AUDIO_PROFILING();
+	
 	dsp::term();
 }
 
@@ -1525,6 +1548,8 @@ static u32 cdda_index = CDDA_SIZE;
 
 void AICA_Sample()
 {
+	PROFILE_AUDIO("AICA_Sample");
+	
 	SampleType mixl,mixr;
 	mixl = 0;
 	mixr = 0;

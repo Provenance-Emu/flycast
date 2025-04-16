@@ -895,6 +895,8 @@ target_sources(${PROJECT_NAME} PRIVATE
 		core/hw/aica/dsp_x86.cpp
 		core/hw/aica/sgc_if.cpp
 		core/hw/aica/sgc_if.h
+		core/hw/aica/audio_profiler.cpp
+		core/hw/aica/audio_profiler.h
 		core/hw/arm7/arm7.cpp
 		core/hw/arm7/arm7.h
 		core/hw/arm7/arm_mem.cpp
