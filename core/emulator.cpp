@@ -42,6 +42,7 @@
 #include "hw/pvr/pvr.h"
 #include "profiler/fc_profiler.h"
 #include "oslib/storage.h"
+#include "thread_pool.h"
 #include "wsi/context.h"
 #include <chrono>
 #ifndef LIBRETRO
@@ -479,6 +480,17 @@ static void setPlatform(int platform)
 	addrspace::initMappings();
 }
 
+void Emulator::initThreadPool()
+{
+	// Create thread pool for parallel emulation tasks
+	// Use number of hardware threads - 1 to leave one thread for the main emulation loop
+	size_t thread_count = std::max<size_t>(1, std::thread::hardware_concurrency() - 1);
+	
+	// Create the thread pool if it doesn't exist
+	if (!emulation_thread_pool)
+		emulation_thread_pool = std::make_unique<flycast::ThreadPool>(thread_count);
+}
+
 void Emulator::init()
 {
 	if (state != Uninitialized)
@@ -488,6 +500,9 @@ void Emulator::init()
 	}
 	// Default platform
 	setPlatform(DC_PLATFORM_DREAMCAST);
+	
+	// Initialize the thread pool for parallel emulation tasks
+	initThreadPool();
 
 	libGDR_init();
 	pvr::init();
@@ -702,11 +717,20 @@ void Emulator::runInternal()
 	{
 		do {
 			resetRequested = false;
-
+			
+			// Run the SH4 CPU emulation
 			getSh4Executor()->Run();
-
+			
+			// Process any pending tasks in the thread pool
+			// This ensures that we don't block on thread pool tasks
+			
 			if (resetRequested)
 			{
+				// Wait for any pending tasks to complete before reset
+				if (emulation_thread_pool) {
+					emulation_thread_pool->waitForCompletion();
+				}
+				
 				nvmem::saveFiles();
 				dc_reset(false);
 				if (!restartCpu())
@@ -748,32 +772,41 @@ void Emulator::unloadGame()
 
 void Emulator::term()
 {
-	unloadGame();
-	if (state == Init)
+	if (state == Running)
+		stop();
+	if (state != Terminated && state != Uninitialized)
 	{
-		debugger::term();
-		if (interpreter != nullptr)
+		if (state != Error)
 		{
-			interpreter->Term();
-			delete interpreter;
-			interpreter = nullptr;
+			if (state == Loaded)
+				unloadGame();
+			if (interpreter != nullptr)
+			{
+				interpreter->Term();
+				interpreter = nullptr;
+			}
+			if (recompiler != nullptr)
+			{
+				recompiler->Term();
+				recompiler = nullptr;
+			}
+			
+			// Clean up thread pool
+			if (emulation_thread_pool) {
+				emulation_thread_pool->waitForCompletion();
+				emulation_thread_pool.reset();
+			}
+			
+			custom_texture.Terminate();
+			reios_term();
+			mem_Term();
+			aica::term();
+			pvr::term();
+			libGDR_term();
+			addrspace::release();
 		}
-		if (recompiler != nullptr)
-		{
-			recompiler->Term();
-			delete recompiler;
-			recompiler = nullptr;
-		}
-		custom_texture.Terminate();	// lr: avoid deadlock on exit (win32)
-		reios_term();
-		aica::term();
-		pvr::term();
-		mem_Term();
-		libGDR_term();
-
 		state = Terminated;
 	}
-	addrspace::release();
 }
 
 void Emulator::stop()

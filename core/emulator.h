@@ -19,12 +19,20 @@
     along with flycast.  If not, see <https://www.gnu.org/licenses/>.
  */
 #pragma once
+#include <string>
+#include <functional>
+#include <mutex>
+#include <vector>
+#include <atomic>
+#include <memory>
+#include <future>
 #include "types.h"
 
-#include <atomic>
-#include <future>
-#include <array>
-#include <mutex>
+// Forward declaration of ThreadPool
+namespace flycast {
+    class ThreadPool;
+}
+
 #include <utility>
 #include <vector>
 #include <time.h>
@@ -191,6 +199,12 @@ private:
 	bool checkStatus(bool wait = false);
 	void runInternal();
 	void diskChange();
+	
+	// Initialize the thread pool for parallel emulation
+	void initThreadPool();
+	
+	// Thread pool for parallel emulation tasks
+	std::unique_ptr<flycast::ThreadPool> emulation_thread_pool;
 
 	enum State {
 		Uninitialized = 0,
