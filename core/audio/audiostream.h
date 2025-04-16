@@ -63,6 +63,9 @@ void InitAudio();
 void TermAudio();
 void WriteSample(s16 right, s16 left);
 
+// Get the current audio buffer fullness (0.0 = empty, 1.0 = full)
+float getAudioBufferFullness();
+
 void StartAudioRecording(bool eight_khz);
 u32 RecordAudio(void *buffer, u32 samples);
 void StopAudioRecording();

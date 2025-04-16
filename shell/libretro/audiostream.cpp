@@ -171,8 +171,14 @@ void audio_thread_func()
 }
 
 // Add these variables at the top with other globals
-static float buffer_fullness = 0.5f;
+static std::atomic<float> buffer_fullness{0.5f};
 static size_t optimal_buffer_size = (44100 / 60) * 2 * 3; // 3 frames worth at 60Hz
+
+// Function to get the current audio buffer fullness
+// Returns a value between 0.0 (empty) and 1.0 (full)
+float getAudioBufferFullness() {
+    return buffer_fullness.load(std::memory_order_relaxed);
+}
 
 // Define a single consistent buffer size
 #define AUDIO_BUFFER_SIZE 8192
@@ -226,6 +232,10 @@ void retro_audio_upload(void)
 		available = (current_write - current_read) / 2;
 	else
 		available = (AUDIO_BUFFER_SIZE - current_read + current_write) / 2;
+	
+	// Update buffer fullness
+	float new_fullness = static_cast<float>(available) / AUDIO_BUFFER_SIZE;
+	buffer_fullness.store(new_fullness, std::memory_order_relaxed);
 
 	if (available == 0)
 		return;

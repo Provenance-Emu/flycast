@@ -10,9 +10,10 @@
 #include "../sh4_interrupts.h"
 #include "hw/sh4/sh4_mem.h"
 #include "../sh4_sched.h"
+#include "../sh4_cycles.h"
 #include "../sh4_cache.h"
 #include "debug/gdb_server.h"
-#include "../sh4_cycles.h"
+#include "audio/audiostream.h"
 
 float sh4_cpu_timescale = 1.0f;
 
@@ -180,13 +181,32 @@ void Sh4Interpreter::Run()
 		do
 		{
 			try {
+				// Check audio buffer status but be less aggressive with adjustments
+				float audio_fullness = getAudioBufferFullness();
+				
+				// Use more conservative cycle batch adjustments
+				int cycle_batch;
+				if (audio_fullness < 0.2f) {
+					// Audio buffer is critically low, run more cycles
+					cycle_batch = SH4_TIMESLICE * 1.25;
+				} else if (audio_fullness > 0.8f) {
+					// Audio buffer is very high, run slightly fewer cycles
+					cycle_batch = SH4_TIMESLICE * 0.9;
+				} else {
+					// Normal operation - use standard timeslice
+					cycle_batch = SH4_TIMESLICE;
+				}
+				
 				do
 				{
 					u32 op = ReadNexOp();
 
 					ExecuteOpcode(op);
 				} while (ctx->cycle_counter > 0);
-				ctx->cycle_counter += SH4_TIMESLICE;
+				
+				// Replenish cycle counter
+				ctx->cycle_counter += cycle_batch;
+				
 				UpdateSystem_INTC();
 			} catch (const SH4ThrownException& ex) {
 				Do_Exception(ex.epc, ex.expEvn);
@@ -346,20 +366,36 @@ void Sh4_int_Run()
 
 	while (sh4_int_bCpuRun)
 	{
-		// Apply CPU frequency scaling to the batch size, but with a more efficient approach
+		// Get audio buffer fullness to adjust processing
+		float audio_fullness = getAudioBufferFullness();
+		
+		// Apply CPU frequency scaling to the batch size, adjusted by audio buffer fullness
 		int scaled_batch_size;
 
-		// Use a lookup table approach for common scaling factors to avoid expensive calculations
-		if (sh4_cpu_timescale >= 1.4f)
-			scaled_batch_size = 25000;  // Very fast
-		else if (sh4_cpu_timescale >= 1.1f)
-			scaled_batch_size = 15000;  // Fast
-		else if (sh4_cpu_timescale >= 0.9f)
-			scaled_batch_size = 10000;  // Normal
-		else if (sh4_cpu_timescale >= 0.7f)
-			scaled_batch_size = 8000;   // Slow
-		else
-			scaled_batch_size = 5000;   // Very slow
+		// When audio buffer is critically low, process more instructions
+		if (audio_fullness < 0.2f) {
+			if (sh4_cpu_timescale >= 1.0f)
+				scaled_batch_size = 25000;  // Faster to fill buffer
+			else
+				scaled_batch_size = 15000;  // Fast
+		}
+		// When audio buffer is very high, process fewer instructions
+		else if (audio_fullness > 0.8f) {
+			scaled_batch_size = 5000;    // Slower to let buffer drain
+		}
+		// Normal audio buffer level, use standard scaling
+		else {
+			if (sh4_cpu_timescale >= 1.4f)
+				scaled_batch_size = 20000;  // Very fast
+			else if (sh4_cpu_timescale >= 1.1f)
+				scaled_batch_size = 15000;  // Fast
+			else if (sh4_cpu_timescale >= 0.9f)
+				scaled_batch_size = 10000;  // Normal
+			else if (sh4_cpu_timescale >= 0.7f)
+				scaled_batch_size = 8000;   // Slow
+			else
+				scaled_batch_size = 5000;   // Very slow
+		}
 
 		// Process in larger batches for better efficiency
 		for (int i = 0; i < scaled_batch_size && sh4_int_bCpuRun; i++)
@@ -379,10 +415,20 @@ void Sh4_int_Run()
 				// System updated, might need to break the batch
 				break;
 			}
+			
+			// Periodically check audio buffer status during long batches
+			// but with a moderate threshold to avoid breaking batches too often
+			if (i % 5000 == 0 && i > 0) {
+				if (getAudioBufferFullness() > 0.85f) {
+					// Audio buffer is getting very full, break the batch early
+					break;
+				}
+			}
 		}
 
-		// Allow other threads to run, but only if we're not running at full speed
-		if (sh4_cpu_timescale < 0.9f)
+		// Allow other threads to run based on audio buffer fullness
+		// Yield more aggressively when buffer is full to prevent overruns
+		if (sh4_cpu_timescale < 0.9f || getAudioBufferFullness() > 0.75f)
 			std::this_thread::yield();
 	}
 }
