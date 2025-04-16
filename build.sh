@@ -23,14 +23,13 @@ C_FLAGS="-arch ${ARCH} \
 -finline-functions \
 -flto=thin \
 -fno-strict-aliasing \
--fomit-frame-pointer \
 -fpermissive \
 -ftree-vectorize \
 -funsafe-math-optimizations \
 -fvectorize \
 -march=armv8-a+simd \
 -mcpu=apple-a10 \
--Ofast"
+-O3"
 
 CXX_FLAGS="-arch ${ARCH} \
 -DIOS \
@@ -43,14 +42,13 @@ CXX_FLAGS="-arch ${ARCH} \
 -finline-functions \
 -flto=thin \
 -fno-strict-aliasing \
--fomit-frame-pointer \
 -fpermissive \
 -ftree-vectorize \
 -funsafe-math-optimizations \
 -fvectorize \
 -march=armv8-a+simd \
 -mcpu=apple-a10 \
--Ofast"
+-O3"
 
 # Add a function to display usage information
 print_usage() {
