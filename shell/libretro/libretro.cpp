@@ -66,8 +66,7 @@
 #include "cfg/option.h"
 #include "version.h"
 #include "oslib/oslib.h"
-#include "throttle.h"
-#include <chrono>
+#include "../../core/audio/AudioEngine.h"
 
 constexpr char slash = path_default_slash_c();
 
@@ -110,7 +109,7 @@ constexpr char slash = path_default_slash_c();
 extern void retro_audio_init(void);
 extern void retro_audio_deinit(void);
 extern void retro_audio_flush_buffer(void);
-extern void retro_audio_upload(void);
+//extern void retro_audio_upload(void);
 
 std::string arcadeFlashPath;
 static bool boot_to_bios;
@@ -1282,8 +1281,35 @@ void retro_run()
 
 	video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
 
-    // Always process audio regardless of throttle state
-    retro_audio_upload();
+    // === NEW AUDIO CODE START ===
+    if (audio_batch_cb && emu.audio_engine_) {
+        // Determine number of samples to read per frame.
+        int sample_rate = emu.audio_engine_->get_sample_rate();
+        if (sample_rate > 0) {
+            // Calculate frames needed for approx 1/60th of a second.
+            // This might need adjustment based on actual retro_run frequency.
+            // A fixed buffer size might be more reliable if retro_run timing varies.
+            size_t frames_to_read = sample_rate / 60;
+            // Ensure a minimum/maximum buffer size? Let's try reading what the engine has for now.
+            // frames_to_read = std::max((size_t)256, std::min((size_t)2048, frames_to_read));
+
+            // Use a static vector to avoid frequent reallocations
+            static std::vector<int16_t> audio_buffer;
+            // Resize cautiously - maybe read available first?
+            // Let's try reading up to a max buffer size.
+            const size_t max_frames_to_read = 2048; // Arbitrary max buffer
+            audio_buffer.resize(max_frames_to_read * 2); // Stereo samples
+
+            // Read available samples from the engine's ring buffer
+            size_t frames_read = emu.audio_engine_->read_samples(audio_buffer.data(), max_frames_to_read);
+
+            if (frames_read > 0) {
+                // Send the read samples to the libretro host
+                audio_batch_cb(audio_buffer.data(), frames_read);
+            }
+        }
+    }
+    // === NEW AUDIO CODE END ===
 
 	first_run = false;
 
@@ -2759,7 +2785,7 @@ static void setDeviceButtonState(u32 port, int deviceType, int btnId)
 static void setDeviceButtonStateFromBitmap(u32 bitmap, u32 port, int deviceType, int btnId)
 {
 	uint32_t dc_key = map_gamepad_button(deviceType, btnId);
-	bool is_down    = bitmap & (1 << btnId);
+	bool is_down = bitmap & (1 << btnId);
 	setDeviceButton(port, dc_key, is_down);
 }
 

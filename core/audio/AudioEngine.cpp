@@ -81,8 +81,8 @@ bool AudioEngine::init(
 
     // Prepare the callback buffer
     // TODO: Retrieve actual values? Currently commented out in original logic.
-    // actual_sample_rate_ = backend_->get_sample_rate();
-    // backend_buffer_frames_ = backend_->get_buffer_size(); // Use backend_
+    actual_sample_rate_ = backend_->get_sample_rate();
+    backend_buffer_frames_ = backend_->get_buffer_size(); // Use backend_->get_buffer_size()
 
     // Resize internal buffer based on backend settings
     // Assuming stereo (2 channels) as backend doesn't provide channel info
@@ -170,8 +170,30 @@ void AudioEngine::push_samples_blocking(const int16_t* samples, size_t num_sampl
     }
 }
 
+size_t AudioEngine::read_samples(int16_t* buffer, size_t num_frames) {
+    if (!initialized_ || !ring_buffer_ || !buffer) {
+        return 0;
+    }
+    
+    // Each frame consists of 2 samples (stereo)
+    size_t samples_to_read = num_frames * 2;
+    size_t samples_read = 0;
+    
+    // Read data from ring buffer into output buffer, one sample at a time
+    for (size_t i = 0; i < samples_to_read; ++i) {
+        if (!ring_buffer_->try_read(buffer[i])) {
+            // Underflow - buffer is empty
+            break;
+        }
+        samples_read++;
+    }
+    
+    // Return the number of frames read (samples / 2)
+    return samples_read / 2;
+}
+
 int AudioEngine::get_sample_rate() const {
-    return initialized_ ? backend_->get_sample_rate() : 0;
+    return initialized_ ? actual_sample_rate_ : 0;
 }
 
 int AudioEngine::get_backend_buffer_size() const {

@@ -47,8 +47,14 @@ public:
     /// @param num_samples The total number of samples (num_frames * 2).
     void push_samples_blocking(const int16_t* samples, size_t num_samples);
 
-    /// Gets the sample rate the backend is actually using.
-    /// @return Sample rate in Hz.
+    /// @brief Reads stereo audio samples from the ring buffer.
+    /// @param buffer Pointer to the buffer to receive the samples (interleaved L/R).
+    /// @param num_frames The number of stereo frames to read.
+    /// @return The number of stereo frames actually read.
+    size_t read_samples(int16_t* buffer, size_t num_frames);
+
+    /// @brief Gets the actual sample rate used by the backend.
+    /// @return The sample rate in Hz, or 0 if not initialized.
     int get_sample_rate() const;
 
     /// Gets the buffer size (in frames) the backend is actually using.
