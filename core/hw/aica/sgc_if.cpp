@@ -519,29 +519,11 @@ struct ChannelEx
 	bool quiet;
 	int ChannelNumber;
 
-	// Channel types for prioritization
-	enum class ChannelType {
-		Unknown,
-		SoundEffect,
-		BackgroundMusic
-	};
-
-	ChannelType channelType = ChannelType::Unknown;
-
 	void Init(int cn,u8* ccd_raw)
 	{
 		ccd=(ChannelCommonData*)&ccd_raw[cn*0x80];
 		ChannelNumber = cn;
 		quiet = true;
-		
-		// Initialize channel type based on channel number
-		// Typically, lower channels (0-7) are used for BGM, higher for SFX
-		// This is a heuristic and may need adjustment for specific games
-		if (cn < 8)
-			channelType = ChannelType::BackgroundMusic;
-		else
-			channelType = ChannelType::SoundEffect;
-			
 		for (u32 i = 0; i < 0x80; i += 2)
 			RegWrite(i, 2);
 		quiet = false;
@@ -667,37 +649,8 @@ struct ChannelEx
 
 	static void StepAll(SampleType& mixl, SampleType& mixr)
 	{
-		PROFILE_AUDIO("ChannelEx::StepAll");
-		
-		// Process channels in batches with different priorities
-		
-		// Counter to track which BGM frames to process
-		static int bgm_frame_counter = 0;
-		bgm_frame_counter++;
-		
-		// Process sound effects every frame - they're important for gameplay
-		for (ChannelEx& channel : Chans) {
-			if (channel.channelType == ChannelType::SoundEffect && channel.enabled) {
-				channel.Step(mixl, mixr);
-			}
-		}
-		
-		// Process background music less frequently to reduce CPU load
-		// Only process BGM channels every other frame
-		if (bgm_frame_counter % 2 == 0) {
-			for (ChannelEx& channel : Chans) {
-				if (channel.channelType == ChannelType::BackgroundMusic && channel.enabled) {
-					channel.Step(mixl, mixr);
-				}
-			}
-		}
-		
-		// Process unknown channel types every frame
-		for (ChannelEx& channel : Chans) {
-			if (channel.channelType == ChannelType::Unknown && channel.enabled) {
-				channel.Step(mixl, mixr);
-			}
-		}
+		for (ChannelEx& channel : Chans)
+			channel.Step(mixl, mixr);
 	}
 
 	void SetAegState(_EG_state newstate)
@@ -744,16 +697,6 @@ struct ChannelEx
 			loop.LEA = 0xffff;
 
 		adpcm.Reset(this);
-
-		// Detect streaming audio channels by checking for loop settings and ADPCM format
-		// These are typically used for background music
-		if (ccd->PCMS == 3 || (ccd->PCMS == 2 && ccd->LPCTL == 1)) {
-			channelType = ChannelType::BackgroundMusic;
-		}
-		// Short sound effects typically don't loop or use PCM formats
-		else if (ccd->LPCTL == 0 || ccd->PCMS <= 1) {
-			channelType = ChannelType::SoundEffect;
-		}
 
 		StepStreamInitial(this);
 		key_printf("[%d] KEY_ON %s @ %f Hz, loop %d - AEG AR %d DC1R %d DC2V %d DC2R %d RR %d - KRS %d OCT %d FNS %d - PFLOS %d PFLOWS %d - SA %x LSA %x LEA %x",
