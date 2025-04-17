@@ -602,6 +602,36 @@ sh4op(i1111_nn01_1111_1101)
 
 	if (ctx->fpscr.PR==0)
 	{
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+		// Load matrix columns from xf (column-major layout)
+		float32x4_t col0 = vld1q_f32(ctx->xf + 0);
+		float32x4_t col1 = vld1q_f32(ctx->xf + 4);
+		float32x4_t col2 = vld1q_f32(ctx->xf + 8);
+		float32x4_t col3 = vld1q_f32(ctx->xf + 12);
+
+		// Load vector elements
+		float vn0 = ctx->fr[n + 0];
+		float vn1 = ctx->fr[n + 1];
+		float vn2 = ctx->fr[n + 2];
+		float vn3 = ctx->fr[n + 3];
+
+		// Perform matrix-vector multiplication using multiply-accumulate
+		// result = col0*vn0 + col1*vn1 + col2*vn2 + col3*vn3
+		float32x4_t result = vmulq_n_f32(col0, vn0);
+		result = vmlaq_n_f32(result, col1, vn1);
+		result = vmlaq_n_f32(result, col2, vn2);
+		result = vmlaq_n_f32(result, col3, vn3);
+
+		// Store result to a temporary buffer to apply fixNaN
+		float temp_result[4];
+		vst1q_f32(temp_result, result);
+
+		// Apply fixNaN and store back to fr registers
+		ctx->fr[n + 0] = fixNaN(temp_result[0]);
+		ctx->fr[n + 1] = fixNaN(temp_result[1]);
+		ctx->fr[n + 2] = fixNaN(temp_result[2]);
+		ctx->fr[n + 3] = fixNaN(temp_result[3]);
+#else
 		double v1 = (double)ctx->xf[0]  * ctx->fr[n + 0] +
 					(double)ctx->xf[4]  * ctx->fr[n + 1] +
 					(double)ctx->xf[8]  * ctx->fr[n + 2] +
@@ -626,6 +656,7 @@ sh4op(i1111_nn01_1111_1101)
 		ctx->fr[n + 1] = fixNaN((float)v2);
 		ctx->fr[n + 2] = fixNaN((float)v3);
 		ctx->fr[n + 3] = fixNaN((float)v4);
+#endif
 	}
 	else
 	{
