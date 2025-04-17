@@ -1875,13 +1875,47 @@ void UpdateSample(s16* updated_buf, u32 samples_to_render)
     }
 }
 
-void WriteSample(s16 r,s16 l)
-{
-//  printf("%d %d\n",r,l);
-//  static FILE* dmp=fopen("aica.pcm","wb");
-//  fwrite(&l,1,2,dmp);
-//  fwrite(&r,1,2,dmp);
+// Global buffer to store audio samples for the libretro frontend
+static std::vector<int16_t> g_audio_buffer;
+static std::mutex g_audio_mutex;
 
+void WriteSample(s16 r, s16 l)
+{
+    // In libretro mode, we need to buffer the audio samples for the frontend to pull later
+    // This is a simple implementation that just stores the samples in a global buffer
+    
+    // Store samples in left-right order (the order expected by the AudioEngine)
+    std::lock_guard<std::mutex> lock(g_audio_mutex);
+    g_audio_buffer.push_back(l);
+    g_audio_buffer.push_back(r);
+    
+    // Keep the buffer from growing too large (limit to ~1 second of audio at 44.1kHz)
+    const size_t max_buffer_size = 44100 * 2 * 2; // 2 channels, 2 seconds
+    if (g_audio_buffer.size() > max_buffer_size) {
+        // If buffer gets too large, remove oldest samples
+        g_audio_buffer.erase(g_audio_buffer.begin(), g_audio_buffer.begin() + (g_audio_buffer.size() - max_buffer_size));
+    }
+}
+
+// Function to get audio samples for the libretro frontend
+// This should be called from retro_run() to get audio samples
+size_t GetAudioSamples(int16_t* buffer, size_t num_frames)
+{
+    std::lock_guard<std::mutex> lock(g_audio_mutex);
+    
+    // Calculate how many frames we can provide
+    size_t available_frames = g_audio_buffer.size() / 2; // Divide by 2 for stereo
+    size_t frames_to_copy = std::min(available_frames, num_frames);
+    
+    // Copy the samples to the output buffer
+    if (frames_to_copy > 0 && buffer != nullptr) {
+        memcpy(buffer, g_audio_buffer.data(), frames_to_copy * 2 * sizeof(int16_t));
+        
+        // Remove the copied samples from our buffer
+        g_audio_buffer.erase(g_audio_buffer.begin(), g_audio_buffer.begin() + (frames_to_copy * 2));
+    }
+    
+    return frames_to_copy;
 }
 
 // Stub implementation for compilation

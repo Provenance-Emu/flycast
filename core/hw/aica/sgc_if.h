@@ -47,3 +47,7 @@ void deserialize(Deserializer& ctx);
 void vmuBeep(int on, int period);
 
 } // namespace aica::sgc
+
+// Function to get audio samples for the libretro frontend
+// This should be called from retro_run() to get audio samples
+size_t GetAudioSamples(int16_t* buffer, size_t num_frames);

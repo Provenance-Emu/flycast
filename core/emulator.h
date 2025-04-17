@@ -43,6 +43,10 @@ class AudioEngine;  // Forward declaration
 void loadGameSpecificSettings(); // Added declaration
 void SaveSettings();
 
+// Function to push audio samples to the AudioEngine
+// This avoids having to include AudioEngine.h in files that need to push samples
+bool pushAudioSamples(const int16_t* samples, size_t num_samples);
+
 int flycast_init(int argc, char* argv[]);
 void flycast_term();
 void dc_exit();
@@ -207,10 +211,10 @@ public:
 private:
 	void runInternal();
 	void diskChange();
-	
+
 	// Initialize the thread pool for parallel emulation
 	void initThreadPool();
-	
+
 	// Thread pool for parallel emulation tasks
 	std::unique_ptr<flycast::ThreadPool> emulation_thread_pool;
 

@@ -521,7 +521,9 @@ void Emulator::init()
 	libGDR_init();
 	pvr::init();
 	aica::init();
+
 	mem_Init();
+
 	reios_init();
 
 	// the recompiler may start generating code at this point and needs a fully configured machine
@@ -805,13 +807,13 @@ void Emulator::term()
 				recompiler->Term();
 				recompiler = nullptr;
 			}
-			
+
 			// Clean up thread pool
 			if (emulation_thread_pool) {
 				emulation_thread_pool->waitForCompletion();
 				emulation_thread_pool.reset();
 			}
-			
+
 			custom_texture.Terminate();
 			reios_term();
 			mem_Term();
