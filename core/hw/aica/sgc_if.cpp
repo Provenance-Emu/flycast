@@ -1878,22 +1878,57 @@ void UpdateSample(s16* updated_buf, u32 samples_to_render)
 // Global buffer to store audio samples for the libretro frontend
 static std::vector<int16_t> g_audio_buffer;
 static std::mutex g_audio_mutex;
+static double g_audio_time_ratio = 1.0; // Ratio to adjust audio timing
+static const int SAMPLE_RATE = 44100;
+
+// Audio buffer parameters
+static const size_t TARGET_BUFFER_SIZE_MS = 100; // Target buffer size in milliseconds
+static const size_t MAX_BUFFER_SIZE_MS = 500;    // Maximum buffer size in milliseconds
+static const size_t MIN_BUFFER_SIZE_MS = 20;     // Minimum buffer size in milliseconds
+
+// Calculate buffer sizes in samples (stereo)
+static const size_t TARGET_BUFFER_SIZE = (SAMPLE_RATE * TARGET_BUFFER_SIZE_MS / 1000) * 2;
+static const size_t MAX_BUFFER_SIZE = (SAMPLE_RATE * MAX_BUFFER_SIZE_MS / 1000) * 2;
+static const size_t MIN_BUFFER_SIZE = (SAMPLE_RATE * MIN_BUFFER_SIZE_MS / 1000) * 2;
 
 void WriteSample(s16 r, s16 l)
 {
-    // In libretro mode, we need to buffer the audio samples for the frontend to pull later
-    // This is a simple implementation that just stores the samples in a global buffer
-    
     // Store samples in left-right order (the order expected by the AudioEngine)
     std::lock_guard<std::mutex> lock(g_audio_mutex);
-    g_audio_buffer.push_back(l);
-    g_audio_buffer.push_back(r);
     
-    // Keep the buffer from growing too large (limit to ~1 second of audio at 44.1kHz)
-    const size_t max_buffer_size = 44100 * 2 * 2; // 2 channels, 2 seconds
-    if (g_audio_buffer.size() > max_buffer_size) {
+    // Apply time ratio adjustment to maintain sync
+    // If we're running too fast, we might skip some samples
+    // If we're running too slow, we might duplicate some samples
+    static double sample_accumulator = 0.0;
+    sample_accumulator += g_audio_time_ratio;
+    
+    while (sample_accumulator >= 1.0) {
+        g_audio_buffer.push_back(l);
+        g_audio_buffer.push_back(r);
+        sample_accumulator -= 1.0;
+    }
+    
+    // Keep the buffer from growing too large
+    if (g_audio_buffer.size() > MAX_BUFFER_SIZE) {
         // If buffer gets too large, remove oldest samples
-        g_audio_buffer.erase(g_audio_buffer.begin(), g_audio_buffer.begin() + (g_audio_buffer.size() - max_buffer_size));
+        size_t samples_to_remove = g_audio_buffer.size() - TARGET_BUFFER_SIZE;
+        g_audio_buffer.erase(g_audio_buffer.begin(), g_audio_buffer.begin() + samples_to_remove);
+        
+        // We're generating audio too fast, slow down the ratio slightly
+        g_audio_time_ratio = std::max(g_audio_time_ratio * 0.995, 0.5);
+    } else if (g_audio_buffer.size() < MIN_BUFFER_SIZE && g_audio_buffer.size() > 0) {
+        // Buffer is too small, we're not generating audio fast enough
+        // Speed up the ratio slightly
+        g_audio_time_ratio = std::min(g_audio_time_ratio * 1.005, 2.0);
+    } else if (g_audio_buffer.size() > TARGET_BUFFER_SIZE * 1.2) {
+        // Buffer is larger than target, slow down slightly
+        g_audio_time_ratio = std::max(g_audio_time_ratio * 0.999, 0.9);
+    } else if (g_audio_buffer.size() < TARGET_BUFFER_SIZE * 0.8) {
+        // Buffer is smaller than target, speed up slightly
+        g_audio_time_ratio = std::min(g_audio_time_ratio * 1.001, 1.1);
+    } else {
+        // Buffer is close to target, gradually move ratio back to 1.0
+        g_audio_time_ratio = g_audio_time_ratio * 0.9999 + 1.0 * 0.0001;
     }
 }
 
@@ -1913,6 +1948,14 @@ size_t GetAudioSamples(int16_t* buffer, size_t num_frames)
         
         // Remove the copied samples from our buffer
         g_audio_buffer.erase(g_audio_buffer.begin(), g_audio_buffer.begin() + (frames_to_copy * 2));
+    } else if (frames_to_copy == 0 && buffer != nullptr && num_frames > 0) {
+        // Buffer underrun - generate silence
+        // This helps prevent audio stuttering when the buffer is empty
+        memset(buffer, 0, num_frames * 2 * sizeof(int16_t));
+        frames_to_copy = num_frames;
+        
+        // We're not generating audio fast enough, speed up the ratio
+        g_audio_time_ratio = std::min(g_audio_time_ratio * 1.01, 2.0);
     }
     
     return frames_to_copy;
