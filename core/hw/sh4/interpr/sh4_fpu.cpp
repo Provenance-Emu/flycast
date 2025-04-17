@@ -1,6 +1,11 @@
 #include "types.h"
 #include <cmath>
 
+// Include ARM NEON intrinsics header if available
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#include <arm_neon.h>
+#endif
+
 #include "sh4_opcodes.h"
 #include "hw/sh4/sh4_core.h"
 #include "hw/sh4/sh4_rom.h"
@@ -404,12 +409,24 @@ sh4op(i1111_nnmm_1110_1101)
 	int m=(GetN(op)&0x3)<<2;
 	if (ctx->fpscr.PR == 0)
 	{
+	#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+		// Load the two vectors (FVn and FVm)
+		float32x4_t v_n = vld1q_f32(ctx->fr + n);
+		float32x4_t v_m = vld1q_f32(ctx->fr + m);
+		// Multiply the vectors element-wise
+		float32x4_t prod = vmulq_f32(v_n, v_m);
+		// Sum all elements of the product vector
+		float sum = vaddvq_f32(prod);
+		// Apply NaN fix and store the result in the last element of FVn
+		ctx->fr[n + 3] = fixNaN(sum);
+	#else
 		double idp = (double)ctx->fr[n + 0] * ctx->fr[m + 0];
 		idp += (double)ctx->fr[n + 1] * ctx->fr[m + 1];
 		idp += (double)ctx->fr[n + 2] * ctx->fr[m + 2];
 		idp += (double)ctx->fr[n + 3] * ctx->fr[m + 3];
 
 		ctx->fr[n + 3] = fixNaN((float)idp);
+	#endif
 	}
 	else
 	{
