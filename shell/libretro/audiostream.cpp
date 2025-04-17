@@ -201,24 +201,24 @@ static std::atomic<size_t>& getReadPos() {
 	return read_pos;
 }
 
-void WriteSample(s16 r, s16 l)
-{
-	// Calculate next write position
-	size_t current_write = write_pos.load(std::memory_order_relaxed);
-	size_t next_write = (current_write + 2) % AUDIO_BUFFER_SIZE;
+// void WriteSample(s16 r, s16 l)
+// {
+// 	// Calculate next write position
+// 	size_t current_write = write_pos.load(std::memory_order_relaxed);
+// 	size_t next_write = (current_write + 2) % AUDIO_BUFFER_SIZE;
 
-	// Check if buffer is full
-	size_t current_read = read_pos.load(std::memory_order_acquire);
-	if (next_write == current_read)
-		return; // Buffer full, drop sample
+// 	// Check if buffer is full
+// 	size_t current_read = read_pos.load(std::memory_order_acquire);
+// 	if (next_write == current_read)
+// 		return; // Buffer full, drop sample
 
-	// Write sample to buffer
-	audio_ring_buffer[current_write] = l;
-	audio_ring_buffer[current_write + 1] = r;
+// 	// Write sample to buffer
+// 	audio_ring_buffer[current_write] = l;
+// 	audio_ring_buffer[current_write + 1] = r;
 
-	// Update write position
-	write_pos.store(next_write, std::memory_order_release);
-}
+// 	// Update write position
+// 	write_pos.store(next_write, std::memory_order_release);
+// }
 
 void retro_audio_upload(void)
 {
@@ -232,7 +232,7 @@ void retro_audio_upload(void)
 		available = (current_write - current_read) / 2;
 	else
 		available = (AUDIO_BUFFER_SIZE - current_read + current_write) / 2;
-	
+
 	// Update buffer fullness
 	float new_fullness = static_cast<float>(available) / AUDIO_BUFFER_SIZE;
 	buffer_fullness.store(new_fullness, std::memory_order_relaxed);

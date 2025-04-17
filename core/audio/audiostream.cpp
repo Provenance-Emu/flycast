@@ -49,6 +49,7 @@ AudioBackend *AudioBackend::getBackend(const std::string& slug)
 	return nullptr;
 }
 
+/* Removed duplicate/old WriteSample function
 void WriteSample(s16 r, s16 l)
 {
 	if (currentBackend == nullptr)
@@ -64,13 +65,11 @@ void WriteSample(s16 r, s16 l)
 		ProcessAudioThreadBuffer();
 		
 		// Push the buffer to the audio backend
-		currentBackend->push(Buffer, SAMPLE_COUNT, false);
-		
-		// Update buffer fullness
-		float new_fullness = static_cast<float>(AUDIO_BUFFER_SIZE) / AUDIO_BUFFER_SIZE;
-		buffer_fullness.store(new_fullness, std::memory_order_relaxed);
+		if (currentBackend)
+			currentBackend->PushBuffer(Buffer);
 	}
 }
+*/
 
 // Forward declarations for audio thread functions
 void InitAudioThread();
@@ -170,3 +169,6 @@ float getAudioBufferFullness() {
 	EventManager::listen(Event::Terminate, callback);
 	EventManager::listen(Event::LoadState, callback);
 }
+
+static std::mutex audioThreadMutex;
+static std::condition_variable audioThreadCv;
