@@ -92,6 +92,14 @@ static inline void optimized_memcpy(void *dst, const void *src, size_t size)
 }
 #endif
 
+static OpCallFP* sh4_opcode_handlers[0x10000];
+
+// Cache for instruction fetches to avoid repeated memory lookups
+// Size: 64K entries * (2 bytes opcode + 4 bytes addr + 1 byte valid) = ~448 KB
+static u16 op_cache[1 << 16]; // 64K entries for 16-bit index
+static u32 op_cache_addr[1 << 16];
+static bool op_cache_valid[1 << 16];
+
 Sh4ICache icache;
 Sh4OCache ocache;
 Sh4Interpreter *Sh4Interpreter::Instance;
@@ -161,14 +169,26 @@ void Sh4Interpreter::ExecuteOpcode(u16 op)
 
 u16 Sh4Interpreter::ReadNexOp()
 {
-	u32 addr = ctx->pc;
-	if (!mmu_enabled() && (addr & 1))
-		// address error
-		throw SH4ThrownException(addr, Sh4Ex_AddressErrorRead);
+	const u32 pc_before = ctx->pc;
+	const u16 index = pc_before & 0xFFFF;
 
-	ctx->pc = addr + 2;
+	// Check cache first
+	if (op_cache_valid[index] && op_cache_addr[index] == pc_before)
+	{
+		ctx->pc += 2;
+		return op_cache[index];
+	}
 
-	return IReadMem16(addr);
+	// Cache miss: read from memory
+	u16 op = IReadMem16(pc_before);
+	ctx->pc += 2;
+
+	// Store in cache
+	op_cache[index] = op;
+	op_cache_addr[index] = pc_before;
+	op_cache_valid[index] = true;
+
+	return op;
 }
 
 void Sh4Interpreter::Run()
