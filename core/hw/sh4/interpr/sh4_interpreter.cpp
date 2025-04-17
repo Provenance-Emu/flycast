@@ -13,6 +13,9 @@
 #include "../sh4_cycles.h"
 #include "../sh4_cache.h"
 #include "debug/gdb_server.h"
+#include "../sh4_cycles.h"
+#include "deps/xxHash/xxhash.h"
+#include "hw/sh4/interpr/sh4_opcodes.h" // Include for CHECK_FPU macros
 #include "audio/audiostream.h"
 
 float sh4_cpu_timescale = 1.0f;
@@ -139,18 +142,76 @@ void Sh4Interpreter::ExecuteOpcode(u16 op)
 		// Optimize floating point opcodes
 		case 0xF000: // FADD Rm,Rn
 		{
-			u32 n = ((op >> 8) & 0xf);
-			u32 m = ((op >> 4) & 0xf);
-			ctx->fr[n] = optimized_float_add(ctx->fr[n], ctx->fr[m]);
+			u32 n = GetN(op);
+			u32 m = GetM(op);
+			if (ctx->fpscr.PR == 0) // Single precision
+			{
+				ctx->fr[n] += ctx->fr[m];
+				CHECK_FPU_32(ctx->fr[n]);
+			}
+			else // Double precision
+			{
+				u64* d = (u64*)&ctx->fr[0];
+				d[n >> 1] += d[m >> 1];
+				CHECK_FPU_64(d[n >> 1]);
+			}
 			sh4cycles.executeCycles(op);
 			return;
 		}
 
-		case 0xF002: // FMUL Rm,Rn
+		case 0xF001: // FSUB FRm, FRn
 		{
-			u32 n = ((op >> 8) & 0xf);
-			u32 m = ((op >> 4) & 0xf);
-			ctx->fr[n] = optimized_float_mul(ctx->fr[n], ctx->fr[m]);
+			u32 n = GetN(op);
+			u32 m = GetM(op);
+			if (ctx->fpscr.PR == 0) // Single precision
+			{
+				ctx->fr[n] -= ctx->fr[m];
+				CHECK_FPU_32(ctx->fr[n]);
+			}
+			else // Double precision
+			{
+				u64* d = (u64*)&ctx->fr[0];
+				d[n >> 1] -= d[m >> 1];
+				CHECK_FPU_64(d[n >> 1]);
+			}
+			sh4cycles.executeCycles(op);
+			return;
+		}
+
+		case 0xF002: // FMUL FRm, FRn
+		{
+			u32 n = GetN(op);
+			u32 m = GetM(op);
+			if (ctx->fpscr.PR == 0) // Single precision
+			{
+				ctx->fr[n] *= ctx->fr[m];
+				CHECK_FPU_32(ctx->fr[n]);
+			}
+			else // Double precision
+			{
+				u64* d = (u64*)&ctx->fr[0];
+				d[n >> 1] *= d[m >> 1];
+				CHECK_FPU_64(d[n >> 1]);
+			}
+			sh4cycles.executeCycles(op);
+			return;
+		}
+
+		case 0xF003: // FDIV FRm, FRn
+		{
+			u32 n = GetN(op);
+			u32 m = GetM(op);
+			if (ctx->fpscr.PR == 0) // Single precision
+			{
+				ctx->fr[n] /= ctx->fr[m];
+				CHECK_FPU_32(ctx->fr[n]);
+			}
+			else // Double precision
+			{
+				u64* d = (u64*)&ctx->fr[0];
+				d[n >> 1] /= d[m >> 1];
+				CHECK_FPU_64(d[n >> 1]);
+			}
 			sh4cycles.executeCycles(op);
 			return;
 		}
@@ -405,16 +466,16 @@ void Sh4_int_Run()
 		}
 		// Normal audio buffer level, use standard scaling
 		else {
-			if (sh4_cpu_timescale >= 1.4f)
+		if (sh4_cpu_timescale >= 1.4f)
 				scaled_batch_size = 20000;  // Very fast
-			else if (sh4_cpu_timescale >= 1.1f)
-				scaled_batch_size = 15000;  // Fast
-			else if (sh4_cpu_timescale >= 0.9f)
-				scaled_batch_size = 10000;  // Normal
-			else if (sh4_cpu_timescale >= 0.7f)
-				scaled_batch_size = 8000;   // Slow
-			else
-				scaled_batch_size = 5000;   // Very slow
+		else if (sh4_cpu_timescale >= 1.1f)
+			scaled_batch_size = 15000;  // Fast
+		else if (sh4_cpu_timescale >= 0.9f)
+			scaled_batch_size = 10000;  // Normal
+		else if (sh4_cpu_timescale >= 0.7f)
+			scaled_batch_size = 8000;   // Slow
+		else
+			scaled_batch_size = 5000;   // Very slow
 		}
 
 		// Process in larger batches for better efficiency
