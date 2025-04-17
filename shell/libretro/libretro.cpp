@@ -1279,37 +1279,58 @@ void retro_run()
 		glsm_ctl(GLSM_CTL_STATE_UNBIND, nullptr);
 #endif
 
-	video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
+    video_cb(is_dupe ? 0 : RETRO_HW_FRAME_BUFFER_VALID, framebufferWidth, framebufferHeight, 0);
 
-    // === NEW AUDIO CODE START ===
+    // === AUDIO RENDERING ===
     if (audio_batch_cb && emu.audio_engine_) {
-        // Determine number of samples to read per frame.
+        // Get the current sample rate
         int sample_rate = emu.audio_engine_->get_sample_rate();
         if (sample_rate > 0) {
-            // Calculate frames needed for approx 1/60th of a second.
-            // This might need adjustment based on actual retro_run frequency.
-            // A fixed buffer size might be more reliable if retro_run timing varies.
-            size_t frames_to_read = sample_rate / 60;
-            // Ensure a minimum/maximum buffer size? Let's try reading what the engine has for now.
-            // frames_to_read = std::max((size_t)256, std::min((size_t)2048, frames_to_read));
-
-            // Use a static vector to avoid frequent reallocations
-            static std::vector<int16_t> audio_buffer;
-            // Resize cautiously - maybe read available first?
-            // Let's try reading up to a max buffer size.
-            const size_t max_frames_to_read = 2048; // Arbitrary max buffer
-            audio_buffer.resize(max_frames_to_read * 2); // Stereo samples
-
-            // Read available samples from the engine's ring buffer
-            size_t frames_read = emu.audio_engine_->read_samples(audio_buffer.data(), max_frames_to_read);
-
-            if (frames_read > 0) {
-                // Send the read samples to the libretro host
-                audio_batch_cb(audio_buffer.data(), frames_read);
+            // Calculate how many frames we should ideally process per frame
+            // For 60fps gameplay, we want sample_rate/60 samples per video frame
+            // But we'll adapt based on what's actually available in the buffer
+            size_t ideal_frames = sample_rate / 60;
+            
+            // Get the current buffer level to see how many frames are available
+            size_t available_frames = emu.audio_engine_->get_ring_buffer_level() / 2; // Divide by 2 for stereo
+            
+            // Determine how many frames to actually read
+            // - If we have fewer than ideal, read what we have (underrun)
+            // - If we have way more than ideal, read a bit extra to catch up (overrun)
+            // - Otherwise, read the ideal amount
+            size_t frames_to_read;
+            if (available_frames < ideal_frames) {
+                // Underrun - read what we have
+                frames_to_read = available_frames;
+            } else if (available_frames > ideal_frames * 2) {
+                // Overrun - read a bit extra to catch up
+                frames_to_read = ideal_frames + (available_frames - ideal_frames) / 4;
+                frames_to_read = std::min(frames_to_read, available_frames);
+            } else {
+                // Normal case - read the ideal amount
+                frames_to_read = ideal_frames;
+            }
+            
+            // Cap to a reasonable maximum to avoid excessive memory usage
+            const size_t max_frames = 4096;
+            frames_to_read = std::min(frames_to_read, max_frames);
+            
+            if (frames_to_read > 0) {
+                // Use a static buffer to avoid frequent allocations
+                static std::vector<int16_t> audio_buffer;
+                audio_buffer.resize(frames_to_read * 2); // Stereo samples
+                
+                // Read samples from the engine's ring buffer
+                size_t frames_read = emu.audio_engine_->read_samples(audio_buffer.data(), frames_to_read);
+                
+                if (frames_read > 0) {
+                    // Send the samples to the libretro frontend
+                    audio_batch_cb(audio_buffer.data(), frames_read);
+                }
             }
         }
     }
-    // === NEW AUDIO CODE END ===
+    // === END AUDIO RENDERING ===
 
 	first_run = false;
 
