@@ -881,7 +881,7 @@ endif()
 target_sources(${PROJECT_NAME} PRIVATE
 		core/hw/hwreg.h
 		core/audio/AudioEngine.cpp
-		core/audio/NullAudioBackend.cpp
+		core/audio/LibretroAudioBackend.cpp
 		core/hw/aica/aica.cpp
 		core/hw/aica/aica.h
 		core/hw/aica/aica_if.cpp
@@ -1221,7 +1221,6 @@ if(NOT LIBRETRO)
 			core/audio/audiostream.cpp
 			core/audio/audiostream.h
 			core/audio/audiostream_thread.cpp
-			core/audio/NullAudioBackend.cpp
 			core/oslib/http_client.cpp
 			core/oslib/http_client.h
 			core/oslib/oslib.cpp)

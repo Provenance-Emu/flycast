@@ -31,7 +31,7 @@
 #include "hw/flashrom/nvmem.h"
 #include "cheats.h"
 #include "audio/AudioEngine.h"
-#include "audio/NullAudioBackend.h"
+#include "audio/LibretroAudioBackend.h"
 #include "debug/gdb_server.h"
 #include "hw/pvr/Renderer_if.h"
 #include "hw/arm7/arm7_rec.h"
@@ -506,17 +506,17 @@ void Emulator::init()
 	initThreadPool();
 
 	// Initialize the new Audio Engine
-	audio_engine_ = std::make_unique<AudioEngine>(std::make_unique<NullAudioBackend>());
-	// Call parameterless init()
-	const int desired_sample_rate = 44100;
-	const int desired_buffer_frames = 1024;
-	if (!audio_engine_->init(desired_sample_rate, desired_buffer_frames)) {
-		// ELOG("Failed to initialize AudioEngine!"); // Use appropriate logging
-		audio_engine_.reset(); // Ensure it's null if init failed
-	}
-	else {
-		// ILOG("AudioEngine initialized with NullAudioBackend."); // Use appropriate logging
-	}
+    audio_engine_ = std::make_unique<AudioEngine>(std::make_unique<LibretroAudioBackend>());
+    // Call parameterless init()
+    const int desired_sample_rate = 44100;
+    const int desired_buffer_frames = 1024;
+    if (!audio_engine_->init(desired_sample_rate, desired_buffer_frames)) {
+        // ELOG("Failed to initialize AudioEngine!"); // Use appropriate logging
+        audio_engine_.reset(); // Ensure it's null if init failed
+    }
+    else {
+        // ILOG("AudioEngine initialized with LibretroAudioBackend."); // Use appropriate logging
+    }
 
 	libGDR_init();
 	pvr::init();
