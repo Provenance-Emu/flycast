@@ -37,7 +37,10 @@ namespace flycast {
 #include <vector>
 #include <time.h>
 
-void loadGameSpecificSettings();
+class AudioBackend; // Forward declaration
+class AudioEngine;  // Forward declaration
+
+void loadGameSpecificSettings(); // Added declaration
 void SaveSettings();
 
 int flycast_init(int argc, char* argv[]);
@@ -162,6 +165,10 @@ public:
 	 */
 	bool render();
 	/**
+	 * Check the status of the async emulation thread.
+	 */
+	bool checkStatus(bool wait = false);
+	/**
 	 * Set the network state.
 	 */
 	void setNetworkState(bool online);
@@ -195,8 +202,9 @@ public:
 
 	void dc_reset(bool hard); // for tests only
 
+	std::unique_ptr<AudioEngine> audio_engine_;
+
 private:
-	bool checkStatus(bool wait = false);
 	void runInternal();
 	void diskChange();
 	

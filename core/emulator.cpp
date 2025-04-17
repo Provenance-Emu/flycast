@@ -30,7 +30,8 @@
 #include "hw/sh4/sh4_sched.h"
 #include "hw/flashrom/nvmem.h"
 #include "cheats.h"
-#include "audio/audiostream.h"
+#include "audio/AudioEngine.h"
+#include "audio/NullAudioBackend.h"
 #include "debug/gdb_server.h"
 #include "hw/pvr/Renderer_if.h"
 #include "hw/arm7/arm7_rec.h"
@@ -485,7 +486,7 @@ void Emulator::initThreadPool()
 	// Create thread pool for parallel emulation tasks
 	// Use number of hardware threads - 1 to leave one thread for the main emulation loop
 	size_t thread_count = std::max<size_t>(1, std::thread::hardware_concurrency() - 1);
-	
+
 	// Create the thread pool if it doesn't exist
 	if (!emulation_thread_pool)
 		emulation_thread_pool = std::make_unique<flycast::ThreadPool>(thread_count);
@@ -500,9 +501,22 @@ void Emulator::init()
 	}
 	// Default platform
 	setPlatform(DC_PLATFORM_DREAMCAST);
-	
+
 	// Initialize the thread pool for parallel emulation tasks
 	initThreadPool();
+
+	// Initialize the new Audio Engine
+	audio_engine_ = std::make_unique<AudioEngine>(std::make_unique<NullAudioBackend>());
+	// Call parameterless init()
+	const int desired_sample_rate = 44100;
+	const int desired_buffer_frames = 1024;
+	if (!audio_engine_->init(desired_sample_rate, desired_buffer_frames)) {
+		// ELOG("Failed to initialize AudioEngine!"); // Use appropriate logging
+		audio_engine_.reset(); // Ensure it's null if init failed
+	}
+	else {
+		// ILOG("AudioEngine initialized with NullAudioBackend."); // Use appropriate logging
+	}
 
 	libGDR_init();
 	pvr::init();
@@ -523,6 +537,7 @@ void Emulator::init()
 	interpreter->Init();
 	state = Init;
 }
+
 
 Sh4Executor *Emulator::getSh4Executor()
 {
@@ -717,20 +732,20 @@ void Emulator::runInternal()
 	{
 		do {
 			resetRequested = false;
-			
+
 			// Run the SH4 CPU emulation
 			getSh4Executor()->Run();
-			
+
 			// Process any pending tasks in the thread pool
 			// This ensures that we don't block on thread pool tasks
-			
+
 			if (resetRequested)
 			{
 				// Wait for any pending tasks to complete before reset
 				if (emulation_thread_pool) {
 					emulation_thread_pool->waitForCompletion();
 				}
-				
+
 				nvmem::saveFiles();
 				dc_reset(false);
 				if (!restartCpu())
@@ -841,10 +856,10 @@ void Emulator::stop()
 		// normally only useful on android due to multithreading
 		stopRequested = true;
 #else
-		TermAudio();
+		stopRequested = false;
+#endif
 		nvmem::saveFiles();
 		EventManager::event(Event::Pause);
-#endif
 	}
 }
 
@@ -856,6 +871,47 @@ void Emulator::requestReset()
 		NetworkHandshake::term();
 	getSh4Executor()->Stop();
 }
+
+void Emulator::insertGdrom(const std::string& path)
+{
+	if (settings.platform.isArcade())
+		return;
+	gdr::insertDisk(path);
+	diskChange();
+}
+
+void Emulator::openGdrom()
+{
+	if (settings.platform.isArcade())
+		return;
+	gdr::openLid();
+	diskChange();
+}
+
+void Emulator::diskChange()
+{
+	config::Settings::instance().reset();
+	config::Settings::instance().load(false);
+	if (!settings.content.path.empty())
+	{
+		hostfs::FileInfo info = hostfs::storage().getFileInfo(settings.content.path);
+		settings.content.fileName = info.name;
+		loadGameSpecificSettings();
+	}
+	else
+	{
+		settings.content.fileName.clear();
+		settings.content.gameId.clear();
+		settings.content.title = BIOS_TITLE;
+	}
+	cheatManager.reset(settings.content.gameId);
+	if (cheatManager.isWidescreen())
+		config::ScreenStretching.override(134);	// 4:3 -> 16:9
+	custom_texture.Terminate();
+	EventManager::event(Event::DiskChange);
+}
+
+Emulator emu;
 
 void loadGameSpecificSettings()
 {
@@ -1000,7 +1056,6 @@ void Emulator::start()
 		getSh4Executor()->Start();
 		threadResult = std::async(std::launch::async, [this] {
 				ThreadName _("Flycast-emu");
-				InitAudio();
 
 				try {
 					while (state == Running || singleStep || stepRangeTo != 0)
@@ -1011,11 +1066,10 @@ void Emulator::start()
 						if (!ggpo::nextFrame())
 							break;
 					}
-					TermAudio();
+					audio_engine_->shutdown();
 				} catch (...) {
 					setNetworkState(false);
 					getSh4Executor()->Stop();
-					TermAudio();
 					throw;
 				}
 		});
@@ -1023,7 +1077,7 @@ void Emulator::start()
 	else
 	{
 		stopRequested = false;
-		InitAudio();
+
 	}
 
 	EventManager::event(Event::Resume);
@@ -1064,7 +1118,6 @@ bool Emulator::render()
 		if (stopRequested)
 		{
 			stopRequested = false;
-			TermAudio();
 			nvmem::saveFiles();
 			EventManager::event(Event::Pause);
 			return false;
@@ -1103,44 +1156,3 @@ bool Emulator::restartCpu()
 	getSh4Executor()->Start();
 	return true;
 }
-
-void Emulator::insertGdrom(const std::string& path)
-{
-	if (settings.platform.isArcade())
-		return;
-	gdr::insertDisk(path);
-	diskChange();
-}
-
-void Emulator::openGdrom()
-{
-	if (settings.platform.isArcade())
-		return;
-	gdr::openLid();
-	diskChange();
-}
-
-void Emulator::diskChange()
-{
-	config::Settings::instance().reset();
-	config::Settings::instance().load(false);
-	if (!settings.content.path.empty())
-	{
-		hostfs::FileInfo info = hostfs::storage().getFileInfo(settings.content.path);
-		settings.content.fileName = info.name;
-		loadGameSpecificSettings();
-	}
-	else
-	{
-		settings.content.fileName.clear();
-		settings.content.gameId.clear();
-		settings.content.title = BIOS_TITLE;
-	}
-	cheatManager.reset(settings.content.gameId);
-	if (cheatManager.isWidescreen())
-		config::ScreenStretching.override(134);	// 4:3 -> 16:9
-	custom_texture.Terminate();
-	EventManager::event(Event::DiskChange);
-}
-
-Emulator emu;
