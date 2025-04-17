@@ -75,15 +75,8 @@ public:
     AudioEngine& operator=(AudioEngine&&) = delete;
 
 private:
-    /// The main function for the audio processing thread.
-    // Rename thread function declaration
-    void audio_thread_main();
-
     std::unique_ptr<AudioBackend> backend_ = nullptr;    // The audio output backend
     std::unique_ptr<AudioRingBuffer<int16_t>> ring_buffer_ = nullptr; // Ring buffer for audio data
-    std::thread audio_thread_;                   // The dedicated audio thread
-    std::atomic<bool> running_{false};
-    std::vector<int16_t> callback_buffer_; // Temporary buffer for backend callbacks
 
     int actual_sample_rate_ = 0;
     int backend_buffer_frames_ = 0;

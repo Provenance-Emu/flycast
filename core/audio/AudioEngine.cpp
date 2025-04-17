@@ -27,7 +27,6 @@
 AudioEngine::AudioEngine(std::unique_ptr<AudioBackend> backend)
     : backend_(std::move(backend)), // Use backend_
       ring_buffer_(std::make_unique<AudioRingBuffer<int16_t>>(DEFAULT_AUDIO_RING_BUFFER_SIZE)),
-      running_(false),
       initialized_(false) {
     if (!backend_) { // Use backend_
         // Potentially throw or log an error if backend is null
@@ -73,11 +72,11 @@ bool AudioEngine::init(
         return false;
     }
 
-    // --- Compatibility Issue: Backend likely doesn't need source buffer set --- 
+    // --- Compatibility Issue: Backend likely doesn't need source buffer set ---
     // If AudioBackend uses a callback model, it likely *pulls* data via
     // audio_callback rather than having a buffer pushed to it.
     // Commenting this out as it's not in the AudioBackend interface.
-    // backend_->set_source_buffer(ring_buffer_.get()); // Use backend_ 
+    // backend_->set_source_buffer(ring_buffer_.get()); // Use backend_
 
     // Prepare the callback buffer
     // TODO: Retrieve actual values? Currently commented out in original logic.
@@ -86,24 +85,24 @@ bool AudioEngine::init(
 
     // Resize internal buffer based on backend settings
     // Assuming stereo (2 channels) as backend doesn't provide channel info
-    callback_buffer_.resize(backend_->get_buffer_size() * 2); // Use backend_->get_buffer_size()
+    // callback_buffer_.resize(backend_->get_buffer_size() * 2); // Use backend_->get_buffer_size()
 
-    if (callback_buffer_.empty())
-    {
-        // ELOG("AudioEngine::init error: Failed to allocate callback buffer."); // Removed
-        return false;
-    }
+    // if (callback_buffer_.empty())
+    // {
+    //     // ELOG("AudioEngine::init error: Failed to allocate callback buffer."); // Removed
+    //     return false;
+    // }
 
-    // Start the audio thread
-    running_ = true;
-    try {
-        audio_thread_ = std::thread(&AudioEngine::audio_thread_main, this);
-    } catch (const std::system_error& e) {
-        // ELOG("AudioEngine::init error: Failed to start audio thread: %s", e.what()); // Removed
-        running_ = false;
-        backend_->shutdown(); // Use backend_
-        return false;
-    }
+    // // Start the audio thread
+    // running_ = true;
+    // try {
+    //     audio_thread_ = std::thread(&AudioEngine::audio_thread_main, this);
+    // } catch (const std::system_error& e) {
+    //     // ELOG("AudioEngine::init error: Failed to start audio thread: %s", e.what()); // Removed
+    //     running_ = false;
+    //     backend_->shutdown(); // Use backend_
+    //     return false;
+    // }
 
     initialized_ = true;
     // ILOG("AudioEngine initialized successfully."); // Removed
@@ -111,34 +110,28 @@ bool AudioEngine::init(
 }
 
 void AudioEngine::shutdown() {
-    // DLOG("AudioEngine::shutdown starting..."); // Removed
     if (!initialized_) {
-        // WLOG("AudioEngine not initialized, nothing to shut down."); // Removed
         return;
     }
 
-    running_ = false;
-
-    if (audio_thread_.joinable()) {
-        // DLOG("Joining audio thread..."); // Removed
-        try {
-            audio_thread_.join();
-            // DLOG("Audio thread joined."); // Removed
-        } catch (const std::system_error& e) {
-            // ELOG("Error joining audio thread: %s", e.what()); // Removed
-            // Continue shutdown regardless
-        }
-    }
-
     // Shutdown the backend
-    if (backend_) { // Use backend_
-        backend_->shutdown(); // Use backend_
+    if (backend_) { // Check if backend_ is valid
+        backend_->shutdown();
+        // backend_.release(); // Release ownership if managed externally - Let unique_ptr handle this
     }
 
-    ring_buffer_.reset();
-    callback_buffer_.clear();
+    // Clear the ring buffer
+    if (ring_buffer_) { // Check if ring_buffer_ is valid
+        // Removed: ring_buffer_->clear(); - Method does not exist
+        // ring_buffer_.reset(); // Explicitly reset unique_ptr - Let unique_ptr handle this
+    }
+
+    // Reset state variables
     initialized_ = false;
-    // ILOG("AudioEngine shutdown complete."); // Removed
+    actual_sample_rate_ = 0;
+    backend_buffer_frames_ = 0;
+
+    // DLOG("AudioEngine shut down."); // Removed
 }
 
 bool AudioEngine::push_samples(const int16_t* samples, size_t num_samples) {
@@ -174,11 +167,11 @@ size_t AudioEngine::read_samples(int16_t* buffer, size_t num_frames) {
     if (!initialized_ || !ring_buffer_ || !buffer) {
         return 0;
     }
-    
+
     // Each frame consists of 2 samples (stereo)
     size_t samples_to_read = num_frames * 2;
     size_t samples_read = 0;
-    
+
     // Read data from ring buffer into output buffer, one sample at a time
     for (size_t i = 0; i < samples_to_read; ++i) {
         if (!ring_buffer_->try_read(buffer[i])) {
@@ -187,7 +180,7 @@ size_t AudioEngine::read_samples(int16_t* buffer, size_t num_frames) {
         }
         samples_read++;
     }
-    
+
     // Return the number of frames read (samples / 2)
     return samples_read / 2;
 }
@@ -202,47 +195,4 @@ int AudioEngine::get_backend_buffer_size() const {
 
 size_t AudioEngine::get_ring_buffer_level() const {
     return (initialized_ && ring_buffer_) ? ring_buffer_->size() : 0;
-}
-
-void AudioEngine::audio_thread_main() {
-    while (running_.load()) {
-        // TODO: This whole thread logic needs rethinking based on AudioBackend callback design.
-        // The current push model doesn't fit the interface.
-        // For now, commenting out incompatible calls to allow compilation.
-
-        // backend_->wait_for_buffer_request(); // ERROR: Method does not exist
-
-        // Calculate how much data is needed
-        const size_t frames_to_read = backend_->get_buffer_size(); // Use backend_->get_buffer_size()
-        // Assuming stereo (2 channels) as backend doesn't provide channel info
-        const size_t samples_to_read = frames_to_read * 2;
-
-        if (samples_to_read == 0 || callback_buffer_.size() < samples_to_read) {
-            // Avoid division by zero or buffer overflow if backend gives weird values
-            std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Prevent tight spin
-            continue;
-        }
-
-        // Read data from ring buffer into callback buffer, one sample at a time
-        size_t samples_read = 0;
-        for (size_t i = 0; i < samples_to_read; ++i) {
-            if (!ring_buffer_->try_read(callback_buffer_[i])) {
-                // Underflow during read loop - buffer became empty
-                break; // Exit loop, remaining will be filled with silence later
-            }
-            samples_read++;
-        }
-
-        // Handle underflow - fill remaining part of the buffer with silence
-        if (samples_read < samples_to_read) {
-            std::fill(callback_buffer_.begin() + samples_read, callback_buffer_.begin() + samples_to_read, 0);
-        }
-
-        // backend_->submit_buffer(callback_buffer_.data(), frames_to_read); // ERROR: Method does not exist
-
-        // Since we can't submit, add a small sleep to prevent this thread
-        // from consuming 100% CPU in a tight loop.
-        // This is a temporary measure until the logic is refactored.
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
 }
