@@ -880,6 +880,8 @@ endif()
 
 target_sources(${PROJECT_NAME} PRIVATE
 		core/hw/hwreg.h
+		core/audio/AudioEngine.cpp
+		core/audio/NullAudioBackend.cpp
 		core/hw/aica/aica.cpp
 		core/hw/aica/aica.h
 		core/hw/aica/aica_if.cpp
@@ -1217,6 +1219,9 @@ if(NOT LIBRETRO)
 			core/audio/audiobackend_pulseaudio.cpp
 			core/audio/audiobackend_sdl2.cpp
 			core/audio/audiostream.cpp
+			core/audio/audiostream.h
+			core/audio/audiostream_thread.cpp
+			core/audio/NullAudioBackend.cpp
 			core/oslib/http_client.cpp
 			core/oslib/http_client.h
 			core/oslib/oslib.cpp)
@@ -1759,7 +1764,7 @@ if(NOT LIBRETRO)
 				MACOSX_BUNDLE_LONG_VERSION_STRING "${GIT_VERSION}"
 				MACOSX_BUNDLE_SHORT_VERSION_STRING "${TAG_VERSION}"
 				MACOSX_BUNDLE_BUNDLE_VERSION "${GIT_HASH}"
-				MACOSX_BUNDLE_COPYRIGHT "Copyright © ${YEAR} Flycast contributors. All rights reserved."
+				MACOSX_BUNDLE_COPYRIGHT "Copyright \u00A9 ${YEAR} Flycast contributors. All rights reserved."
 				MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/shell/apple/emulator-ios/plist.in
 
 				XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
@@ -1829,7 +1834,7 @@ if(NOT LIBRETRO)
 				MACOSX_BUNDLE_SHORT_VERSION_STRING "${TAG_VERSION}"
 				MACOSX_BUNDLE_BUNDLE_VERSION "${GIT_HASH}"
 				MACOSX_BUNDLE_BUNDLE_NAME "Flycast"
-				MACOSX_BUNDLE_COPYRIGHT "Copyright © ${YEAR} Flycast contributors. All rights reserved."
+				MACOSX_BUNDLE_COPYRIGHT "Copyright \u00A9 ${YEAR} Flycast contributors. All rights reserved."
 				XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf"
 				XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT[variant=RelWithDebInfo] "dwarf-with-dsym"
 				XCODE_ATTRIBUTE_CLANG_DEBUG_INFORMATION_LEVEL[variant=RelWithDebInfo] "line-tables-only"

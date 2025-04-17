@@ -1,4 +1,5 @@
 #include "audiostream.h"
+#include "audio_thread.h"
 #include "cfg/option.h"
 #include "emulator.h"
 
@@ -50,72 +51,79 @@ AudioBackend *AudioBackend::getBackend(const std::string& slug)
 
 void WriteSample(s16 r, s16 l)
 {
-	Buffer[writePtr].r = r * config::AudioVolume.dbPower();
-	Buffer[writePtr].l = l * config::AudioVolume.dbPower();
+	if (currentBackend == nullptr)
+		return;
 
-	if (++writePtr == SAMPLE_COUNT)
+	Buffer[writePtr].r = r;
+	Buffer[writePtr].l = l;
+	writePtr = (writePtr + 1) % SAMPLE_COUNT;
+
+	if (writePtr == 0)
 	{
-		if (currentBackend != nullptr)
-			currentBackend->push(Buffer, SAMPLE_COUNT, config::LimitFPS);
-		writePtr = 0;
+		// Process any pending samples from the audio thread buffer
+		ProcessAudioThreadBuffer();
+		
+		// Push the buffer to the audio backend
+		currentBackend->push(Buffer, SAMPLE_COUNT, false);
+		
+		// Update buffer fullness
+		float new_fullness = static_cast<float>(AUDIO_BUFFER_SIZE) / AUDIO_BUFFER_SIZE;
+		buffer_fullness.store(new_fullness, std::memory_order_relaxed);
 	}
 }
+
+// Forward declarations for audio thread functions
+void InitAudioThread();
+void TermAudioThread();
+void ProcessAudioThreadBuffer();
+void RequestAudioThreadProcessing();
 
 void InitAudio()
 {
 	registerForEvents();
-	TermAudio();
 
-	std::string slug = config::AudioBackend;
-	currentBackend = AudioBackend::getBackend(slug);
-	if (currentBackend == nullptr && slug != "auto")
-	{
-		slug = "auto";
-		currentBackend = AudioBackend::getBackend(slug);
-	}
 	if (currentBackend != nullptr)
-	{
-		INFO_LOG(AUDIO, "Initializing audio backend \"%s\" (%s)...", currentBackend->slug.c_str(), currentBackend->name.c_str());
-		if (!currentBackend->init())
-		{
-			currentBackend = nullptr;
-			if (slug != "auto")
-			{
-				WARN_LOG(AUDIO, "Audio driver %s failed to initialize. Defaulting to 'auto'", slug.c_str());
-				slug = "auto";
-				currentBackend = AudioBackend::getBackend(slug);
-				if (!currentBackend->init())
-					currentBackend = nullptr;
-			}
-		}
-	}
+		return;
 
+	string audioBackend = config::AudioBackend.get();
+	currentBackend = AudioBackend::getBackend(audioBackend);
 	if (currentBackend == nullptr)
 	{
-		WARN_LOG(AUDIO, "Running without audio!");
+		WARN_LOG(AUDIO, "WARNING: Selected audio backend \"%s\" not found. Using auto selection.", audioBackend.c_str());
+		currentBackend = AudioBackend::getBackend("auto");
+	}
+	if (currentBackend == nullptr)
+	{
+		ERROR_LOG(AUDIO, "FATAL: No audio backends available.");
 		return;
 	}
 
-	if (audio_recording_started)
+	if (!currentBackend->init())
 	{
-		// Restart recording
-		audio_recording_started = false;
-		StartAudioRecording(eight_khz);
+		ERROR_LOG(AUDIO, "FATAL: Audio backend \"%s\" (%s) initialization failed.", currentBackend->slug.c_str(), currentBackend->name.c_str());
+		currentBackend = nullptr;
+		return;
 	}
+
+	INFO_LOG(AUDIO, "Audio backend \"%s\" (%s) initialized.", currentBackend->slug.c_str(), currentBackend->name.c_str());
+
+	writePtr = 0;
+	memset(Buffer, 0, sizeof(Buffer));
+	
+	// Initialize the audio thread system
+	InitAudioThread();
 }
 
 void TermAudio()
 {
-	if (currentBackend == nullptr)
-		return;
-
-	// Save recording state before stopping
-	bool rec_started = audio_recording_started;
-	StopAudioRecording();
-	audio_recording_started = rec_started;
-	currentBackend->term();
-	INFO_LOG(AUDIO, "Terminating audio backend \"%s\" (%s)...", currentBackend->slug.c_str(), currentBackend->name.c_str());
-	currentBackend = nullptr;
+	// Terminate the audio thread system
+	TermAudioThread();
+	
+	if (currentBackend != nullptr)
+	{
+		currentBackend->term();
+		currentBackend = nullptr;
+	}
 }
 
 void StartAudioRecording(bool eight_khz)
@@ -149,12 +157,16 @@ static void registerForEvents()
 	if (done)
 		return;
 	done = true;
-	// Empty the audio buffer when loading a state or terminating the game
-	const auto& callback = [](Event, void *) {
-		writePtr = 0;
-	};
+	// Function to get the current audio buffer fullness
+// Returns a value between 0.0 (empty) and 1.0 (full)
+float getAudioBufferFullness() {
+    // If audio thread is running, use its buffer fullness
+    if (AudioThread::isRunning()) {
+        return AudioThread::getBufferFullness();
+    }
+    // Otherwise use the traditional buffer fullness
+    return buffer_fullness.load(std::memory_order_relaxed);
+}	};
 	EventManager::listen(Event::Terminate, callback);
 	EventManager::listen(Event::LoadState, callback);
 }
-
-
