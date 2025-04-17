@@ -30,7 +30,6 @@ static void setDRn(Sh4Context *ctx, u32 op, double d) {
 
 static void iNimp(const char *str);
 
-#define CHECK_FPU_32(v) v = fixNaN(v)
 
 //fadd <FREG_M>,<FREG_N>
 sh4op(i1111_nnnn_mmmm_0000)

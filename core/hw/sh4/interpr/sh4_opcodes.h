@@ -2,6 +2,9 @@
 #include "types.h"
 #include "hw/sh4/sh4_opcode_list.h"
 
+#define CHECK_FPU_32(v) v = fixNaN(v)
+#define CHECK_FPU_64(v) v = fixNaN64(v)
+
 /* Opcodes :) */
 
 //stc SR,<REG_N>
