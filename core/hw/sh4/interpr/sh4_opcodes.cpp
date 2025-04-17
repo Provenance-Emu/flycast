@@ -1408,8 +1408,11 @@ sh4op(i0000_nnnn_mmmm_0111)
 {
 	u32 n = GetN(op);
 	u32 m = GetM(op);
-	ctx->mac.l = (u32)((((s32)ctx->r[n]) * ((s32)ctx->r[m])));
+	u64 result = (u64)ctx->r[n] * (u64)ctx->r[m]; // Perform 64-bit unsigned multiplication
+	ctx->mac.h = (u32)(result >> 32);             // Store high 32 bits
+	ctx->mac.l = (u32)(result & 0xFFFFFFFF);      // Store low 32 bits
 }
+
 //************************ Div ! ************************
 //div0u
 sh4op(i0000_0000_0001_1001)
@@ -1927,4 +1930,3 @@ sh4op(iNotImplemented)
 
 	throw SH4ThrownException(ctx->pc - 2, Sh4Ex_IllegalInstr);
 }
-

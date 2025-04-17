@@ -214,6 +214,31 @@ void Sh4Interpreter::ExecuteOpcode(u16 op)
 			return;
 		}
 
+		case 0xF00C: // FMOV FRm, FRn (or DRm, DRn etc.)
+		{
+			if (ctx->fpscr.SZ == 0) // Single precision FRm -> FRn
+			{
+				u32 n = GetN(op);
+				u32 m = GetM(op);
+				ctx->fr[n] = ctx->fr[m];
+			}
+			else // Double precision (DR/XD)
+			{
+				u32 n_idx = GetN(op) >> 1;
+				u32 m_idx = GetM(op) >> 1;
+				u64* d = (u64*)&ctx->fr[0];
+				switch ((op >> 4) & 0x11)
+				{
+					case 0x00: d[n_idx] = d[m_idx]; break;         // DRm -> DRn
+					case 0x01: d[n_idx] = d[m_idx + 16]; break; // XDm -> DRn
+					case 0x10: d[n_idx + 16] = d[m_idx]; break; // DRm -> XDn
+					case 0x11: d[n_idx + 16] = d[m_idx + 16]; break;// XDm -> XDn
+				}
+			}
+			sh4cycles.executeCycles(op);
+			return;
+		}
+
 		default:
 			// Use standard execution for other opcodes
 			OpPtr[op](ctx, op);

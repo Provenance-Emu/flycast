@@ -408,7 +408,7 @@ sh4op(i1111_nnmm_1110_1101)
 	int m=(GetN(op)&0x3)<<2;
 	if (ctx->fpscr.PR == 0)
 	{
-	#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
 		// Load the two vectors (FVn and FVm)
 		float32x4_t v_n = vld1q_f32(ctx->fr + n);
 		float32x4_t v_m = vld1q_f32(ctx->fr + m);
@@ -518,8 +518,11 @@ sh4op(i1111_nnnn_0110_1101)
 	if (ctx->fpscr.PR == 0)
 	{
 		u32 n = GetN(op);
-
+#ifdef USE_NEON
+		ctx->fr[n] = vsqrts_f32(ctx->fr[n]);
+#else
 		ctx->fr[n] = sqrtf(ctx->fr[n]);
+#endif
 		CHECK_FPU_32(ctx->fr[n]);
 	}
 	else
