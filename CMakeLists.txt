@@ -248,7 +248,7 @@ else()
 		$<$<COMPILE_LANGUAGE:CXX>:-Wall>)
 endif()
 
-if(${CMAKE_OSX_SYSROOT} MATCHES "\/MacOSX.platform\/Developer\/SDKs")
+if(APPLE AND NOT IOS)
 	set(TARGET_MAC ON)
 endif()
 
@@ -524,9 +524,8 @@ if(NOT WITH_SYSTEM_ZLIB)
 	set(ZLIB_FOUND TRUE)
 	set(ZLIB_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${ZLIB_RELATIVE_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/${ZLIB_RELATIVE_PATH}")
 
-	cmake_policy(SET CMP0026 OLD)
-	get_target_property(ZLIB_LIBRARY_RELEASE zlibstatic LOCATION)
-	get_target_property(ZLIB_LIBRARY_DEBUG zlibstatic LOCATION_Debug)
+	set(ZLIB_LIBRARY_RELEASE "${CMAKE_CURRENT_BINARY_DIR}/core/deps/libchdr/deps/zlib-1.3.1/libz.a")
+	set(ZLIB_LIBRARY_DEBUG   "${CMAKE_CURRENT_BINARY_DIR}/core/deps/libchdr/deps/zlib-1.3.1/libz.a")
 endif()
 
 if(PKG_CONFIG_FOUND AND NOT ANDROID AND NOT APPLE AND NOT LIBRETRO)
@@ -672,10 +671,8 @@ if(NOT MINIUPNP_FOUND)
 endif()
 
 if(NOT LIBZIP_FOUND OR NINTENDO_SWITCH)
-	cmake_policy(SET CMP0026 OLD)
 	set(zstd_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/core/deps/libchdr/deps/zstd-1.5.6/lib")
-	get_target_property(zstd_STATIC_LIBRARY libzstd_static LOCATION)
-
+	set(zstd_STATIC_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/core/deps/libchdr/deps/zstd-1.5.6/build/cmake/lib/libzstd.a")
 	option(ENABLE_COMMONCRYPTO "Enable use of CommonCrypto" OFF)
 	option(ENABLE_GNUTLS "Enable use of GnuTLS" OFF)
 	option(ENABLE_MBEDTLS "Enable use of mbed TLS" OFF)
@@ -1299,8 +1296,7 @@ if(NOT LIBRETRO)
 			core/deps/rcheevos/src/rhash/aes.c
 			core/deps/rcheevos/src/rhash/cdreader.c
 			core/deps/rcheevos/src/rhash/hash.c
-			core/deps/rcheevos/src/rhash/md5.c
-			core/deps/rcheevos/src/rurl/url.c)
+			core/deps/rcheevos/src/rhash/md5.c)
 	target_include_directories(${PROJECT_NAME} PRIVATE core/deps/rcheevos/include)
 	target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RACHIEVEMENTS RC_DISABLE_LUA)
 endif()
@@ -1671,8 +1667,6 @@ if(NOT LIBRETRO)
 		core/deps/ggpo/lib/ggpo/main.cpp
 		core/deps/ggpo/lib/ggpo/platform_linux.cpp
 		core/deps/ggpo/lib/ggpo/platform_linux.h
-		core/deps/ggpo/lib/ggpo/platform_windows.cpp
-		core/deps/ggpo/lib/ggpo/platform_windows.h
 		core/deps/ggpo/lib/ggpo/poll.cpp
 		core/deps/ggpo/lib/ggpo/ggpo_poll.h
 		core/deps/ggpo/lib/ggpo/ring_buffer.h
@@ -1763,7 +1757,7 @@ if(NOT LIBRETRO)
 				MACOSX_BUNDLE_LONG_VERSION_STRING "${GIT_VERSION}"
 				MACOSX_BUNDLE_SHORT_VERSION_STRING "${TAG_VERSION}"
 				MACOSX_BUNDLE_BUNDLE_VERSION "${GIT_HASH}"
-				MACOSX_BUNDLE_COPYRIGHT "Copyright © ${YEAR} Flycast contributors. All rights reserved."
+				MACOSX_BUNDLE_COPYRIGHT "Copyright \u00A9 ${YEAR} Flycast contributors. All rights reserved."
 				MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/shell/apple/emulator-ios/plist.in
 
 				XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
@@ -1833,7 +1827,7 @@ if(NOT LIBRETRO)
 				MACOSX_BUNDLE_SHORT_VERSION_STRING "${TAG_VERSION}"
 				MACOSX_BUNDLE_BUNDLE_VERSION "${GIT_HASH}"
 				MACOSX_BUNDLE_BUNDLE_NAME "Flycast"
-				MACOSX_BUNDLE_COPYRIGHT "Copyright © ${YEAR} Flycast contributors. All rights reserved."
+				MACOSX_BUNDLE_COPYRIGHT "Copyright \u00A9 ${YEAR} Flycast contributors. All rights reserved."
 				XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf"
 				XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT[variant=RelWithDebInfo] "dwarf-with-dsym"
 				XCODE_ATTRIBUTE_CLANG_DEBUG_INFORMATION_LEVEL[variant=RelWithDebInfo] "line-tables-only"

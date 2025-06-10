@@ -166,7 +166,8 @@ CMAKE_CMD="cmake -B ${BUILD_DIR} \
   -DCMAKE_C_FLAGS=\"${C_FLAGS}\" \
   -DCMAKE_CXX_FLAGS=\"${CXX_FLAGS}\" \
   -DIOS=${IOS} \
-  -DCMAKE_SYSTEM_NAME=${SYSTEM_NAME}"
+  -DCMAKE_SYSTEM_NAME=${SYSTEM_NAME} \
+  -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
 # Add linker flags if provided
 if [ -n "$LINKER_FLAGS" ]; then
@@ -186,7 +187,7 @@ if [ $? -eq 0 ]; then
   # Run make if requested
   if [ "${RUN_BUILD}" = "ON" ]; then
     echo "Running make in ${BUILD_DIR}..."
-    cmake --build ${BUILD_DIR} -- -j4
+    cmake --build ${BUILD_DIR} -- -j12
 
     if [ $? -eq 0 ]; then
       echo "Build successful!"
