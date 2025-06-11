@@ -15,8 +15,25 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
         {
         case Op::END:
             return;
+        case Op::NOP:
+            break;
+        case Op::MOV_REG:
+            ctx->r[ins.dst.reg] = ctx->r[ins.src1.reg];
+            break;
+        case Op::MOV_IMM:
+            ctx->r[ins.dst.reg] = static_cast<uint32_t>(ins.src1.imm);
+            break;
+        case Op::ADD_IMM:
+            ctx->r[ins.dst.reg] += static_cast<int32_t>(ins.src1.imm);
+            // TODO: set condition codes
+            break;
+        case Op::ADD_REG:
+            ctx->r[ins.dst.reg] += ctx->r[ins.src1.reg];
+            break;
+        case Op::BRA:
+            ctx->pc += ins.extra; // pc+4+disp already encoded
+            return; // leave block
         default:
-            // Unimplemented opcodes just skip for now
             break;
         }
     }

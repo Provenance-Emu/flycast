@@ -24,7 +24,12 @@ enum class Op : uint8_t {
     SHL,
     SHR,
     BRANCH,
-    END
+    END,
+    MOV_REG,   // dst = src (both registers)
+    MOV_IMM,   // dst = imm32 (sign-extended immediate)
+    ADD_REG,   // dst += src
+    ADD_IMM,   // dst += imm32
+    BRA,       // pc = pc + disp
 };
 
 // Operand kinds – for now just register index or immediate flag

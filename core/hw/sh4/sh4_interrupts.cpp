@@ -12,6 +12,7 @@
 #include "types.h"
 #include "sh4_interrupts.h"
 #include "sh4_core.h"
+#include "hw/sh4/modules/mmu.h"
 #include "sh4_mmr.h"
 #include "oslib/oslib.h"
 #include "debug/gdb_server.h"
@@ -200,8 +201,17 @@ void Do_Exception(u32 epc, Sh4ExceptionCode expEvn)
 {
 	assert((expEvn >= Sh4Ex_TlbMissRead && expEvn <= Sh4Ex_SlotIllegalInstr)
 			|| expEvn == Sh4Ex_FpuDisabled || expEvn == Sh4Ex_SlotFpuDisabled || expEvn == Sh4Ex_UserBreak);
-	if (Sh4cntx.sr.BL != 0)
-		throw FlycastException("Fatal: SH4 exception when blocked");
+	if (Sh4cntx.sr.BL != 0) {
+		char msg[256];
+		u16 opcode = 0xFFFF;
+		try {
+			opcode = mmu_IReadMem16(epc);
+		} catch (const SH4ThrownException&) {
+			// ignore - can't safely fetch opcode when MMU raises.
+		}
+		std::snprintf(msg, sizeof(msg), "Fatal: SH4 exception evn %d opcode %04X at %08X", expEvn, opcode, epc);
+		throw FlycastException(msg);
+	}
 	CCN_EXPEVT = expEvn;
 
 	Sh4cntx.ssr = Sh4cntx.sr.getFull();
