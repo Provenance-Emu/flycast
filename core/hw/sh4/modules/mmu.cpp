@@ -287,6 +287,19 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 		}
 	}
 
+	if (CCN_MMUCR.AT == 0)
+	{
+		// P4 should still be accessed via direct map (already in P4), but software often
+		// uses P0/U0 when AT is off. Just forward them unchanged, with special handling
+		// for the P4 MMIO window.
+		if ((va & 0x1C000000) == 0x1C000000)
+			// Map 0x1C000000-0x1FFFFFFF to P4 MMIO (same logic as later in this function)
+			rv = va | 0xF0000000;
+		else
+			rv = va;
+		return MmuError::NONE;
+	}
+
 	if (Sh4cntx.sr.MD == 0 && (va & 0x80000000) != 0)
 		//if on kernel, and not SQ addr -> error
 		return MmuError::BADADDR;
@@ -351,6 +364,16 @@ template MmuError mmu_data_translation<MMU_TT_DWRITE>(u32 va, u32& rv);
 
 MmuError mmu_instruction_translation(u32 va, u32& rv)
 {
+	if (CCN_MMUCR.AT == 0)
+	{
+		if ((va >> 29) == 7)
+			// P4 code fetch not allowed even when AT is off
+			return MmuError::BADADDR;
+		// Direct mapping
+		rv = va;
+		return MmuError::NONE;
+	}
+
 	if (Sh4cntx.sr.MD == 0 && (va & 0x80000000) != 0)
 		// User mode on kernel address
 		return MmuError::BADADDR;

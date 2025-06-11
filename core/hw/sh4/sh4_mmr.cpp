@@ -656,6 +656,10 @@ void map_p4()
 	// sh4 system registers
 	addrspace::handler p4mmr_handler = addrspaceRegisterHandlerTemplate(ReadMem_p4mmr, WriteMem_p4mmr);
 	addrspace::mapHandler(p4mmr_handler, 0xFF, 0xFF);
+
+	// Reserved P4 ranges (0xFC-0xFE) should safely return 0 to avoid faults
+	// Map them to the generic P4 handler which logs and returns zero for unhandled accesses.
+	addrspace::mapHandler(p4arrays_handler, 0xFC, 0xFE);
 }
 
 namespace sh4

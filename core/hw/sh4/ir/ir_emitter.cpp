@@ -51,8 +51,22 @@ Block& Emitter::CreateNew(uint32_t pc) {
         ins.src2 = {};
         bool decoded = false;
 
-        // NOP : treat MOV R0,R0 (0x0009) and 0x0000 as NOP
-        if (raw == 0x0009 || raw == 0x0000)
+        static Block zero_blk;
+        if (raw == 0x0000)
+        {
+            // Reuse a single stub block for 0x0000 to avoid excessive allocations
+            if (zero_blk.code.empty())
+            {
+                zero_blk.pcStart = pc;
+                Instr nop{}; nop.op = Op::NOP; zero_blk.code.push_back(nop);
+                Instr end{}; end.op = Op::END; zero_blk.code.push_back(end);
+                zero_blk.pcNext = pc + 2;
+            }
+            return zero_blk;
+        }
+
+        // NOP : MOV R0,R0 (0x0009)
+        if (raw == 0x0009)
         {
             ins.op = Op::NOP;
             decoded = true;
@@ -101,7 +115,504 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::BRA;
             ins.extra = disp + 4; // pc-relative (add after delay slot)
             decoded = true;
-            blk.pcNext = pc + 2; // executor updates
+            blk.pcNext = pc + 4; // after delay slot
+        }
+        // SHLL2/8/16 Rn  (0x4n08,0x4n18,0x4n28)
+        else if ((raw & 0xF00F) == 0x4008)
+        {
+            uint8_t sub = (raw >> 4) & 0xF; // bits 7-4 determine variant
+            uint8_t shift = 0;
+            switch (sub)
+            {
+            case 0x0: shift = 2; break;   // 0x4n08
+            case 0x1: shift = 8; break;   // 0x4n18
+            case 0x2: shift = 16; break;  // 0x4n28
+            default: shift = 1; break; // fallback
+            }
+            ins.op = Op::SHL;
+            ins.dst.isImm = false;
+            ins.dst.reg = n;
+            ins.extra = shift;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.L @Rm,Rn  (0x6nm0)
+        else if ((raw & 0xF00F) == 0x6000)
+        {
+            ins.op = Op::LOAD32;
+            ins.dst.isImm = false;
+            ins.dst.reg = n;
+            ins.src1.isImm = false;
+            ins.src1.reg = m;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.L Rm,@Rn  (0x2nm0)
+        else if ((raw & 0xF00F) == 0x2000)
+        {
+            ins.op = Op::STORE32;
+            ins.dst.isImm = false; // address in Rn
+            ins.dst.reg = n;
+            ins.src1.isImm = false; // value in Rm
+            ins.src1.reg = m;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // CMP/EQ Rm,Rn  (0x3nm0)
+        else if ((raw & 0xF00F) == 0x3000)
+        {
+            ins.op = Op::CMP_EQ;
+            ins.dst.isImm = false; ins.dst.reg = n; // Rn
+            ins.src1.isImm = false; ins.src1.reg = m; // Rm
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // CMP/HI Rm,Rn (0x3nm6)
+        else if ((raw & 0xF00F) == 0x3006)
+        {
+            ins.op = Op::CMP_HI;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // CMP/HS Rm,Rn (0x3nm7)
+        else if ((raw & 0xF00F) == 0x3007)
+        {
+            ins.op = Op::CMP_HS;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // CMP/PL Rn (0x4n05)
+        else if ((raw & 0xF0FF) == 0x4005)
+        {
+            ins.op = Op::CMP_PL;
+            ins.src1.isImm = false; ins.src1.reg = n;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // TST #imm8,R0  (0xC8??)
+        else if ((raw & 0xFF00) == 0xC800)
+        {
+            ins.op = Op::TST_IMM;
+            ins.src1.isImm = true; ins.src1.imm = raw & 0xFF;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOVT Rn (0x6n02)
+        else if ((raw & 0xF0FF) == 0x6002)
+        {
+            ins.op = Op::MOVT;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // BF disp8 0x8B?? / BF/S 0x8F?? (branch if T==0)
+        else if ((raw & 0xFF00) == 0x8B00 || (raw & 0xFF00) == 0x8F00)
+        {
+            int8_t disp = raw & 0xFF;
+            int32_t d = disp << 1;
+            ins.op = Op::BF;
+            ins.extra = d + 4;
+            decoded = true;
+            blk.pcNext = pc + 4;
+        }
+        // BT disp8 0x8900 / BT/S 0x8D?? (branch if T==1)
+        else if ((raw & 0xFF00) == 0x8900 || (raw & 0xFF00) == 0x8D00)
+        {
+            int8_t disp = raw & 0xFF;
+            int32_t d = disp << 1;
+            ins.op = Op::BT;
+            ins.extra = d + 4;
+            decoded = true;
+            blk.pcNext = pc + 4;
+        }
+        // MOV.W @(disp,PC),Rn  (0x9000 | Rn<<8 | disp8)
+        else if ((raw & 0xF000) == 0x9000)
+        {
+            uint8_t disp = raw & 0xFF;
+            uint32_t addr = (pc + 4) + (disp << 1);
+            ins.op = Op::LOAD16_IMM;
+            ins.dst.isImm = false;
+            ins.dst.reg = n;
+            ins.src1.isImm = true;
+            ins.src1.imm = addr;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.L @(disp,PC),Rn  (0xD000 | Rn<<8 | disp8)
+        else if ((raw & 0xF000) == 0xD000)
+        {
+            uint8_t disp = raw & 0xFF;
+            uint32_t addr = (pc + 4) + (disp << 2);
+            ins.op = Op::LOAD32_IMM;
+            ins.dst.isImm = false;
+            ins.dst.reg = n;
+            ins.src1.isImm = true;
+            ins.src1.imm = addr;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // JSR @Rm  (0x4nmB)
+        else if ((raw & 0xF00F) == 0x400B)
+        {
+            ins.op = Op::JSR;
+            ins.src1.isImm = false;
+            ins.src1.reg = m;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // RTS (0x000B)
+        else if (raw == 0x000B)
+        {
+            ins.op = Op::RTS;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // SWAP.B Rm,Rn 0x6nm8
+        else if ((raw & 0xF00F) == 0x6008)
+        {
+            ins.op = Op::SWAP_B;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // SWAP.W Rm,Rn 0x6nm9
+        else if ((raw & 0xF00F) == 0x6009)
+        {
+            ins.op = Op::SWAP_W;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // AND Rm,Rn 0x2nm9
+        else if ((raw & 0xF00F) == 0x2009)
+        {
+            ins.op = Op::AND_REG;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // TST Rm,Rn 0x2nm8
+        else if ((raw & 0xF00F) == 0x2008)
+        {
+            ins.op = Op::TST_REG;
+            ins.dst.isImm = false; ins.dst.reg = n; // Rn is first operand (same as AND)
+            ins.src1.isImm = false; ins.src1.reg = m; // Rm
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // XOR Rm,Rn 0x2nmA
+        else if ((raw & 0xF00F) == 0x200A)
+        {
+            ins.op = Op::XOR_REG;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // OR Rm,Rn 0x2nmB
+        else if ((raw & 0xF00F) == 0x200B)
+        {
+            ins.op = Op::OR_REG;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // NOT Rm,Rn 0x6nm7
+        else if ((raw & 0xF00F) == 0x6007)
+        {
+            ins.op = Op::NOT_OP;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // DT Rn 0x4010
+        else if ((raw & 0xF0FF) == 0x4010)
+        {
+            ins.op = Op::DT;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // SHLL Rn (shift left 1) 0x4000
+        else if ((raw & 0xF0FF) == 0x4000)
+        {
+            ins.op = Op::SHL1;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // SHLR Rn 0x4001
+        else if ((raw & 0xF0FF) == 0x4001)
+        {
+            ins.op = Op::SHR1;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // SHAL Rn 0x4020 (same as SHL1)
+        else if ((raw & 0xF0FF) == 0x4020)
+        {
+            ins.op = Op::SHL1;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // SHAR Rn 0x4021
+        else if ((raw & 0xF0FF) == 0x4021)
+        {
+            ins.op = Op::SAR1;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // ROTL Rn 0x4004
+        else if ((raw & 0xF0FF) == 0x4004)
+        {
+            ins.op = Op::SHL; // reuse SHL with extra=1 but wrap-around later in exec
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.extra = 1 | 0x80; // flag 0x80 indicates rotate
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // ROTR Rn 0x4005
+        else if ((raw & 0xF0FF) == 0x4005)
+        {
+            ins.op = Op::SHR_OP; // treat as right rotate 1 using flag
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.extra = 1 | 0x80;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // AND #imm8,R0 0xC9??
+        else if ((raw & 0xFF00) == 0xC900)
+        {
+            ins.op = Op::AND_IMM;
+            ins.dst.isImm = false; ins.dst.reg = 0;
+            ins.src1.isImm = true; ins.src1.imm = raw & 0xFF;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // XOR #imm8,R0 0xCA??
+        else if ((raw & 0xFF00) == 0xCA00)
+        {
+            ins.op = Op::XOR_IMM;
+            ins.dst.isImm = false; ins.dst.reg = 0;
+            ins.src1.isImm = true; ins.src1.imm = raw & 0xFF;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // OR #imm8,R0 0xCB??
+        else if ((raw & 0xFF00) == 0xCB00)
+        {
+            ins.op = Op::OR_IMM;
+            ins.dst.isImm = false; ins.dst.reg = 0;
+            ins.src1.isImm = true; ins.src1.imm = raw & 0xFF;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.B R0,@(disp,GBR) 0xC0??  (store)
+        else if ((raw & 0xFF00) == 0xC000)
+        {
+            uint8_t disp = raw & 0xFF;
+            ins.op = Op::STORE8_GBR;
+            ins.src1.isImm = false; ins.src1.reg = 0; // R0 value
+            ins.extra = disp; // byte offset
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.W R0,@(disp,GBR) 0xC1??
+        else if ((raw & 0xFF00) == 0xC100)
+        {
+            uint8_t disp = raw & 0xFF;
+            ins.op = Op::STORE16_GBR;
+            ins.src1.isImm = false; ins.src1.reg = 0;
+            ins.extra = disp << 1;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.L R0,@(disp,GBR) 0xC2??
+        else if ((raw & 0xFF00) == 0xC200)
+        {
+            uint8_t disp = raw & 0xFF;
+            ins.op = Op::STORE32_GBR;
+            ins.src1.isImm = false; ins.src1.reg = 0;
+            ins.extra = disp << 2;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.B @(disp,GBR),R0 0xC4?? (load)
+        else if ((raw & 0xFF00) == 0xC400)
+        {
+            uint8_t disp = raw & 0xFF;
+            ins.op = Op::LOAD8_GBR;
+            ins.dst.isImm = false; ins.dst.reg = 0;
+            ins.extra = disp;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.W @(disp,GBR),R0 0xC5??
+        else if ((raw & 0xFF00) == 0xC500)
+        {
+            uint8_t disp = raw & 0xFF;
+            ins.op = Op::LOAD16_GBR;
+            ins.dst.isImm = false; ins.dst.reg = 0;
+            ins.extra = disp << 1;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.L @(disp,GBR),R0 0xC6??
+        else if ((raw & 0xFF00) == 0xC600)
+        {
+            uint8_t disp = raw & 0xFF;
+            ins.op = Op::LOAD32_GBR;
+            ins.dst.isImm = false; ins.dst.reg = 0;
+            ins.extra = disp << 2;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOVA @(disp,PC),R0 0xC7??
+        else if ((raw & 0xFF00) == 0xC700)
+        {
+            uint8_t disp = raw & 0xFF;
+            uint32_t imm = ((pc & ~3u) + 4) + (disp << 2);
+            ins.op = Op::MOVA;
+            ins.dst.isImm = false; ins.dst.reg = 0;
+            ins.src1.isImm = true; ins.src1.imm = imm;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.L @(disp,Rm),Rn 0x5nmd (disp=low4*4)
+        else if ((raw & 0xF000) == 0x5000)
+        {
+            uint8_t disp4 = raw & 0xF;
+            ins.op = Op::LOAD32;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            ins.extra = disp4 * 4;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.B @(disp,Rm),Rn 0x8nmd (disp=low4)
+        else if ((raw & 0xF000) == 0x8000)
+        {
+            uint8_t disp4 = raw & 0xF;
+            ins.op = Op::LOAD8;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            ins.extra = disp4;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.W @(disp,Rm),Rn 0x9nmd (disp=low4*2)
+        else if ((raw & 0xF000) == 0x9000)
+        {
+            uint8_t disp4 = raw & 0xF;
+            ins.op = Op::LOAD16;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            ins.extra = disp4 * 2;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // JSR @(disp,PC) 0xA000 | disp12
+        else if ((raw & 0xF000) == 0xA000)
+        {
+            int32_t disp = static_cast<int32_t>(raw & 0x0FFF);
+            if (disp & 0x800) // sign bit of 12-bit
+                disp |= ~0xFFF; // sign extend to 32-bit
+            disp <<= 1; // disp*2 since pc+4 later
+            ins.op = Op::JSR;
+            ins.extra = disp + 4; // pc-relative (add after delay slot)
+            decoded = true;
+            blk.pcNext = pc + 4;
+        }
+        // SHLR2/8/16 Rn : 0x4n09,0x4n19,0x4n29
+        else if ((raw & 0xF00F) == 0x4009)
+        {
+            uint8_t idx = (raw >> 4) & 0xF; // middle nibble determines amount
+            int shift = (idx == 0) ? 2 : (idx == 1 ? 8 : 16);
+            ins.op = Op::SHR_OP;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.extra = shift;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // SHAR2/8/16 Rn : 0x4n0B,0x4n1B,0x4n2B
+        else if ((raw & 0xF00F) == 0x400B)
+        {
+            uint8_t idx = (raw >> 4) & 0xF;
+            int shift = (idx == 0) ? 2 : (idx == 1 ? 8 : 16);
+            ins.op = Op::SAR_OP;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.extra = shift;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.B Rm,@(disp,Rn) 0x0nmd (disp=low4)
+        else if ((raw & 0xF000) == 0x0000 && (raw & 0x0F00) != 0x0000)
+        {
+            uint8_t disp4 = raw & 0xF;
+            ins.op = Op::STORE8;
+            ins.dst.isImm = false; ins.dst.reg = n; // base
+            ins.src1.isImm = false; ins.src1.reg = m; // value
+            ins.extra = disp4;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.W Rm,@(disp,Rn) 0x1nmd (disp=low4*2)
+        else if ((raw & 0xF000) == 0x1000 && (raw & 0x0F00) != 0x0000)
+        {
+            uint8_t disp4 = raw & 0xF;
+            ins.op = Op::STORE16;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            ins.extra = disp4 * 2;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.L Rm,@(disp,Rn) 0x4nmd (disp=low4*4)
+        else if ((raw & 0xF000) == 0x4000 && (raw & 0x0F00) != 0x0000)
+        {
+            uint8_t disp4 = raw & 0xF;
+            ins.op = Op::STORE32;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            ins.extra = disp4 * 4;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // CMP/STR Rm,Rn 0x2nmE
+        else if ((raw & 0xF00F) == 0x200E)
+        {
+            ins.op = Op::CMP_STR;
+            ins.dst.isImm = false; ins.dst.reg = n; // use dst as Rn
+            ins.src1.isImm = false; ins.src1.reg = m; // src as Rm
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // STS MACH,Rn 0x0n0A
+        else if ((raw & 0x00FF) == 0x000A)
+        {
+            ins.op = Op::GET_MACH;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // STS MACL,Rn 0x0n1A
+        else if ((raw & 0x00FF) == 0x001A)
+        {
+            ins.op = Op::GET_MACL;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // STS PR,Rn 0x0n2A
+        else if ((raw & 0x00FF) == 0x002A)
+        {
+            ins.op = Op::GET_PR;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            decoded = true;
+            blk.pcNext = pc + 2;
         }
 
         if (!decoded)
