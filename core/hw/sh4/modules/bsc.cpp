@@ -7,6 +7,45 @@
 #include "cfg/option.h"
 #include "modules.h"
 
+// Helper handlers to keep BIOS polling loops happy ---------------------------
+static u16 read_BSC_RTCSR(u32 addr)
+{
+    // Always report CMF (bit 7) and OVF (bit 6) set so BIOS thinks refresh/compare events occurred.
+    // Preserve other writable bits.
+    return static_cast<u16>(BSC_RTCSR.full | 0x00C0);
+}
+
+static void write_BSC_RTCSR(u32 addr, u16 data)
+{
+    // The BIOS will typically clear CMF by writing 0. Mask to valid bits (00ff)
+    BSC_RTCSR.full = data & 0x00FF;
+}
+
+// Aliases for half-word accesses to upper 16-bits of BCR1 and BCR2 -----------
+static u16 read_BSC_BCR1_hi(u32 addr)
+{
+    return static_cast<u16>(BSC_BCR1.full >> 16);
+}
+
+static void write_BSC_BCR1_hi(u32 addr, u16 data)
+{
+    // Only bits allowed by original mask (0x033E_FFFD) should be writable on BCR1,
+    // but the BIOS only uses word/half-word writes during setup, so keep it simple.
+    u32 low = BSC_BCR1.full & 0x0000FFFF;
+    BSC_BCR1.full = low | (static_cast<u32>(data) << 16);
+}
+
+static u16 read_BSC_BCR2_hi(u32 addr)
+{
+    // BCR2 is 16-bit; mirror its value on the upper alias.
+    return BSC_BCR2.full;
+}
+
+static void write_BSC_BCR2_hi(u32 addr, u16 data)
+{
+    BSC_BCR2.full = data & 0x3FFD; // respect writable mask set earlier
+}
+
 BSCRegisters bsc;
 
 //u32 port_out_data;
@@ -77,7 +116,8 @@ void BSCRegisters::init()
 	setRW<BSC_PCR_addr, u16>();
 
 	//BSC RTCSR 0xFF80001C 0x1F80001C 16 0x0000 Held Held Held Bclk
-	setRW<BSC_RTCSR_addr, u16, 0x00ff>();
+	// Provide custom CMF-toggling behaviour via handlers
+	setHandlers<BSC_RTCSR_addr>(read_BSC_RTCSR, write_BSC_RTCSR);
 
 	//BSC RTCNT 0xFF800020 0x1F800020 16 0x0000 Held Held Held Bclk
 	setRW<BSC_RTCNT_addr, u16, 0x00ff>();
@@ -105,7 +145,7 @@ void BSCRegisters::init()
 	//BSC GPIOIC 0xFF800048 0x1F800048 16 0x00000000 Held Held Held Bclk
 	setRW<BSC_GPIOIC_addr, u16>();
 
-	reset();
+ 	reset();
 }
 
 void BSCRegisters::reset()
@@ -144,4 +184,8 @@ void BSCRegisters::reset()
 		setHandlers<BSC_PDTRA_addr>(read_BSC_PDTRA_arcade, write_BSC_PDTRA_arcade);
 	else
 		setHandlers<BSC_PDTRA_addr>(read_BSC_PDTRA, write_BSC_PDTRA);
+
+    // Ensure alias handlers survive resets
+    setHandlers<BSC_BCR1_addr + 2>(read_BSC_BCR1_hi, write_BSC_BCR1_hi);
+    setHandlers<BSC_BCR2_addr + 2>(read_BSC_BCR2_hi, write_BSC_BCR2_hi);
 }

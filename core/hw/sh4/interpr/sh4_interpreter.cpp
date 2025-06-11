@@ -114,6 +114,14 @@ void Sh4Interpreter::ExecuteOpcode(u16 op)
 	if (ctx->sr.FD == 1 && OpDesc[op]->IsFloatingPoint())
 		throw SH4ThrownException(ctx->pc - 2, Sh4Ex_FpuDisabled);
 
+	// Treat 0x0000 (and 0x0009) as NOP to mirror IR behaviour and avoid illegal opcode exceptions
+	if (op == 0x0000 || op == 0x0009)
+	{
+		ctx->pc += 2; // advance to next instruction
+		sh4cycles.executeCycles(op);
+		return;
+	}
+
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
 	// Use optimized execution for common opcodes
 	switch (op)

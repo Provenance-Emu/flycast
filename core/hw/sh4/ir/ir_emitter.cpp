@@ -173,14 +173,14 @@ Block& Emitter::CreateNew(uint32_t pc) {
         static Block zero_blk;
         if (raw == 0x0000)
         {
-            // Reuse a single stub block for 0x0000 to avoid excessive allocations
+            // Reuse a single stub block for 0x0000 to avoid excessive allocations, but update PC fields each time
             if (zero_blk.code.empty())
             {
-                zero_blk.pcStart = pc;
                 Instr nop{}; nop.op = Op::NOP; zero_blk.code.push_back(nop);
                 Instr end{}; end.op = Op::END; zero_blk.code.push_back(end);
-                zero_blk.pcNext = pc + 2;
             }
+            zero_blk.pcStart = pc;
+            zero_blk.pcNext  = pc + 2;
             return zero_blk;
         }
 

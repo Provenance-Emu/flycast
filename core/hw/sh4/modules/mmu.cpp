@@ -289,20 +289,43 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 
 	if (CCN_MMUCR.AT == 0)
 	{
-		// P4 should still be accessed via direct map (already in P4), but software often
-		// uses P0/U0 when AT is off. Just forward them unchanged, with special handling
-		// for the P4 MMIO window.
-		if ((va & 0x1C000000) == 0x1C000000)
-			// Map 0x1C000000-0x1FFFFFFF to P4 MMIO (same logic as later in this function)
+		if ((va & 0xE0000000) == 0xE0000000)
+		{
+			rv = va; // P4 direct
+		}
+		else if ((va & 0x1C000000) == 0x1C000000)
+		{
+			// Map 0x1C000000-0x1FFFFFFF (store queues) into P4 MMIO window
 			rv = va | 0xF0000000;
+		}
+		else if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
+		{
+			// Map P1/P2 to main RAM window (mirror)
+			rv = 0x0C000000 | (va & 0x00FFFFFF);
+		}
 		else
-			rv = va;
+		{
+			rv = va & 0x0FFFFFFF; // mirror into first 16MB physical SDRAM
+		}
 		return MmuError::NONE;
 	}
 
 	if (Sh4cntx.sr.MD == 0 && (va & 0x80000000) != 0)
 		//if on kernel, and not SQ addr -> error
 		return MmuError::BADADDR;
+
+	// P1 (0x80000000-0x9FFFFFFF) and P2 (0xA0000000-BFFFFFFF) are always direct-mapped
+	if ((va & 0xE0000000) == 0x80000000)
+	{
+		rv = 0x0C000000 | (va & 0x00FFFFFF); // mirror to main RAM window
+		return MmuError::NONE;
+	}
+
+	if ((va & 0xE0000000) == 0xA0000000)
+	{
+		rv = 0x0C000000 | (va & 0x00FFFFFF);
+		return MmuError::NONE;
+	}
 
 	if ((va & 0xFC000000) == 0x7C000000)
 	{
@@ -366,11 +389,26 @@ MmuError mmu_instruction_translation(u32 va, u32& rv)
 {
 	if (CCN_MMUCR.AT == 0)
 	{
-		if ((va >> 29) == 7)
-			// P4 code fetch not allowed even when AT is off
-			return MmuError::BADADDR;
-		// Direct mapping
-		rv = va;
+		if ((va & 0xE0000000) == 0xE0000000)
+		{
+			// P4 direct
+			rv = va;
+		}
+		else if ((va & 0x1C000000) == 0x1C000000)
+		{
+			// Store queue window -> mirror into P4
+			rv = va | 0xF0000000;
+		}
+		else if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
+		{
+			// P1/P2 mirror to main RAM window
+			rv = 0x0C000000 | (va & 0x00FFFFFF);
+		}
+		else
+		{
+			// P0/U0 mirror into first 16MB
+			rv = va & 0x0FFFFFFF;
+		}
 		return MmuError::NONE;
 	}
 
@@ -384,8 +422,15 @@ MmuError mmu_instruction_translation(u32 va, u32& rv)
 
 	if (fast_reg_lut[va >> 29] != 0)
 	{
-		// P1 and P2 aren't translated
-		rv = va;
+		// P1 and P2 mirror to main RAM window
+		if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
+		{
+			rv = 0x0C000000 | (va & 0x00FFFFFF);
+		}
+		else
+		{
+			rv = va;
+		}
 		return MmuError::NONE;
 	}
 

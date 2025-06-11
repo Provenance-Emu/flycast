@@ -127,11 +127,23 @@ template<u32 *Module, u32 AddressMask = 0xff, u32 BaseAddress = 0>
 class MMRegister : public HwRegister
 {
 public:
-	template<u32 Addr, typename T = u32, u32 Mask = 0xffffffff, u32 OrMask = 0>
+	// Configure register for 8/16/32-bit accesses in one call.
+	// For 32-bit registers, we automatically expose aligned sub-word views so the BIOS
+	// can read/write the upper or lower half-word/byte as on real hardware.
+	template<u32 Addr, u32 Mask = 0xffffffff, u32 OrMask = 0>
 	void setReadWrite()
 	{
-		setReadHandler(readModule<Addr, T>);
-		setWriteHandler(writeModule<Addr, T, Mask, OrMask>);
+		// 8-bit
+		setReadHandler<u8>(readModule<Addr, u8>);
+		setWriteHandler<u8>(writeModule<Addr, u8, 0xff, 0>);
+
+		// 16-bit
+		setReadHandler<u16>(readModule<Addr, u16>);
+		setWriteHandler<u16>(writeModule<Addr, u16, 0xffff, 0>);
+
+		// 32-bit (honour provided masks)
+		setReadHandler<u32>(readModule<Addr, u32>);
+		setWriteHandler<u32>(writeModule<Addr, u32, Mask, OrMask>);
 	}
 
 	template<u32 Addr, typename T = u32>
@@ -150,13 +162,46 @@ private:
 	template<u32 Addr, typename T = u32>
 	static T readModule(u32 addr)
 	{
-		return (T)Module[((Addr - BaseAddress) & AddressMask) / 4];
+		u32 &word = Module[((Addr - BaseAddress) & AddressMask) / 4];
+
+		if constexpr (sizeof(T) == 4)
+		{
+			return static_cast<T>(word);
+		}
+		else if constexpr (sizeof(T) == 2)
+		{
+			return static_cast<T>((addr & 2) ? (word >> 16) : (word & 0xFFFF));
+		}
+		else // 1 byte
+		{
+			u32 shift = (addr & 3) * 8;
+			return static_cast<T>((word >> shift) & 0xFF);
+		}
 	}
 
 	template<u32 Addr, typename T = u32, u32 Mask = 0xffffffff, u32 OrMask = 0>
 	static void writeModule(u32 addr, T data)
 	{
-		Module[((Addr - BaseAddress) & AddressMask) / 4] = (u32)((data & Mask) | OrMask);
+		u32 &word = Module[((Addr - BaseAddress) & AddressMask) / 4];
+
+		if constexpr (sizeof(T) == 4)
+		{
+			word = (static_cast<u32>(data) & Mask) | OrMask;
+		}
+		else if constexpr (sizeof(T) == 2)
+		{
+			u32 masked = (static_cast<u32>(data) & 0xFFFF);
+			if (addr & 2)
+				word = (word & 0x0000FFFF) | (masked << 16);
+			else
+				word = (word & 0xFFFF0000) | masked;
+		}
+		else // 1 byte
+		{
+			u32 shift = (addr & 3) * 8;
+			u32 mask = 0xFF << shift;
+			word = (word & ~mask) | (static_cast<u32>(data) << shift);
+		}
 	}
 };
 
@@ -197,7 +242,7 @@ public:
 	template<u32 Addr, typename T = u32, u32 Mask = 0xffffffff, u32 OrMask = 0>
 	void setRW()
 	{
-		getRegister<Addr>().template setReadWrite<Addr, T, Mask, OrMask>();
+		getRegister<Addr>().template setReadWrite<Addr, Mask, OrMask>();
 	}
 
 	// Configure the register at the given address to use the given read and write handlers
@@ -258,7 +303,8 @@ public:
 			INFO_LOG(MEMORY, "Out of bound read @ %x", addr);
 			return 0;
 		}
-		if (addr & 3)
+		constexpr size_t align_mask = sizeof(T) - 1;
+		if ((addr & align_mask) != 0)
 		{
 			INFO_LOG(MEMORY, "Unaligned register read @ %x", addr);
 			return 0;
@@ -273,10 +319,17 @@ public:
 		size_t index = getRegIndex(addr);
 		if (index >= Size)
 			INFO_LOG(MEMORY, "Out of bound write @ %x = %x", addr, (int)data);
-		else if (addr & 3)
-			INFO_LOG(MEMORY, "Unaligned register write @ %x = %x", addr, (int)data);
 		else
+		{
+			constexpr size_t align_mask = sizeof(T) - 1;
+			if ((addr & align_mask) != 0)
+			{
+				INFO_LOG(MEMORY, "Unaligned register write @ %x = %x", addr, (int)data);
+				return;
+			}
 			registers[index].write(addr, data);
+			return;
+		}
 	}
 };
 

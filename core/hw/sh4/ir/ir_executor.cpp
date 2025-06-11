@@ -1,11 +1,77 @@
 #include "ir_executor.h"
 #include "hw/sh4/modules/mmu.h"
+#include "hw/sh4/sh4_core.h" // for SH4ThrownException
 #include <cassert>
 #include "log/Log.h"
+#include <array>
+#include <atomic>
+#include <cstdio>
+#include <utility>
 
 namespace sh4 {
 namespace ir {
 
+// ----------------------------------------------------------------------------
+//  Execution statistics helpers
+// ----------------------------------------------------------------------------
+namespace {
+constexpr size_t kOpCount = static_cast<size_t>(Op::XTRCT) + 1;
+static std::array<std::atomic<uint64_t>, kOpCount> g_opExecCounts{};
+static std::atomic<uint64_t> g_totalExecCount{0};
+constexpr uint64_t kLogInterval = 200; // log every ~200 instructions
+
+// string names for enumeration – keep in sync with Op enum via X macro style list in one place.
+// For now provide a fallback minimal array so stats compile; full names generation to be added later.
+static const char* OpNames[kOpCount] = {"NOP", "ADD", "SUB", "MOV", "LOAD8", "LOAD16", "LOAD32", "STORE8", "STORE16", "STORE32"};
+
+inline const char* GetOpName(size_t idx)
+{
+    if (idx < kOpCount && OpNames[idx])
+        return OpNames[idx];
+    static char buf[16];
+    std::snprintf(buf, sizeof(buf), "OP_%zu", idx);
+    return buf;
+}
+
+static void MaybeDumpStats()
+{
+    uint64_t executed = g_totalExecCount.load(std::memory_order_relaxed);
+    if (executed == 0 || executed % kLogInterval != 0)
+        return;
+
+    INFO_LOG(SH4, "--- IR opcode execution stats after %llu instructions ---", static_cast<unsigned long long>(executed));
+    // Print the 10 most executed opcodes
+    struct Item { size_t idx; uint64_t count; };
+    std::array<Item, 10> top{{}};
+
+    for (size_t i = 0; i < kOpCount; ++i)
+    {
+        uint64_t count = g_opExecCounts[i].load(std::memory_order_relaxed);
+        if (count == 0)
+            continue;
+
+        for (auto& slot : top)
+        {
+            if (count > slot.count)
+            {
+                std::swap(count, slot.count);
+                std::swap(i, slot.idx);
+            }
+        }
+    }
+
+    for (const auto& item : top)
+    {
+        if (item.count == 0)
+            break;
+        INFO_LOG(SH4, "  %-12s : %llu", GetOpName(item.idx), static_cast<unsigned long long>(item.count));
+    }
+}
+
+} // end anonymous namespace
+// ----------------------------------------------------------------------------
+//  Executor
+// ----------------------------------------------------------------------------
 void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
 {
     assert(blk);
@@ -24,6 +90,12 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
         }
 
         const Instr& ins = blk->code[ip++];
+        // ---- statistics ----
+        g_opExecCounts[static_cast<size_t>(ins.op)]++;
+        g_totalExecCount++;
+
+        MaybeDumpStats();
+
         switch (ins.op)
         {
         case Op::END:
@@ -252,7 +324,10 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
             ctx->r[ins.dst.reg] = static_cast<uint32_t>(ins.src1.imm);
             break;
         default:
-            break;
+            // Unimplemented opcode – fall back to legacy interpreter via IllegalInstr exception
+            ERROR_LOG(SH4, "IR executor unimplemented opcode Op %d at %08X", static_cast<int>(ins.op), curr_pc);
+            g_opExecCounts[static_cast<size_t>(ins.op)] = 0;
+            throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
         }
 
         // Advance PC by 2 for the next sequential instruction unless a branch is pending

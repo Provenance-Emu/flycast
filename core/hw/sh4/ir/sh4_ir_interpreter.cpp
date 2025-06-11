@@ -50,7 +50,7 @@ void Sh4IrInterpreter::Run()
                 WARN_LOG(SH4, "IR step %llu PC=%08X", static_cast<unsigned long long>(step_counter), ctx_->pc);
             }
         } catch (const SH4ThrownException& ex) {
-            if (ex.expEvn == Sh4Ex_IllegalInstr)
+            if (ex.expEvn == Sh4Ex_IllegalInstr || ex.expEvn == Sh4Ex_SlotIllegalInstr)
             {
                 static Sh4Interpreter* legacy = nullptr;
                 if (!legacy)
@@ -78,7 +78,7 @@ void Sh4IrInterpreter::Step()
         if (ctx_->pc == old_pc)
             ctx_->pc = blk->pcNext;
     } catch (const SH4ThrownException& ex) {
-        if (ex.expEvn == Sh4Ex_IllegalInstr)
+        if (ex.expEvn == Sh4Ex_IllegalInstr || ex.expEvn == Sh4Ex_SlotIllegalInstr)
         {
             static Sh4Interpreter* legacy = nullptr;
             if (!legacy)
