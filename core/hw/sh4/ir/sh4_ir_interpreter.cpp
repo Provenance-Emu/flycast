@@ -3,6 +3,7 @@
 #include "hw/sh4/sh4_interrupts.h"
 #include "hw/sh4/sh4_core.h" // for SH4ThrownException
 #include "log/Log.h"
+#include "hw/sh4/sh4_interpreter.h"
 
 namespace sh4 {
 namespace ir {
@@ -49,6 +50,19 @@ void Sh4IrInterpreter::Run()
                 WARN_LOG(SH4, "IR step %llu PC=%08X", static_cast<unsigned long long>(step_counter), ctx_->pc);
             }
         } catch (const SH4ThrownException& ex) {
+            if (ex.expEvn == Sh4Ex_IllegalInstr)
+            {
+                static Sh4Interpreter* legacy = nullptr;
+                if (!legacy)
+                {
+                    legacy = new Sh4Interpreter();
+                    legacy->Init();
+                }
+                // Let the legacy interpreter execute this single instruction
+                legacy->Step();
+                // PC and context are shared (same global ctx_), so just continue
+                continue;
+            }
             Do_Exception(ex.epc, ex.expEvn);
         }
     }
@@ -64,6 +78,17 @@ void Sh4IrInterpreter::Step()
         if (ctx_->pc == old_pc)
             ctx_->pc = blk->pcNext;
     } catch (const SH4ThrownException& ex) {
+        if (ex.expEvn == Sh4Ex_IllegalInstr)
+        {
+            static Sh4Interpreter* legacy = nullptr;
+            if (!legacy)
+            {
+                legacy = new Sh4Interpreter();
+                legacy->Init();
+            }
+            legacy->Step();
+            return;
+        }
         Do_Exception(ex.epc, ex.expEvn);
     }
 }

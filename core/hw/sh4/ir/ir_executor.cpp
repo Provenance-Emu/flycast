@@ -27,6 +27,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
         switch (ins.op)
         {
         case Op::END:
+            // normal block end; PC already at next sequential instruction
             return;
         case Op::NOP:
             break;
@@ -254,15 +255,21 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
             break;
         }
 
-        // advance PC for next instruction inside block
-        curr_pc += 2;
-
-        // If we have a pending branch and we just executed its delay slot, flag for commit on next loop start
-        if (branch_pending)
+        // Advance PC by 2 for the next sequential instruction unless a branch is pending
+        if (!branch_pending)
         {
-            executed_delay = true; // delay slot executed this iteration
-            branch_pending = false; // clear pending, will commit on next iteration
+            ctx->pc += 2;
         }
+
+        // If a branch is pending and we just executed the delay slot (i.e., branch_pending already true
+        // and executed_delay was false entering this iteration), mark that the delay slot has executed so
+        // the next loop will commit the branch.
+        if (branch_pending && !executed_delay)
+        {
+            executed_delay = true;
+        }
+
+        curr_pc = ctx->pc; // update for next loop iteration
     }
 }
 
