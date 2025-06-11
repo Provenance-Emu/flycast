@@ -14,7 +14,7 @@ Block& Emitter::CreateNew(uint32_t pc) {
         Instr i{};
         i.op = Op::END;
         blk.code.push_back(i);
-        blk.pcNext = pc + 2; // SH4 instruction width (bytes)
+        blk.pcNext = pc; // Keep same PC until real decoding added to avoid runaway cache growth
     }
     return blk;
 }
