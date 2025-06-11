@@ -436,10 +436,12 @@ void Sh4Interpreter::Term()
 	INFO_LOG(INTERPRETER, "Sh4 Term");
 }
 
+#ifndef ENABLE_SH4_IR
 Sh4Executor *Get_Sh4Interpreter()
 {
-	return new Sh4Interpreter();
+    return new Sh4Interpreter();
 }
+#endif
 
 // Then modify the Sh4_int_Run function
 void Sh4_int_Run()

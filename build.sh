@@ -167,6 +167,7 @@ CMAKE_CMD="cmake -B ${BUILD_DIR} \
   -DCMAKE_CXX_FLAGS=\"${CXX_FLAGS}\" \
   -DIOS=${IOS} \
   -DCMAKE_SYSTEM_NAME=${SYSTEM_NAME} \
+  -DENABLE_SH4_IR=ON \
   -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
 # Add linker flags if provided

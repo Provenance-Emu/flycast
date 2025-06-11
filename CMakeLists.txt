@@ -1987,3 +1987,17 @@ if(${CMAKE_GENERATOR} MATCHES "^Xcode.*|^Visual Studio.*")
 	file(GLOB_RECURSE SRC_FILES *.h *.cpp *.c *.cc *.mm)
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_FILES})
 endif()
+
+option(ENABLE_SH4_IR "Enable cached IR SH4 interpreter (no JIT)" OFF)
+
+if(ENABLE_SH4_IR)
+    target_sources(${PROJECT_NAME} PRIVATE
+        core/hw/sh4/ir/ir_defs.h
+        core/hw/sh4/ir/ir_emitter.h
+        core/hw/sh4/ir/ir_emitter.cpp
+        core/hw/sh4/ir/ir_executor.h
+        core/hw/sh4/ir/ir_executor.cpp
+        core/hw/sh4/ir/sh4_ir_interpreter.h
+        core/hw/sh4/ir/sh4_ir_interpreter.cpp)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_SH4_IR)
+endif()
