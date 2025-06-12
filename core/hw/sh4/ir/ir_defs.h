@@ -18,6 +18,13 @@ enum class Op : uint8_t {
     STORE8,
     STORE16,
     STORE32,
+    // Post-increment addressing forms
+    LOAD8_POST,
+    LOAD16_POST,
+    LOAD32_POST,
+    STORE8_POST,
+    STORE16_POST,
+    STORE32_POST,
     STORE8_PREDEC,
     STORE16_PREDEC,
     STORE32_PREDEC,
@@ -179,7 +186,8 @@ enum class Op : uint8_t {
     TST,
     TST_B,
     XOR_B,
-    XTRCT
+    XTRCT,
+    NUM_OPS
 };
 
 // Operand kinds – for now just register index or immediate flag

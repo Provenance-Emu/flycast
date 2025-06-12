@@ -4,6 +4,7 @@
 #include "hw/sh4/sh4_core.h" // for SH4ThrownException
 #include "log/Log.h"
 #include "hw/sh4/sh4_interpreter.h"
+#include "hw/sh4/modules/mmu.h"
 
 namespace sh4 {
 namespace ir {
@@ -44,25 +45,26 @@ void Sh4IrInterpreter::Run()
             executor_.ExecuteBlock(blk, ctx_);
             if (ctx_->pc == old_pc)
                 ctx_->pc = blk->pcNext;
+            if (blk->code.size() == 2 && blk->code[0].op == ir::Op::NOP)
+            {
+                uint32_t pc_skip = ctx_->pc;
+                // Examine up to 4 KB ahead (safety) or until non-NOP
+                const uint32_t limit = pc_skip + 0x1000;
+                while (pc_skip < limit)
+                {
+                    uint16_t iw = mmu_IReadMem16(pc_skip);
+                    if (iw != 0x0000 && iw != 0x0009)
+                        break;
+                    pc_skip += 2;
+                }
+                ctx_->pc = pc_skip;
+            }
             ++step_counter;
             if ((step_counter & 0x1FFFF) == 0) // every 131072 blocks
             {
                 WARN_LOG(SH4, "IR step %llu PC=%08X", static_cast<unsigned long long>(step_counter), ctx_->pc);
             }
         } catch (const SH4ThrownException& ex) {
-            if (ex.expEvn == Sh4Ex_IllegalInstr || ex.expEvn == Sh4Ex_SlotIllegalInstr)
-            {
-                static Sh4Interpreter* legacy = nullptr;
-                if (!legacy)
-                {
-                    legacy = new Sh4Interpreter();
-                    legacy->Init();
-                }
-                // Let the legacy interpreter execute this single instruction
-                legacy->Step();
-                // PC and context are shared (same global ctx_), so just continue
-                continue;
-            }
             Do_Exception(ex.epc, ex.expEvn);
         }
     }
@@ -77,18 +79,21 @@ void Sh4IrInterpreter::Step()
         executor_.ExecuteBlock(blk, ctx_);
         if (ctx_->pc == old_pc)
             ctx_->pc = blk->pcNext;
-    } catch (const SH4ThrownException& ex) {
-        if (ex.expEvn == Sh4Ex_IllegalInstr || ex.expEvn == Sh4Ex_SlotIllegalInstr)
+        if (blk->code.size() == 2 && blk->code[0].op == ir::Op::NOP)
         {
-            static Sh4Interpreter* legacy = nullptr;
-            if (!legacy)
+            uint32_t pc_skip = ctx_->pc;
+            // Examine up to 4 KB ahead (safety) or until non-NOP
+            const uint32_t limit = pc_skip + 0x1000;
+            while (pc_skip < limit)
             {
-                legacy = new Sh4Interpreter();
-                legacy->Init();
+                uint16_t iw = mmu_IReadMem16(pc_skip);
+                if (iw != 0x0000 && iw != 0x0009)
+                    break;
+                pc_skip += 2;
             }
-            legacy->Step();
-            return;
+            ctx_->pc = pc_skip;
         }
+    } catch (const SH4ThrownException& ex) {
         Do_Exception(ex.epc, ex.expEvn);
     }
 }
