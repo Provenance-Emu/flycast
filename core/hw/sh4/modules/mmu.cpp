@@ -5,6 +5,7 @@
 #include "hw/sh4/sh4_core.h"
 #include "debug/gdb_server.h"
 #include "serialize.h"
+#include "hw/flashrom/nvmem.h"
 
 TLB_Entry UTLB[64];
 TLB_Entry ITLB[4];
@@ -230,6 +231,20 @@ static u32 mmu_QACR_SQ(u32 va)
 template<u32 translation_type>
 MmuError mmu_full_SQ(u32 va, u32& rv)
 {
+	// Fast bypass for BIOS block copies using the store queue. Any SQ address
+	// that targets the first 256 MiB of virtual space is mapped directly to
+	// main SDRAM without touching the TLB. This mirrors the behaviour we now
+	// apply to ordinary reads/writes and prevents early UTLB-MISS exceptions
+	// when the BIOS clears or copies RAM before MMU initialisation.
+	if ((va & 0xE0000000) == 0xE0000000)       // SQ window selected
+	{
+		u32 dst = va & 0x1FFFFFFF;             // strip SQ selector bits
+		if (dst < 0x10000000)                 // within 0-0x0FFF_FFFF
+		{
+			rv = 0x0C000000 | (dst & 0x00FFFFFF); // mirror into first 16 MB
+			return MmuError::NONE;
+		}
+	}
 
 	if ((va & 3) || (CCN_MMUCR.SQMD == 1 && Sh4cntx.sr.MD == 0))
 		//here, or after ?
@@ -274,6 +289,24 @@ template MmuError mmu_full_SQ<MMU_TT_DWRITE>(u32 va, u32& rv);
 template<u32 translation_type>
 MmuError mmu_data_translation(u32 va, u32& rv)
 {
+	// Uncached low memory (first 256 MB of SDRAM) is directly accessible even with MMU on
+	// The BIOS performs block moves/clears up to 0x0CFFFFFF before the MMU and TLB
+	// are fully initialised.  Allow these addresses to bypass translation to avoid
+	// early UTLB miss exceptions.
+	if (va < 0x10000000)
+	{
+		// Mirror into main SDRAM window
+		rv = 0x0C000000 | (va & 0x00FFFFFF);
+		return MmuError::NONE;
+	}
+
+	// P4 area (on-chip I/O, ROM) is always direct-mapped regardless of MMU enable state.
+	if ((va & 0xE0000000) == 0xE0000000)
+	{
+		rv = va;
+		return MmuError::NONE;
+	}
+
 	if (translation_type == MMU_TT_DWRITE)
 	{
 		if ((va & 0xFC000000) == 0xE0000000)
@@ -289,9 +322,16 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 
 	if (CCN_MMUCR.AT == 0)
 	{
+		if (va < 0x02000000)
+		{
+			rv = va;
+			return MmuError::NONE;
+		}
+
 		if ((va & 0xE0000000) == 0xE0000000)
 		{
-			rv = va; // P4 direct
+			// P4 direct
+			rv = va;
 		}
 		else if ((va & 0x1C000000) == 0x1C000000)
 		{
@@ -305,7 +345,7 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 		}
 		else
 		{
-			rv = va & 0x0FFFFFFF; // mirror into first 16MB physical SDRAM
+			rv = 0x0C000000 | (va & 0x00FFFFFF);
 		}
 		return MmuError::NONE;
 	}
@@ -347,17 +387,6 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 	if (lookup != MmuError::NONE)
 		return lookup;
 
-#ifdef TRACE_WINCE_SYSCALLS
-	if (unresolved_unicode_string != 0)
-	{
-		if (va == unresolved_unicode_string)
-		{
-			unresolved_unicode_string = 0;
-			INFO_LOG(SH4, "RESOLVED %s", get_unicode_string(va).c_str());
-		}
-	}
-#endif
-
 	u32 md = entry->Data.PR >> 1;
 
 	//0X  & User mode-> protection violation
@@ -387,6 +416,17 @@ template MmuError mmu_data_translation<MMU_TT_DWRITE>(u32 va, u32& rv);
 
 MmuError mmu_instruction_translation(u32 va, u32& rv)
 {
+	// Always map low memory directly to SDRAM regardless of MMU state. The BIOS
+	// executes its exception vectors (0x00000000–0x000001FF) and other early
+	// code from P0 while AT may already be enabled but before any ITLB entries
+	// exist. Avoid fatal UTLB misses by mirroring the first 256 MiB into the
+	// main RAM window.
+	if (va < 0x10000000)
+	{
+		rv = 0x0C000000 | (va & 0x00FFFFFF);
+		return MmuError::NONE;
+	}
+
 	if (CCN_MMUCR.AT == 0)
 	{
 		if ((va & 0xE0000000) == 0xE0000000)
@@ -582,14 +622,39 @@ void mmu_flush_table()
 template<typename T>
 T DYNACALL mmu_ReadMem(u32 adr)
 {
+	// Fast path for Boot ROM data reads (first 2 MiB, any mode). This avoids
+	// costly MMU translation and, more importantly, prevents fatal TLB-miss
+	// exceptions when the MMU is still enabled but no TLB entries exist yet
+	// for low memory.
+	if (adr < 0x00200000 || (adr >= 0x40000000 && adr < 0x40200000))
+	{
+		// BIOS is word-aligned; unaligned byte/halfword reads are still legal
+		// because the SH-4 core provides little-endian ordering. We therefore
+		// fetch the native-width value directly from the ROM buffer.
+		return *reinterpret_cast<const T*>(nvmem::getBiosData() + (adr & 0x001FFFFF));
+	}
+
+	// Fast path for SDRAM access in cached/uncached areas (0x0000_0000–0x3FFF_FFFF).
+	// When the MMU is enabled early in boot there are no valid TLB entries for
+	// these regions yet; however the SH-4 still performs a simple address mask
+	// to physical SDRAM. Mirror the behaviour by short-circuiting translation and
+	// mapping the address into physical area C (0x0C00_0000).
+	if (adr < 0x40000000)
+	{
+		u32 phys = 0x0C000000 | (adr & 0x00FFFFFF);
+		return addrspace::readt<T>(phys);
+	}
+
 	if (adr & (std::min((int)sizeof(T), 4) - 1))
 		// Unaligned
 		mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DREAD);
-	u32 addr;
-	MmuError rv = mmu_data_translation<MMU_TT_DREAD>(adr, addr);
+
+	u32 phys;
+	MmuError rv = mmu_data_translation<MMU_TT_DREAD>(adr, phys);
 	if (rv != MmuError::NONE)
 		mmu_raise_exception(rv, adr, MMU_TT_DREAD);
-	return addrspace::readt<T>(addr);
+
+	return addrspace::readt<T>(phys);
 }
 template u8 mmu_ReadMem(u32 adr);
 template u16 mmu_ReadMem(u32 adr);
@@ -598,6 +663,12 @@ template u64 mmu_ReadMem(u32 adr);
 
 u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 {
+	// Fast path: Boot ROM fetch before MMU translation
+	if (vaddr < 0x00200000 || (vaddr >= 0x40000000 && vaddr < 0x40200000))
+	{
+		return *reinterpret_cast<u16*>(nvmem::getBiosData() + (vaddr & 0x001FFFFF));
+	}
+
 	if (vaddr & (sizeof(u16) - 1))
 		// Unaligned
 		mmu_raise_exception(MmuError::BADADDR, vaddr, MMU_TT_IREAD);
@@ -611,6 +682,16 @@ u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 template<typename T>
 void DYNACALL mmu_WriteMem(u32 adr, T data)
 {
+	// Fast path for early BIOS memset/ memcpy using normal stores. Any address
+	// in cached/uncached areas 0x0000_0000–0x3FFF_FFFF is mirrored directly into
+	// physical SDRAM, matching the fast path in mmu_ReadMem.
+	if (adr < 0x40000000)
+	{
+		u32 phys = 0x0C000000 | (adr & 0x00FFFFFF);
+		addrspace::writet<T>(phys, data);
+		return;
+	}
+
 	if (adr & (std::min((int)sizeof(T), 4) - 1))
 		// Unaligned
 		mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DWRITE);
