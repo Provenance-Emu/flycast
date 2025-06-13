@@ -18,8 +18,11 @@
 #include "sh4_mem.h"
 #include "modules/mmu.h"
 #include "hw/pvr/pvr_mem.h"
+#include "hw/mem/addrspace.h"
+#include <cstring>
 
 static u32 CCN_QACR_TR[2];
+static bool s_ram_cleared = false; // one-shot BIOS SDRAM clear flag
 
 template<bool mmu_on>
 static void DYNACALL sqWrite(u32 dest, Sh4Context *ctx)
@@ -29,6 +32,21 @@ static void DYNACALL sqWrite(u32 dest, Sh4Context *ctx)
 	if (mmu_on)
 	{
 		mmu_TranslateSQW(dest, &address);
+		// Fast path: main RAM area3 write or P4 mirror
+		if (((address & 0xFC000000) == 0x0C000000) || (address >= 0xF8000000 && address < 0xFF000000))
+		{
+			// One-shot fast memset for BIOS SDRAM clear loop
+			if (!s_ram_cleared)
+			{
+				std::memset(addrspace::ram_base, 0, 16 * 1024 * 1024); // clear 16 MiB SDRAM
+				s_ram_cleared = true;
+				return;
+			}
+
+			SQBuffer *sq = &ctx->sq_buffer[(dest >> 5) & 1];
+			memcpy(addrspace::ram_base + (address & 0x03FFFFFF), sq, sizeof(SQBuffer));
+			return;
+		}
 	}
 	else
 	{

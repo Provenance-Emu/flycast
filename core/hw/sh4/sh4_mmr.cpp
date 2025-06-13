@@ -20,7 +20,8 @@ static std::array<u8, 0x2000> OnChipRAM;	// 8 KB
 
 //All registers are 4 byte aligned
 
-u32 CCN[18];
+// CCN register block is 0x100 bytes (64 dwords)
+u32 CCN[64];
 u32 UBC[9];
 u32 BSC[19];
 u32 DMAC[17];
@@ -192,14 +193,14 @@ T DYNACALL ReadMem_P4(u32 addr)
 		return 0;
 
 	case 0xF0:
-		DEBUG_LOG(SH4, "IC Address read %08x", addr);
+		// DEBUG_LOG(SH4, "IC Address read %08x", addr);
 		if constexpr (sz == 4)
 			return icache.ReadAddressArray(addr);
 		else
 			return 0;
 
 	case 0xF1:
-		DEBUG_LOG(SH4, "IC Data read %08x", addr);
+		// DEBUG_LOG(SH4, "IC Data read %08x", addr);
 		if constexpr (sz == 4)
 			return icache.ReadDataArray(addr);
 		else
@@ -218,14 +219,14 @@ T DYNACALL ReadMem_P4(u32 addr)
 		}
 
 	case 0xF4:
-		DEBUG_LOG(SH4, "OC Address read %08x", addr);
+		// DEBUG_LOG(SH4, "OC Address read %08x", addr);
 		if constexpr (sz == 4)
 			return ocache.ReadAddressArray(addr);
 		else
 			return 0;
 
 	case 0xF5:
-		DEBUG_LOG(SH4, "OC Data read %08x", addr);
+		//DEBUG_LOG(SH4, "OC Data read %08x", addr);
 		if constexpr (sz == 4)
 			return ocache.ReadDataArray(addr);
 		else
@@ -251,7 +252,9 @@ T DYNACALL ReadMem_P4(u32 addr)
 		break;
 
 	default:
-		INFO_LOG(SH4, "Unhandled p4 read [Reserved] 0x%x", addr);
+		// Suppress log spam for reserved FC–FE region; BIOS polls these heavily.
+		if ((addr & 0xFC000000) != 0xFC000000)
+			INFO_LOG(SH4, "Unhandled p4 read [Reserved] 0x%x", addr);
 		break;
 	}
 
@@ -371,8 +374,10 @@ void DYNACALL WriteMem_P4(u32 addr,T data)
 		break;
 
 	default:
-		INFO_LOG(SH4, "Unhandled p4 Write [Reserved] 0x%x", addr);
-		break;
+		// For FC–FE reserved writes, ignore without spam.
+		if ((addr & 0xFC000000) != 0xFC000000)
+			INFO_LOG(SH4, "Unhandled p4 Write [Reserved] 0x%x", addr);
+		return;
 	}
 }
 
@@ -387,8 +392,8 @@ void DYNACALL WriteMem_P4(u32 addr,T data)
 template <class T>
 T DYNACALL ReadMem_p4mmr(u32 addr)
 {
-	if ((addr & 0x1fffffff) != TMU_TCNT0_addr)
-		DEBUG_LOG(SH4, "read %s", regName(addr));
+	// if ((addr & 0x1fffffff) != TMU_TCNT0_addr)
+	// 	DEBUG_LOG(SH4, "read %s", regName(addr));
 
 	/*
 	if (likely(addr == 0xffd80024))
@@ -413,14 +418,13 @@ T DYNACALL ReadMem_p4mmr(u32 addr)
 
 	case A7_REG_HASH(BSC_BASE_addr):
 		return bsc.read<T>(addr);
-
 	case A7_REG_HASH(BSC_SDMR2_addr):
-		//dram settings 2 / write only
-		INFO_LOG(SH4, "Read from write-only registers [dram settings 2]");
+		// dram settings 2 – write-only, BIOS sometimes polls; keep the log but at DEBUG level
+		DEBUG_LOG(SH4, "Read from write-only registers [dram settings 2]");
 		return 0;
 	case A7_REG_HASH(BSC_SDMR3_addr):
-		//dram settings 3 / write only
-		INFO_LOG(SH4, "Read from write-only registers [dram settings 3]");
+		// dram settings 3 – write-only
+		DEBUG_LOG(SH4, "Read from write-only registers [dram settings 3]");
 		return 0;
 
 	case A7_REG_HASH(DMAC_BASE_addr):
@@ -453,14 +457,16 @@ T DYNACALL ReadMem_p4mmr(u32 addr)
 			break;
 
 
-			//UDI SDDR 0x1FF00008 0x1FF00008 32 Held Held Held Held Pclk
+			//UDI SDDR 0xFFF00008 0x1FF00008 32 Held Held Held Held Pclk
 		case UDI_SDDR_addr :
 			break;
 		}
 		break;
 	}
 
-	INFO_LOG(SH4, "Unknown Read from P4 mmr - addr=%x", addr);
+	// Suppress spam for unimplemented CCN/UDI range (0x1F000000–0x1FFFFFFF).
+	if ((addr & 0xFF000000) != 0x1F000000)
+		INFO_LOG(SH4, "Unknown Read from P4 mmr - addr=%x", addr);
 	return 0;
 }
 
@@ -537,7 +543,7 @@ void DYNACALL WriteMem_p4mmr(u32 addr, T data)
 	case A7_REG_HASH(UDI_BASE_addr):
 		switch(addr)
 		{
-			//UDI SDIR 0xFFF00000 0x1FF00000 16 0xFFFF Held Held Held Pclk
+			//UDI SDIR 0x1FF00000 0x1FF00000 16 0xFFFF Held Held Held Pclk
 		case UDI_SDIR_addr :
 			break;
 
@@ -549,9 +555,23 @@ void DYNACALL WriteMem_p4mmr(u32 addr, T data)
 		break;
 	}
 
-	INFO_LOG(SH4, "Write to P4 mmr not implemented, addr=%x, data=%x", addr, data);
+	// Suppress spam for unimplemented CCN/UDI range writes.
+	if ((addr & 0xFF000000) != 0x1F000000)
+		INFO_LOG(SH4, "Write to P4 mmr not implemented, addr=%x, data=%x", addr, data);
 }
 
+// G2 / AICA stub (P4 area 0xE8xxxxxx)
+template <typename T>
+static T DYNACALL ReadMem_G2Stub(u32 /*addr*/)
+{
+    return 0;
+}
+
+template <typename T>
+static void DYNACALL WriteMem_G2Stub(u32 /*addr*/, T /*data*/)
+{
+    // writes ignored
+}
 
 //***********
 //On Chip Ram
@@ -653,6 +673,8 @@ void map_p4()
 	// sh4 IC, OC and TLB arrays
 	addrspace::handler p4arrays_handler = addrspaceRegisterHandlerTemplate(ReadMem_P4, WriteMem_P4);
 	addrspace::mapHandler(p4arrays_handler, 0xF0, 0xF7);
+	// Map 0xF8–0xFE directly to main RAM mirrors (16-MB blocks) for fast access
+	addrspace::mapBlockMirror(addrspace::ram_base + 0x0C000000, 0xF8, 0xFE, 0x01000000);
 	// sh4 system registers
 	addrspace::handler p4mmr_handler = addrspaceRegisterHandlerTemplate(ReadMem_p4mmr, WriteMem_p4mmr);
 	addrspace::mapHandler(p4mmr_handler, 0xFF, 0xFF);
@@ -660,6 +682,10 @@ void map_p4()
 	// Reserved P4 ranges (0xFC-0xFE) should safely return 0 to avoid faults
 	// Map them to the generic P4 handler which logs and returns zero for unhandled accesses.
 	addrspace::mapHandler(p4arrays_handler, 0xFC, 0xFE);
+
+	// G2/AICA MMIO window stub (0xE8xxxxxx). BIOS probes these registers early on.
+	static addrspace::handler g2_stub_handler = addrspaceRegisterHandlerTemplate(ReadMem_G2Stub, WriteMem_G2Stub);
+	addrspace::mapHandler(g2_stub_handler, 0xE8, 0xEB);
 }
 
 namespace sh4

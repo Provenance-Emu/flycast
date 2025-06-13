@@ -225,6 +225,14 @@ void Do_Exception(u32 epc, Sh4ExceptionCode expEvn)
 	Sh4cntx.pc = Sh4cntx.vbr + (expEvn == Sh4Ex_TlbMissRead || expEvn == Sh4Ex_TlbMissWrite ? 0x400 : 0x100);
 	debugger::subroutineCall();
 
+	// Diagnostic: log MMU/TLB exceptions with offending address to aid IR bring-up
+	if (expEvn == Sh4Ex_TlbMissRead || expEvn == Sh4Ex_TlbMissWrite ||
+		expEvn == Sh4Ex_TlbProtViolRead || expEvn == Sh4Ex_TlbProtViolWrite ||
+		expEvn == Sh4Ex_AddressErrorRead || expEvn == Sh4Ex_AddressErrorWrite)
+	{
+		// TEA register contains the virtual address that caused the fault (on SH-4)
+		INFO_LOG(SH4, "MMU exception %03X at EPC=%08X TEA=%08X", (u32)expEvn, epc, CCN_TEA);
+	}
 	//printf("RaiseException: from pc %08x to %08x, event %x\n", epc, next_pc, expEvn);
 }
 
