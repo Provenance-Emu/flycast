@@ -687,6 +687,17 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::FCMP_GT:
                     ctx->sr.T = (ctx->fr[ins.dst.reg] > ctx->fr[ins.src1.reg]);
                     break;
+                case Op::LOAD32_PC:
+                {
+                    uint32_t disp8 = static_cast<uint32_t>(ins.extra);
+                    uint32_t base = (curr_pc & ~3u) + 4u;
+                    uint32_t addr = base + (disp8 << 2);
+                    if (u8* p = FastRamPtr(addr))
+                        ctx->r[ins.dst.reg] = *reinterpret_cast<u32*>(p);
+                    else
+                        ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(addr);
+                    break;
+                }
                 default:
                     // Unimplemented opcode – fall back to legacy interpreter via IllegalInstr exception
                     ERROR_LOG(SH4, "IR executor unimplemented opcode %s at %08X", GetOpName(static_cast<size_t>(ins.op)), curr_pc);

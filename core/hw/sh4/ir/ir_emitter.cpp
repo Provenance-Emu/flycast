@@ -1080,6 +1080,15 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.extra = disp4 * 4;
             decoded = true; blk.pcNext = pc + 2;
         }
+        // MOV.L @(disp8,PC),Rn (0x5n??)
+        else if ((raw & 0xF000) == 0x5000)
+        {
+            uint8_t disp8 = raw & 0xFF;
+            ins.op = Op::LOAD32_PC;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.extra = disp8; // store raw displacement byte
+            decoded = true; blk.pcNext = pc + 2;
+        }
 
         // ----------------------------------------------------------------
         //  Fail-safe: if still not decoded, treat as NOP so execution 

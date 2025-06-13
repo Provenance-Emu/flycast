@@ -73,6 +73,7 @@ enum class Op : uint8_t {
     RTS,       // return from subroutine
     LOAD16_IMM, // dst = *(u16*)addr
     LOAD32_IMM,  // dst = *(u32*)addr
+    LOAD32_PC,   // dst = *(u32*)((PC&~3)+4+disp8*4)
     ILLEGAL,      // illegal opcode placeholder
     CMP_EQ,
     CMP_PL,
