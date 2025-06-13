@@ -104,12 +104,15 @@ public:
 
 	template<typename T>
 	static T invalidRead(u32 addr) {
-		INFO_LOG(MEMORY, "Invalid register read<%d> %x", (int)sizeof(T), addr);
+		// Suppress log spam for P4 MMIO range (0x1Fxxxxxx) which the BIOS probes heavily.
+		if ((addr & 0xFF000000) != 0x1F000000)
+			INFO_LOG(MEMORY, "Invalid register read<%d> %x", (int)sizeof(T), addr);
 		return 0;
 	}
 	template<typename T>
 	static void invalidWrite(u32 addr, T value) {
-		INFO_LOG(MEMORY, "Invalid register write<%d> %x = %x", (int)sizeof(T), addr, (int)value);
+		if ((addr & 0xFF000000) != 0x1F000000)
+			INFO_LOG(MEMORY, "Invalid register write<%d> %x = %x", (int)sizeof(T), addr, (int)value);
 	}
 
 private:
@@ -300,13 +303,15 @@ public:
 		size_t index = getRegIndex(addr);
 		if (index >= Size)
 		{
-			INFO_LOG(MEMORY, "Out of bound read @ %x", addr);
+			if ((addr & 0xFF000000) != 0x1F000000)
+				INFO_LOG(MEMORY, "Out of bound read @ %x", addr);
 			return 0;
 		}
 		constexpr size_t align_mask = sizeof(T) - 1;
 		if ((addr & align_mask) != 0)
 		{
-			INFO_LOG(MEMORY, "Unaligned register read @ %x", addr);
+			if ((addr & 0xFF000000) != 0x1F000000)
+				INFO_LOG(MEMORY, "Unaligned register read @ %x", addr);
 			return 0;
 		}
 		return registers[index].template read<T>(addr);
@@ -318,16 +323,20 @@ public:
 	{
 		size_t index = getRegIndex(addr);
 		if (index >= Size)
-			INFO_LOG(MEMORY, "Out of bound write @ %x = %x", addr, (int)data);
+		{
+			if ((addr & 0xFF000000) != 0x1F000000)
+				INFO_LOG(MEMORY, "Out of bound write @ %x = %x", addr, (int)data);
+		}
 		else
 		{
 			constexpr size_t align_mask = sizeof(T) - 1;
 			if ((addr & align_mask) != 0)
 			{
-				INFO_LOG(MEMORY, "Unaligned register write @ %x = %x", addr, (int)data);
+				if ((addr & 0xFF000000) != 0x1F000000)
+					INFO_LOG(MEMORY, "Unaligned register write @ %x = %x", addr, (int)data);
 				return;
 			}
-			registers[index].write(addr, data);
+			registers[index].template write<T>(addr, data);
 			return;
 		}
 	}
