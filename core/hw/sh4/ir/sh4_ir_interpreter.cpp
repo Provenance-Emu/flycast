@@ -5,6 +5,8 @@
 #include "log/Log.h"
 #include "hw/sh4/sh4_interpreter.h"
 #include "hw/sh4/modules/mmu.h"
+#include "hw/mem/addrspace.h" // for ram_base fast access
+#include "hw/flashrom/nvmem.h" // for BIOS pointer
 
 namespace sh4 {
 namespace ir {
@@ -32,6 +34,28 @@ void Sh4IrInterpreter::Reset(bool /*hard*/)
     ResetCache();
 }
 
+// Helper similar to Executor::FastRamPtr (local copy for interpreter)
+static inline u8* FastPtr(uint32_t addr)
+{
+    // BIOS ROM (2 MiB) and mirrors (include P0 0x4000 0000 for ITLB-miss handler)
+    if ((addr & 0xFFE00000u) == 0x00000000u ||
+        (addr & 0xFFE00000u) == 0x40000000u ||
+        (addr & 0xFFE00000u) == 0x80000000u ||
+        (addr & 0xFFE00000u) == 0xA0000000u ||
+        (addr & 0xFFE00000u) == 0xC0000000u)
+        return nvmem::getBiosData() + (addr & 0x001FFFFF);
+
+    // Main RAM 0x0C000000–0x0FFFFFFF
+    if ((addr & 0xFC000000u) == 0x0C000000u)
+        return addrspace::ram_base + (addr & 0x03FFFFFF);
+
+    // P4 SDRAM mirrors
+    if (addr >= 0xF8000000u && addr < 0xFF000000u)
+        return addrspace::ram_base + 0x0C000000 + (addr & 0x00FFFFFF);
+
+    return nullptr;
+}
+
 void Sh4IrInterpreter::Run()
 {
     running_ = true;
@@ -47,17 +71,36 @@ void Sh4IrInterpreter::Run()
                 ctx_->pc = blk->pcNext;
             if (blk->code.size() == 2 && blk->code[0].op == ir::Op::NOP)
             {
-                uint32_t pc_skip = ctx_->pc;
-                // Examine up to 4 KB ahead (safety) or until non-NOP
-                const uint32_t limit = pc_skip + 0x1000;
-                while (pc_skip < limit)
+                // Fast-skip over large stretches of 0x0000 instructions that
+                // the BIOS uses for memory clear stubs. We only do this when
+                // we have a direct pointer into either RAM or the BIOS ROM –
+                // this guarantees the memory is valid and avoids hiding real
+                // mapping bugs.
+                u32 pc_scan = ctx_->pc;
+                if (u8* base = FastPtr(pc_scan))
                 {
-                    uint16_t iw = mmu_IReadMem16(pc_skip);
-                    if (iw != 0x0000 && iw != 0x0009)
-                        break;
-                    pc_skip += 2;
+                    const u16* w = reinterpret_cast<const u16*>(base);
+                    while (*w == 0 || *w == 0x0009)
+                    {
+                        ++w;
+                        pc_scan += 2;
+                        if ((pc_scan - ctx_->pc) >= 0x100000)
+                            break;
+                    }
+                    ctx_->pc = pc_scan;
                 }
-                ctx_->pc = pc_skip;
+                else
+                {
+                    // No direct pointer; fall back to reading via MMU
+                    const uint32_t limit = pc_scan + 0x100000; // 1 MiB max
+                    while (pc_scan < limit)
+                    {
+                        u16 iw = mmu_IReadMem16(pc_scan);
+                        if (iw != 0x0000 && iw != 0x0009) break;
+                        pc_scan += 2;
+                    }
+                    ctx_->pc = pc_scan;
+                }
             }
             ++step_counter;
             if ((step_counter & 0x1FFFF) == 0) // every 131072 blocks
@@ -81,17 +124,30 @@ void Sh4IrInterpreter::Step()
             ctx_->pc = blk->pcNext;
         if (blk->code.size() == 2 && blk->code[0].op == ir::Op::NOP)
         {
-            uint32_t pc_skip = ctx_->pc;
-            // Examine up to 4 KB ahead (safety) or until non-NOP
-            const uint32_t limit = pc_skip + 0x1000;
-            while (pc_skip < limit)
+            u32 pc_scan = ctx_->pc;
+            if (u8* base = FastPtr(pc_scan))
             {
-                uint16_t iw = mmu_IReadMem16(pc_skip);
-                if (iw != 0x0000 && iw != 0x0009)
-                    break;
-                pc_skip += 2;
+                const u16* w = reinterpret_cast<const u16*>(base);
+                while (*w == 0 || *w == 0x0009)
+                {
+                    ++w;
+                    pc_scan += 2;
+                    if ((pc_scan - ctx_->pc) >= 0x100000)
+                        break;
+                }
+                ctx_->pc = pc_scan;
             }
-            ctx_->pc = pc_skip;
+            else
+            {
+                const uint32_t limit = pc_scan + 0x100000;
+                while (pc_scan < limit)
+                {
+                    u16 iw = mmu_IReadMem16(pc_scan);
+                    if (iw != 0x0000 && iw != 0x0009) break;
+                    pc_scan += 2;
+                }
+                ctx_->pc = pc_scan;
+            }
         }
     } catch (const SH4ThrownException& ex) {
         Do_Exception(ex.epc, ex.expEvn);

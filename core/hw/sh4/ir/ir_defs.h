@@ -187,6 +187,13 @@ enum class Op : uint8_t {
     TST_B,
     XOR_B,
     XTRCT,
+    // --- new for stack save/restore of PR ---
+    STS_PR_L,   // store PR to @-Rn (pre-decrement long)
+    LDS_PR_L,   // load PR from @Rn+ (post-increment long)
+    // --- load control regs from stack ---
+    LDC_SSR_L,  // load SSR from @Rn+ (post-increment long)
+    LDC_SPC_L,  // load SPC from @Rn+ (post-increment long)
+    LDC_SGR_L,  // load SGR from @Rn+ (post-increment long)
     NUM_OPS
 };
 
