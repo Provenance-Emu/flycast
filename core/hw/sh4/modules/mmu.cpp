@@ -634,12 +634,12 @@ T DYNACALL mmu_ReadMem(u32 adr)
 		return *reinterpret_cast<const T*>(nvmem::getBiosData() + (adr & 0x001FFFFF));
 	}
 
-	// Fast path for SDRAM access in cached/uncached areas (0x0000_0000–0x3FFF_FFFF).
+	// Fast path for SDRAM access in cached/uncached areas (0x0000_0000–0x5FFF_FFFF).
 	// When the MMU is enabled early in boot there are no valid TLB entries for
 	// these regions yet; however the SH-4 still performs a simple address mask
 	// to physical SDRAM. Mirror the behaviour by short-circuiting translation and
 	// mapping the address into physical area C (0x0C00_0000).
-	if (adr < 0x40000000)
+	if (adr < 0x60000000)
 	{
 		u32 phys = 0x0C000000 | (adr & 0x00FFFFFF);
 		return addrspace::readt<T>(phys);
@@ -663,10 +663,16 @@ template u64 mmu_ReadMem(u32 adr);
 
 u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 {
-	// Fast path: Boot ROM fetch before MMU translation
+	// Fast path: Boot ROM fetch or low SDRAM mirror before MMU translation
 	if (vaddr < 0x00200000 || (vaddr >= 0x40000000 && vaddr < 0x40200000))
 	{
 		return *reinterpret_cast<u16*>(nvmem::getBiosData() + (vaddr & 0x001FFFFF));
+	}
+	// Mirror cached/uncached areas (0x0000_0000–0x5FFF_FFFF) into physical SDRAM
+	if (vaddr < 0x60000000)
+	{
+		u32 phys = 0x0C000000 | (vaddr & 0x00FFFFFF);
+		return addrspace::read16(phys);
 	}
 
 	if (vaddr & (sizeof(u16) - 1))
@@ -683,9 +689,9 @@ template<typename T>
 void DYNACALL mmu_WriteMem(u32 adr, T data)
 {
 	// Fast path for early BIOS memset/ memcpy using normal stores. Any address
-	// in cached/uncached areas 0x0000_0000–0x3FFF_FFFF is mirrored directly into
+	// in cached/uncached areas 0x0000_0000–0x5FFF_FFFF is mirrored directly into
 	// physical SDRAM, matching the fast path in mmu_ReadMem.
-	if (adr < 0x40000000)
+	if (adr < 0x60000000)
 	{
 		u32 phys = 0x0C000000 | (adr & 0x00FFFFFF);
 		addrspace::writet<T>(phys, data);
