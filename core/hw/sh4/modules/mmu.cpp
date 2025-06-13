@@ -289,13 +289,12 @@ template MmuError mmu_full_SQ<MMU_TT_DWRITE>(u32 va, u32& rv);
 template<u32 translation_type>
 MmuError mmu_data_translation(u32 va, u32& rv)
 {
-	// Uncached low memory (first 256 MB of SDRAM) is directly accessible even with MMU on
-	// The BIOS performs block moves/clears up to 0x0CFFFFFF before the MMU and TLB
-	// are fully initialised.  Allow these addresses to bypass translation to avoid
-	// early UTLB miss exceptions.
-	if (va < 0x10000000)
+	// Uncached low memory (Areas 0–3 : 0x0000_0000–0x5FFF_FFFF) is directly accessible
+	// even with the MMU on. The BIOS performs block moves/clears across this entire
+	// 1.5 GiB space before setting up any TLBs, so permit a straight mirror to the
+	// physical SDRAM window to prevent UTLB miss exceptions.
+	if (va < 0x60000000)
 	{
-		// Mirror into main SDRAM window
 		rv = 0x0C000000 | (va & 0x00FFFFFF);
 		return MmuError::NONE;
 	}
@@ -416,12 +415,10 @@ template MmuError mmu_data_translation<MMU_TT_DWRITE>(u32 va, u32& rv);
 
 MmuError mmu_instruction_translation(u32 va, u32& rv)
 {
-	// Always map low memory directly to SDRAM regardless of MMU state. The BIOS
-	// executes its exception vectors (0x00000000–0x000001FF) and other early
-	// code from P0 while AT may already be enabled but before any ITLB entries
-	// exist. Avoid fatal UTLB misses by mirroring the first 256 MiB into the
-	// main RAM window.
-	if (va < 0x10000000)
+	// Always map Areas 0–3 (0x0000_0000–0x5FFF_FFFF) directly to SDRAM regardless
+	// of MMU state. This avoids UTLB misses during the very early boot stages when
+	// instruction fetches occur from P0/P2 before the ITLB is populated.
+	if (va < 0x60000000)
 	{
 		rv = 0x0C000000 | (va & 0x00FFFFFF);
 		return MmuError::NONE;
