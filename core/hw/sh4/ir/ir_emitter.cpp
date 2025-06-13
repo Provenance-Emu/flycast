@@ -336,16 +336,24 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
-        // MOV.L @Rm,Rn  (0x6nm0)
+        // MOV.B @Rm,Rn  (0x6nm0)   sign-extended byte load
         else if ((raw & 0xF00F) == 0x6000)
         {
-            ins.op = Op::LOAD32;
+            ins.op = Op::LOAD8;
             ins.dst.isImm = false;
             ins.dst.reg = n;
             ins.src1.isImm = false;
             ins.src1.reg = m;
             decoded = true;
             blk.pcNext = pc + 2;
+        }
+        // MOV.L @Rm,Rn (0x6nm2)
+        else if ((raw & 0xF00F) == 0x6002 && m != 0)
+        {
+            ins.op = Op::LOAD32;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.B @Rm+,Rn (0x6nm4)
         else if ((raw & 0xF00F) == 0x6004)
@@ -412,24 +420,20 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.src1.isImm = false; ins.src1.reg = m;
             decoded = true; blk.pcNext = pc + 2;
         }
-        // MOV.L Rm,@Rn  (0x2nm0)
+        // MOV.B Rm,@Rn  (0x2nm0)
         else if ((raw & 0xF00F) == 0x2000)
         {
-            ins.op = Op::STORE32;
-            ins.dst.isImm = false; // address in Rn
-            ins.dst.reg = n;
-            ins.src1.isImm = false; // value in Rm
-            ins.src1.reg = m;
-            decoded = true;
-            blk.pcNext = pc + 2;
+            ins.op = Op::STORE8;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
         }
-        // MOV.B Rm,@Rn  (0x2nm2)
+        // MOV.L Rm,@Rn  (0x2nm2)
         else if ((raw & 0xF00F) == 0x2002)
         {
-            ins.op = Op::STORE8;
-            ins.dst.isImm = false; ins.dst.reg = n; // base address Rn
-            ins.src1.isImm = false; ins.src1.reg = m; // value Rm
-            ins.extra = 0; // no displacement
+            ins.op = Op::STORE32;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.W Rm,@Rn+ (0x2nm5)
@@ -497,8 +501,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
-        // MOVT Rn (0x6n02)
-        else if ((raw & 0xF0FF) == 0x6002)
+        // MOVT Rn (0x6n02) — requires m == 0
+        else if ((raw & 0xF0FF) == 0x6002 && m == 0)
         {
             ins.op = Op::MOVT;
             ins.dst.isImm = false; ins.dst.reg = n;
@@ -827,7 +831,7 @@ Block& Emitter::CreateNew(uint32_t pc) {
             blk.pcNext = pc + 2;
         }
         // MOV.B @(disp,Rm),Rn 0x8nmd (disp=low4)
-        else if ((raw & 0xF000) == 0x8000)
+        else if ((raw & 0xF000) == 0x8000 && (raw & 0x0F00) != 0x0400 && (raw & 0x0F00) != 0x0500 && (raw & 0x0F00) != 0x0600)
         {
             uint8_t disp4 = raw & 0xF;
             ins.op = Op::LOAD8;
@@ -872,6 +876,13 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
+        // NOP (all-zero word)
+        else if (raw == 0x0000)
+        {
+            ins.op = Op::NOP;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
         // NOP (No operation)
         else if (raw == 0x0009)
         {
@@ -879,7 +890,7 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
-        // MOV.B @(disp,Rm),Rn 0x0nmd (disp = low4)  — allow n=0 too (except 0x0000 and 0x0009)
+        // MOV.B @(disp,Rm),R0 0x0nmd (disp = low4)  — allow n=0 too (except 0x0000 and 0x0009)
         else if ((raw & 0xF000) == 0x0000)
         {
             if (raw != 0x0000 && raw != 0x0009) // exclude NOP variants
@@ -1034,6 +1045,39 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
             ins.extra = 0;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.B @(disp,Rm),R0 0x84md
+        else if ((raw & 0xFF00) == 0x8400)
+        {
+            uint8_t disp4 = raw & 0xF;
+            uint8_t m_reg = (raw >> 4) & 0xF;
+            ins.op = Op::LOAD8;
+            ins.dst.isImm = false; ins.dst.reg = 0; // R0
+            ins.src1.isImm = false; ins.src1.reg = m_reg;
+            ins.extra = disp4; // byte displacement
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.W @(disp,Rm),R0 0x85md
+        else if ((raw & 0xFF00) == 0x8500)
+        {
+            uint8_t disp4 = raw & 0xF;
+            uint8_t m_reg = (raw >> 4) & 0xF;
+            ins.op = Op::LOAD16;
+            ins.dst.isImm = false; ins.dst.reg = 0;
+            ins.src1.isImm = false; ins.src1.reg = m_reg;
+            ins.extra = disp4 * 2;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.L @(disp,Rm),R0 0x86md
+        else if ((raw & 0xFF00) == 0x8600)
+        {
+            uint8_t disp4 = raw & 0xF;
+            uint8_t m_reg = (raw >> 4) & 0xF;
+            ins.op = Op::LOAD32;
+            ins.dst.isImm = false; ins.dst.reg = 0;
+            ins.src1.isImm = false; ins.src1.reg = m_reg;
+            ins.extra = disp4 * 4;
             decoded = true; blk.pcNext = pc + 2;
         }
 

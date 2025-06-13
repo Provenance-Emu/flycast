@@ -324,19 +324,23 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::LOAD8:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + static_cast<uint32_t>(ins.extra);
+                    u8 val;
                     if (u8* p = FastRamPtr(addr))
-                        ctx->r[ins.dst.reg] = *p;
+                        val = *p;
                     else
-                        ctx->r[ins.dst.reg] = mmu_ReadMem<u8>(addr);
+                        val = mmu_ReadMem<u8>(addr);
+                    ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int8_t>(val));
                     break;
                 }
                 case Op::LOAD16:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + static_cast<uint32_t>(ins.extra);
+                    u16 val;
                     if (u8* p = FastRamPtr(addr))
-                        ctx->r[ins.dst.reg] = *reinterpret_cast<u16*>(p);
+                        val = *reinterpret_cast<u16*>(p);
                     else
-                        ctx->r[ins.dst.reg] = mmu_ReadMem<u16>(addr);
+                        val = mmu_ReadMem<u16>(addr);
+                    ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val));
                     break;
                 }
                 case Op::LOAD32:
@@ -349,31 +353,41 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 }
                 case Op::LOAD8_GBR:
-                    ctx->r[ins.dst.reg] = mmu_ReadMem<u8>(ctx->gbr + static_cast<uint32_t>(ins.extra));
+                {
+                    u8 val = mmu_ReadMem<u8>(ctx->gbr + static_cast<uint32_t>(ins.extra));
+                    ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int8_t>(val));
                     break;
+                }
                 case Op::LOAD16_GBR:
-                    ctx->r[ins.dst.reg] = mmu_ReadMem<u16>(ctx->gbr + static_cast<uint32_t>(ins.extra));
+                {
+                    u16 val = mmu_ReadMem<u16>(ctx->gbr + static_cast<uint32_t>(ins.extra));
+                    ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val));
                     break;
+                }
                 case Op::LOAD32_GBR:
                     ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(ctx->gbr + static_cast<uint32_t>(ins.extra));
                     break;
                 case Op::LOAD8_POST:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg];
+                    u8 val;
                     if (u8* p = FastRamPtr(addr))
-                        ctx->r[ins.dst.reg] = *p;
+                        val = *p;
                     else
-                        ctx->r[ins.dst.reg] = mmu_ReadMem<u8>(addr);
+                        val = mmu_ReadMem<u8>(addr);
+                    ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int8_t>(val));
                     ctx->r[ins.src1.reg] += 1;
                     break;
                 }
                 case Op::LOAD16_POST:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg];
+                    u16 val;
                     if (u8* p = FastRamPtr(addr))
-                        ctx->r[ins.dst.reg] = *reinterpret_cast<u16*>(p);
+                        val = *reinterpret_cast<u16*>(p);
                     else
-                        ctx->r[ins.dst.reg] = mmu_ReadMem<u16>(addr);
+                        val = mmu_ReadMem<u16>(addr);
+                    ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val));
                     ctx->r[ins.src1.reg] += 2;
                     break;
                 }
@@ -454,8 +468,11 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     mmu_WriteMem<u32>(ctx->gbr + static_cast<uint32_t>(ins.extra), ctx->r[ins.src1.reg]);
                     break;
                 case Op::LOAD16_IMM:
-                    ctx->r[ins.dst.reg] = mmu_ReadMem<u16>(static_cast<uint32_t>(ins.src1.imm));
+                {
+                    u16 val = mmu_ReadMem<u16>(static_cast<uint32_t>(ins.src1.imm));
+                    ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val));
                     break;
+                }
                 case Op::LOAD32_IMM:
                     ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(static_cast<uint32_t>(ins.src1.imm));
                     break;
