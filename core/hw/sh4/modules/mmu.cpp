@@ -642,9 +642,12 @@ T DYNACALL mmu_ReadMem(u32 adr)
 		return addrspace::readt<T>(phys);
 	}
 
-	if (adr & (std::min((int)sizeof(T), 4) - 1))
-		// Unaligned
-		mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DREAD);
+	// Unaligned check — skip it for P4 MMIO space (0xE000_0000-0xFFFF_FFFF)
+	if ((adr & 0xE0000000) != 0xE0000000)
+	{
+		if (adr & (std::min((int)sizeof(T), 4) - 1))
+			mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DREAD);
+	}
 
 	u32 phys;
 	MmuError rv = mmu_data_translation<MMU_TT_DREAD>(adr, phys);
@@ -695,9 +698,11 @@ void DYNACALL mmu_WriteMem(u32 adr, T data)
 		return;
 	}
 
-	if (adr & (std::min((int)sizeof(T), 4) - 1))
-		// Unaligned
-		mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DWRITE);
+	if ((adr & 0xE0000000) != 0xE0000000)
+	{
+		if (adr & (std::min((int)sizeof(T), 4) - 1))
+			mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DWRITE);
+	}
 	u32 addr;
 	MmuError rv = mmu_data_translation<MMU_TT_DWRITE>(adr, addr);
 	if (rv != MmuError::NONE)
