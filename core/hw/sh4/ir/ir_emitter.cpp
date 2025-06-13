@@ -1032,10 +1032,18 @@ Block& Emitter::CreateNew(uint32_t pc) {
             case 0x3: ins.op = Op::FDIV;    break; // FDIV FRm,FRn
             case 0x4: ins.op = Op::FCMP_EQ; break; // FCMP/EQ FRm,FRn (sets SR.T)
             case 0x5: ins.op = Op::FCMP_GT; break; // FCMP/GT FRm,FRn (sets SR.T)
+            case 0x8: // FMOV.S @(R0,Rm),FRn
+                ins.op = Op::FMOV_LOAD_R0;
+                ins.dst.isImm = false; ins.dst.reg = n; // FRn
+                ins.src1.isImm = false; ins.src1.reg = m; // Rm for address offset
+                break;
+            case 0x9: // FMOV.S FRm,@(R0,Rn)
+                ins.op = Op::FMOV_STORE_R0;
+                ins.dst.isImm = false; ins.dst.reg = n; // Rn provides offset for store address
+                ins.src1.isImm = false; ins.src1.reg = m; // FRm source value register
+                break;
             default:  ins.op = Op::ILLEGAL; break; // other 0xF subcodes not handled yet
             }
-            ins.dst.isImm = false; ins.dst.reg = n; // FRn
-            ins.src1.isImm = false; ins.src1.reg = m; // FRm
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.W @Rm,Rn (0x6nm1)

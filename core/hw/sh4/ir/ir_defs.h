@@ -74,6 +74,8 @@ enum class Op : uint8_t {
     LOAD16_IMM, // dst = *(u16*)addr
     LOAD32_IMM,  // dst = *(u32*)addr
     LOAD32_PC,   // dst = *(u32*)((PC&~3)+4+disp8*4)
+    FMOV_LOAD_R0, // FRn = *(f32*)(R0 + Rm)
+    FMOV_STORE_R0, // *(f32*)(R0 + Rn) = FRm
     ILLEGAL,      // illegal opcode placeholder
     CMP_EQ,
     CMP_PL,

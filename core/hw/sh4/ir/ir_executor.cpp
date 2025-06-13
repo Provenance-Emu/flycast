@@ -698,6 +698,27 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(addr);
                     break;
                 }
+                case Op::FMOV_LOAD_R0:
+                {
+                    uint32_t addr = ctx->r[0] + ctx->r[ins.src1.reg];
+                    uint32_t val;
+                    if (u8* p = FastRamPtr(addr))
+                        val = *reinterpret_cast<u32*>(p);
+                    else
+                        val = mmu_ReadMem<u32>(addr);
+                    ctx->fr[ins.dst.reg] = *reinterpret_cast<float*>(&val);
+                    break;
+                }
+                case Op::FMOV_STORE_R0:
+                {
+                    uint32_t addr = ctx->r[0] + ctx->r[ins.dst.reg];
+                    uint32_t val = *reinterpret_cast<u32*>(&ctx->fr[ins.src1.reg]);
+                    if (u8* p = FastRamPtr(addr))
+                        *reinterpret_cast<u32*>(p) = val;
+                    else
+                        mmu_WriteMem<u32>(addr, val);
+                    break;
+                }
                 default:
                     // Unimplemented opcode – fall back to legacy interpreter via IllegalInstr exception
                     ERROR_LOG(SH4, "IR executor unimplemented opcode %s at %08X", GetOpName(static_cast<size_t>(ins.op)), curr_pc);
