@@ -97,6 +97,7 @@ struct LoadProgress
 };
 
 class Sh4Executor;
+class Sh4Interpreter; // Forward declaration for fallback interpreter
 
 class Emulator
 {
@@ -188,6 +189,8 @@ public:
 	void dc_reset(bool hard); // for tests only
 
 private:
+	Sh4Interpreter* m_fallback_sh4_interpreter = nullptr; // Fallback interpreter instance
+
 	bool checkStatus(bool wait = false);
 	void runInternal();
 	void diskChange();

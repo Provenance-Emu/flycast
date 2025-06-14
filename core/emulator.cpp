@@ -24,10 +24,13 @@
 #include "imgread/common.h"
 #include "hw/naomi/naomi_cart.h"
 #include "reios/reios.h"
-#include "hw/sh4/modules/mmu.h"
+// #include "reios/reios_interp.h" // Removed, file not found
+#include "hw/sh4/sh4_interpreter.h" // For Sh4Interpreter fallback instance
 #include "hw/sh4/sh4_if.h"
 #include "hw/sh4/sh4_mem.h"
 #include "hw/sh4/sh4_sched.h"
+#include "hw/sh4/modules/mmu.h"     // For mmu_flush_table, mmu_set_state
+#include "hw/sh4/modules/modules.h" // For setupPtyPipe
 #include "hw/flashrom/nvmem.h"
 #include "cheats.h"
 #include "audio/audiostream.h"
@@ -495,6 +498,30 @@ void Emulator::init()
 	mem_Init();
 	reios_init();
 
+#ifdef ENABLE_SH4_IR
+	// Create a Sh4Interpreter instance specifically for FPU fallback when IR is enabled.
+	// Its constructor will set Sh4Interpreter::Instance.
+	m_fallback_sh4_interpreter = new Sh4Interpreter();
+	if (m_fallback_sh4_interpreter)
+	{
+		m_fallback_sh4_interpreter->Init(); // Initialize it
+		INFO_LOG(INTERPRETER, "Fallback Sh4Interpreter instance created and initialized for IR JIT.");
+		if (Sh4Interpreter::Instance)
+		{
+			INFO_LOG(INTERPRETER, "Sh4Interpreter::Instance is now: %p", (void*)Sh4Interpreter::Instance);
+		}
+		else
+		{
+			WARN_LOG(INTERPRETER, "Fallback Sh4Interpreter created, but Sh4Interpreter::Instance is STILL NULL!");
+		}
+	}
+	else
+	{
+		WARN_LOG(INTERPRETER, "Failed to create fallback Sh4Interpreter instance!");
+	}
+#endif
+
+
 	// the recompiler may start generating code at this point and needs a fully configured machine
 #if FEAT_SHREC != DYNAREC_NONE
 	recompiler = Get_Sh4Recompiler();
@@ -504,8 +531,21 @@ void Emulator::init()
 	else
 #endif
 		INFO_LOG(INTERPRETER, "Using Interpreter");
-	interpreter = Get_Sh4Interpreter();
+	interpreter = Get_Sh4Interpreter(); // This will be Sh4IrInterpreter if ENABLE_SH4_IR, or Sh4Interpreter otherwise
 	interpreter->Init();
+
+#ifndef ENABLE_SH4_IR
+	// If not using IR, the 'interpreter' IS the Sh4Interpreter, so log its Instance
+	if (Sh4Interpreter::Instance)
+	{
+		INFO_LOG(INTERPRETER, "Primary Sh4Interpreter::Instance is: %p", (void*)Sh4Interpreter::Instance);
+	}
+	else
+	{
+		WARN_LOG(INTERPRETER, "Primary Sh4Interpreter used, but Sh4Interpreter::Instance is NULL!");
+	}
+#endif
+
 	state = Init;
 }
 
@@ -764,6 +804,14 @@ void Emulator::term()
 			delete recompiler;
 			recompiler = nullptr;
 		}
+#ifdef ENABLE_SH4_IR
+		if (m_fallback_sh4_interpreter)
+		{
+			INFO_LOG(INTERPRETER, "Deleting fallback Sh4Interpreter instance.");
+			delete m_fallback_sh4_interpreter;
+			m_fallback_sh4_interpreter = nullptr;
+		}
+#endif
 		custom_texture.Terminate();	// lr: avoid deadlock on exit (win32)
 		reios_term();
 		aica::term();

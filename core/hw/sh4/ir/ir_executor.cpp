@@ -324,7 +324,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::DT:
                 {
-                    uint32_t v = --ctx->r[ins.dst.reg];
+                    uint32_t v = --ctx->r[ins.src1.reg]; // Corrected from ins.dst.reg
                     ctx->sr.T = (v == 0);
                     break;
                 }
@@ -833,6 +833,9 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::FSQRT:
                     ctx->fr[ins.dst.reg] = std::sqrtf(ctx->fr[ins.dst.reg]);
+                    break;
+                case Op::FSTS: // FSTS FPUL, FRn (FRn = FPUL)
+                    ctx->fr[ins.src1.reg] = ctx->fpul;
                     break;
                 case Op::FABS:
                     ctx->fr[ins.dst.reg] = std::fabsf(ctx->fr[ins.src1.reg]);

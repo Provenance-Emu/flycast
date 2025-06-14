@@ -5,6 +5,8 @@
 class Sh4Interpreter : public Sh4Executor
 {
 public:
+	Sh4Interpreter();
+	~Sh4Interpreter() override;
 	void Run() override;
 	void ResetCache() override  {}
 	void Start() override;

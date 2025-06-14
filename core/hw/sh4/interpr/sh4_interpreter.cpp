@@ -106,6 +106,19 @@ Sh4ICache icache;
 Sh4OCache ocache;
 Sh4Interpreter *Sh4Interpreter::Instance;
 
+Sh4Interpreter::Sh4Interpreter()
+{
+    Instance = this;
+}
+
+Sh4Interpreter::~Sh4Interpreter()
+{
+    if (Instance == this)
+    {
+        Instance = nullptr;
+    }
+}
+
 // Add this declaration at the top of the file with other global variables
 static bool sh4_int_bCpuRun = false;
 
@@ -286,7 +299,6 @@ u16 Sh4Interpreter::ReadNexOp()
 
 void Sh4Interpreter::Run()
 {
-	Instance = this;
 	ctx->restoreHostRoundingMode();
 
 	try {
@@ -311,7 +323,6 @@ void Sh4Interpreter::Run()
 	}
 
 	ctx->CpuRunning = false;
-	Instance = nullptr;
 }
 
 void Sh4Interpreter::Start()
@@ -327,7 +338,6 @@ void Sh4Interpreter::Stop()
 void Sh4Interpreter::Step()
 {
 	verify(!ctx->CpuRunning);
-	Instance = this;
 
 	ctx->restoreHostRoundingMode();
 	try {
@@ -339,7 +349,6 @@ void Sh4Interpreter::Step()
 		sh4cycles.addCycles(5 * CPU_RATIO);
 	} catch (const debugger::Stop&) {
 	}
-	Instance = nullptr;
 }
 
 void Sh4Interpreter::Reset(bool hard)
@@ -384,9 +393,16 @@ bool Sh4Interpreter::IsCpuRunning()
 void Sh4Interpreter::ExecuteDelayslot()
 {
 	try {
-		u32 op = ReadNexOp();
-
-		ExecuteOpcode(op);
+		u16 op = ReadNexOp();
+ 
+		// --- NOP Optimization ---
+		// If the delay slot instruction is not NOP (0x0009), execute it.
+		if (op != 0x0009)
+		{
+			ExecuteOpcode(op);
+		}
+		// --- End NOP Optimization ---
+ 
 	} catch (SH4ThrownException& ex) {
 		AdjustDelaySlotException(ex);
 		throw ex;

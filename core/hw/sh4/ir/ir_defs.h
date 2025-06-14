@@ -123,6 +123,7 @@ enum class Op : uint8_t {
     FSUB,
     FTRC,
     FTRV,
+    DT, // Decrement and Test
     JMP,
     LDC,
     LDC_L,
