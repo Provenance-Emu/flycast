@@ -12,21 +12,24 @@
 #include <cstring>
 #include "ir_tables.h" // for Op enum count
 #include "hw/sh4/sh4_mmr.h"
+#include "hw/sh4/sh4_interpreter.h"
 #include "hw/flashrom/nvmem.h" // for getBiosData()
 
 // Auto-generated opcode name table
 #include "ir_opnames.inc"
 
-// Forward declaration (defined later in file inside anonymous namespace)
-static void DumpTrace();
-
 namespace sh4 {
 namespace ir {
 
 // ----------------------------------------------------------------------------
-//  Execution statistics helpers
+//  Execution statistics, trace buffer, and helpers.
+//  These are all defined in an anonymous namespace to keep them local to this
+//  file. The DumpTrace function is defined here, and functions that call it
+//  (like SetPC) are defined after this namespace block.
 // ----------------------------------------------------------------------------
 namespace {
+
+// --- statistics ---
 constexpr size_t kOpCount = static_cast<size_t>(Op::NUM_OPS);
 constexpr size_t kOpNamesCount = sizeof(kOpNames) / sizeof(kOpNames[0]);
 static std::array<std::atomic<uint64_t>, kOpCount> g_opExecCounts{};
@@ -76,6 +79,67 @@ static void MaybeDumpStats()
     }
 }
 
+// --- execution trace for post-mortem debugging ---
+constexpr size_t kTraceLen = 64;
+struct TraceEntry { uint32_t pc; Op op; };
+static std::array<TraceEntry, kTraceLen> g_traceBuf{};
+static size_t g_tracePos = 0;
+
+inline void TraceLog(uint32_t pc, Op op) {
+    g_traceBuf[g_tracePos] = {pc, op};
+    g_tracePos = (g_tracePos + 1) % kTraceLen;
+}
+
+// This is the one and only definition of DumpTrace.
+// It's static, so it's local to this translation unit.
+// Functions that call it (SetPC, ExecStub) are defined after this namespace.
+static void DumpTrace() {
+    INFO_LOG(SH4, "---- Last %zu IR instructions ----", kTraceLen);
+    for (size_t i = 0; i < kTraceLen; ++i) {
+        size_t idx = (g_tracePos + i) % kTraceLen;
+        const auto& e = g_traceBuf[idx];
+        if (e.op == Op::NOP && e.pc == 0) continue; // empty slot
+        INFO_LOG(SH4, "  %08X : %s", e.pc, GetOpName(static_cast<size_t>(e.op)));
+    }
+}
+
+} // end anonymous namespace
+
+// -----------------------------------------------------------------------------
+//  Helpers
+// -----------------------------------------------------------------------------
+static inline bool IsTopRegion(uint32_t addr)
+{
+    // Treat anything from 0xF0000000 upward as suspicious
+    return addr >= 0xF0000000u;
+}
+
+// -----------------------------------------------------------------------------
+//  PC write helper to trap problematic jumps or boundary crossings
+// -----------------------------------------------------------------------------
+static inline void SetPC(Sh4Context* ctx, uint32_t new_pc, const char* why)
+{
+    uint32_t old_pc = ctx->pc;
+
+    if (new_pc == 0)
+    {
+        ERROR_LOG(SH4, "*** SetPC to ZERO from %s", why);
+        DumpTrace();
+    }
+    else if (IsTopRegion(new_pc))
+    {
+        ERROR_LOG(SH4, "*** SetPC to near-top %08X from %s", new_pc, why);
+    }
+
+    // Detect sequential walk crossing into top region (e.g., fall-through past FFFFFFBE)
+    if (!IsTopRegion(old_pc) && IsTopRegion(new_pc))
+    {
+        ERROR_LOG(SH4, "*** PC crossed into top region: %08X -> %08X via %s", old_pc, new_pc, why);
+    }
+
+    ctx->pc = new_pc;
+}
+
 // Fast pointer fetch for main RAM aliases (P1/P2/P3) and P4 SDRAM mirrors (F8–FE)
 static inline u8* FastRamPtr(uint32_t addr)
 {
@@ -103,12 +167,7 @@ static inline u8* FastRamPtr(uint32_t addr)
 // Per-opcode execution helper signature
 using ExecFn = void(*)(const sh4::ir::Instr&, Sh4Context*, uint32_t);
 
-// Forward declaration of trace dump helper (defined later)
-static void DumpTrace();
-
-// Generic stub that falls back to IllegalInstr -> legacy interpreter. We place
-// the complete definition early so that it can be referenced in the exec
-// function table initialisation that follows.
+// Generic stub that falls back to IllegalInstr -> legacy interpreter.
 static void ExecStub(const sh4::ir::Instr&, Sh4Context*, uint32_t pc)
 {
     INFO_LOG(SH4, "IR fallback at PC=%08X", pc);
@@ -149,41 +208,6 @@ static inline ExecFn GetExecFn(sh4::ir::Op op)
     return g_exec_table[static_cast<int>(op)];
 }
 
-// --- execution trace for post-mortem debugging ---
-namespace {
-constexpr size_t kTraceLen = 64;
-struct TraceEntry { uint32_t pc; Op op; };
-static std::array<TraceEntry, kTraceLen> g_traceBuf{};
-static size_t g_tracePos = 0;
-inline void TraceLog(uint32_t pc, Op op) {
-    g_traceBuf[g_tracePos] = {pc, op};
-    g_tracePos = (g_tracePos + 1) % kTraceLen;
-}
-inline void DumpTraceImpl() {
-    INFO_LOG(SH4, "---- Last %zu IR instructions ----", kTraceLen);
-    for (size_t i = 0; i < kTraceLen; ++i) {
-        size_t idx = (g_tracePos + i) % kTraceLen;
-        const auto& e = g_traceBuf[idx];
-        if (e.op == Op::NOP && e.pc == 0) continue; // empty slot
-        INFO_LOG(SH4, "  %08X : %s", e.pc, GetOpName(static_cast<size_t>(e.op)));
-    }
-}
-}
-
-// ---------------------------------------------------------------------------
-//  Public wrapper for the internal DumpTraceImpl (file-local linkage)
-// ---------------------------------------------------------------------------
-static void DumpTrace()
-{
-    DumpTraceImpl();
-}
-
-} // end anonymous namespace
-
-// ---------------------------------------------------------------------------
-//  Generic fallback executor
-// ---------------------------------------------------------------------------
-
 // ----------------------------------------------------------------------------
 //  Executor
 // ----------------------------------------------------------------------------
@@ -198,6 +222,13 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
     {
         // Current PC before executing this instruction
         uint32_t curr_pc = ctx->pc;
+        if (curr_pc == 0)
+        {
+            ERROR_LOG(SH4, "*** PC reached 0! R0=%08X R1=%08X R2=%08X R3=%08X R4=%08X R5=%08X R6=%08X R7=%08X R8=%08X R9=%08X R10=%08X R11=%08X R12=%08X R13=%08X R14=%08X R15=%08X PR=%08X",
+                      ctx->r[0], ctx->r[1], ctx->r[2], ctx->r[3], ctx->r[4], ctx->r[5], ctx->r[6], ctx->r[7], ctx->r[8], ctx->r[9], ctx->r[10], ctx->r[11], ctx->r[12], ctx->r[13], ctx->r[14], ctx->r[15], ctx->pr);
+            DumpTrace();
+        }
+        uint32_t old_pr = ctx->pr; // track PR modifications
 
         // No branch commit here; we defer committing the branch until after the
         // delay-slot instruction has executed (see logic at bottom of loop).
@@ -242,6 +273,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::MOV_IMM:
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(ins.src1.imm);
+                    if ((ctx->r[ins.dst.reg] & 0xFF000000u) == 0xFF000000u)
+                        DEBUG_LOG(SH4, "MOV_IMM loaded HIGH-FF literal %08X into R%u at PC=%08X", ctx->r[ins.dst.reg], ins.dst.reg, curr_pc);
                     break;
                 case Op::ADD_IMM:
                     ctx->r[ins.dst.reg] += static_cast<int32_t>(ins.src1.imm);
@@ -315,6 +348,15 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         ctx->r[ins.dst.reg] >>= (ins.extra & 31);
                     }
                     break;
+                case Op::SHLD:
+                {
+                    uint32_t cnt = ctx->r[ins.src1.reg] & 31;
+                    if (cnt == 0)
+                        ; // no change
+                    else
+                        ctx->r[ins.dst.reg] = (ctx->r[ins.dst.reg] << cnt) | (ctx->r[ins.src1.reg] >> (32 - cnt));
+                    break;
+                }
                 case Op::SAR_OP:
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int32_t>(ctx->r[ins.dst.reg]) >> (ins.extra & 31));
                     break;
@@ -478,8 +520,12 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::JSR:
                     INFO_LOG(SH4, "BR JSR from %08X -> %08X (r%u)", curr_pc, ctx->r[ins.src1.reg], ins.src1.reg);
+                    if (IsTopRegion(ctx->r[ins.src1.reg]))
+                        ERROR_LOG(SH4, "*** HIGH-FF JSR target at %08X : R%u=%08X", curr_pc, ins.src1.reg, ctx->r[ins.src1.reg]);
                     ctx->pr = curr_pc + 4; // address after delay slot
                     branch_target = ctx->r[ins.src1.reg];
+                    if (IsTopRegion(branch_target))
+                        ERROR_LOG(SH4, "*** HIGH-FF branch target set by JMP at %08X -> %08X (r%u)", curr_pc, branch_target, ins.src1.reg);
                     branch_pending = true;
                     executed_delay = false; // ensure delay flag reset
                     break;
@@ -493,6 +539,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                              ctx->r[8], ctx->r[9], ctx->r[10], ctx->r[11],
                              ctx->r[12], ctx->r[13], ctx->r[14], ctx->r[15]);
                     INFO_LOG(SH4, "BR JMP from %08X -> %08X (r%u)", curr_pc, ctx->r[ins.src1.reg], ins.src1.reg);
+                    if (IsTopRegion(ctx->r[ins.src1.reg]))
+                        ERROR_LOG(SH4, "*** HIGH-FF JMP target at %08X : R%u=%08X", curr_pc, ins.src1.reg, ctx->r[ins.src1.reg]);
                     branch_target = ctx->r[ins.src1.reg];
                     branch_pending = true;
                     executed_delay = false;
@@ -500,12 +548,16 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::RTS:
                     INFO_LOG(SH4, "BR RTS from %08X -> %08X", curr_pc, ctx->pr);
                     branch_target = ctx->pr;
+                    if (IsTopRegion(branch_target))
+                        ERROR_LOG(SH4, "*** HIGH-FF RTS target at %08X -> %08X (PR)", curr_pc, branch_target);
                     branch_pending = true;
                     executed_delay = false;
                     break;
                 case Op::BRA:
                     INFO_LOG(SH4, "BR BRA from %08X -> %08X (disp=%d)", curr_pc, curr_pc + 4 + ins.extra, ins.extra);
                     branch_target = curr_pc + 4 + ins.extra;
+                    if (IsTopRegion(branch_target))
+                        ERROR_LOG(SH4, "*** HIGH-FF BRA target at %08X -> %08X (disp=%d)", curr_pc, branch_target, ins.extra);
                     branch_pending = true;
                     executed_delay = false;
                     break;
@@ -514,8 +566,10 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     {
                         uint32_t target = curr_pc + 4 + ins.extra;
                         INFO_LOG(SH4, "BR BT  from %08X -> %08X (disp=%d)", curr_pc, target, ins.extra);
+                        if (IsTopRegion(target))
+                            ERROR_LOG(SH4, "*** HIGH-FF BT target at %08X -> %08X (disp=%d)", curr_pc, target, ins.extra);
                         // No delay slot: set PC to target immediately (account for +2 at loop bottom)
-                        ctx->pc = target - 2;
+                        SetPC(ctx, target - 2, "BT/BF");
                     }
                     break;
                 case Op::BF:
@@ -523,12 +577,10 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     {
                         uint32_t target = curr_pc + 4 + ins.extra;
                         INFO_LOG(SH4, "BR BF  from %08X -> %08X (disp=%d)", curr_pc, target, ins.extra);
-                        ctx->pc = target - 2;
+                        if (IsTopRegion(target))
+                            ERROR_LOG(SH4, "*** HIGH-FF BF target at %08X -> %08X (disp=%d)", curr_pc, target, ins.extra);
+                        SetPC(ctx, target - 2, "BT/BF");
                     }
-                    break;
-                case Op::CMP_EQ:
-                    ctx->sr.T = (ctx->r[ins.dst.reg] == ctx->r[ins.src1.reg]);
-                    break;
                 case Op::CMP_PL:
                     ctx->sr.T = ((static_cast<int32_t>(ctx->r[ins.src1.reg]) > 0) ? 1 : 0);
                     break;
@@ -540,6 +592,9 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::MOVT:
                     ctx->r[ins.dst.reg] = ctx->sr.T;
+                    break;
+                case Op::CMP_EQ:
+                    ctx->sr.T = (ctx->r[ins.dst.reg] == ctx->r[ins.src1.reg]);
                     break;
                 case Op::CMP_HI:
                     ctx->sr.T = (ctx->r[ins.dst.reg] > ctx->r[ins.src1.reg]);
@@ -565,6 +620,15 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::MOVA:
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(ins.src1.imm);
+                    {
+                        uint32_t imm = static_cast<uint32_t>(ins.src1.imm);
+                        uint32_t base = (curr_pc & ~3u) + 4u;
+                        uint32_t disp_calc = (imm - base) >> 2;
+                        uint32_t lit = 0xDEADBEEF;
+                        if (imm < 0x00200000)
+                            lit = *reinterpret_cast<const u32*>(nvmem::getBiosData() + (imm & 0x001FFFFF));
+                        DEBUG_LOG(SH4, "MOVA disp=%02X addr=%08X literal=%08X at PC=%08X", disp_calc & 0xFFu, imm, lit, curr_pc);
+                    }
                     break;
                 case Op::SUB:
                     ctx->r[ins.dst.reg] -= ctx->r[ins.src1.reg];
@@ -601,6 +665,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::BRAF:
                     INFO_LOG(SH4, "BR BRAF from %08X -> %08X (r%u)", curr_pc, curr_pc + 4 + ctx->r[ins.src1.reg], ins.src1.reg);
                     branch_target = curr_pc + 4 + ctx->r[ins.src1.reg];
+                    if (IsTopRegion(branch_target))
+                        ERROR_LOG(SH4, "*** HIGH-FF BRAF target at %08X : target=%08X R%u=%08X", curr_pc, branch_target, ins.src1.reg, ctx->r[ins.src1.reg]);
                     branch_pending = true;
                     executed_delay = false;
                     break;
@@ -608,6 +674,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     INFO_LOG(SH4, "BR BSRF from %08X -> %08X (r%u)", curr_pc, curr_pc + 4 + ctx->r[ins.src1.reg], ins.src1.reg);
                     ctx->pr = curr_pc + 4;
                     branch_target = curr_pc + 4 + ctx->r[ins.src1.reg];
+                    if (IsTopRegion(branch_target))
+                        ERROR_LOG(SH4, "*** HIGH-FF BSRF target at %08X : target=%08X R%u=%08X", curr_pc, branch_target, ins.src1.reg, ctx->r[ins.src1.reg]);
                     branch_pending = true;
                     executed_delay = false;
                     break;
@@ -616,6 +684,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     {
                         INFO_LOG(SH4, "BR BT/S from %08X -> %08X (disp=%d)", curr_pc, curr_pc + 4 + ins.extra, ins.extra);
                         branch_target = curr_pc + 4 + ins.extra;
+                        if (IsTopRegion(branch_target))
+                            ERROR_LOG(SH4, "*** HIGH-FF BT/S target at %08X -> %08X (disp=%d)", curr_pc, branch_target, ins.extra);
                         branch_pending = true;
                         executed_delay = false;
                     }
@@ -623,14 +693,20 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::BF_S:
                     if (!ctx->sr.T)
                     {
-                        INFO_LOG(SH4, "BR BF/S from %08X -> %08X (disp=%d)", curr_pc, curr_pc + 4 + ins.extra, ins.extra);
-                        branch_target = curr_pc + 4 + ins.extra;
+                        uint32_t target = curr_pc + 4 + ins.extra;
+                        INFO_LOG(SH4, "BR BF/S from %08X -> %08X (disp=%d)", curr_pc, target, ins.extra);
+                        if (IsTopRegion(target))
+                            ERROR_LOG(SH4, "*** HIGH-FF BF/S target at %08X -> %08X (disp=%d)", curr_pc, target, ins.extra);
+                        branch_target = target;
                         branch_pending = true;
                         executed_delay = false;
                     }
                     break;
                 case Op::LDS_PR_L:
                     ctx->pr = mmu_ReadMem<u32>(ctx->r[ins.src1.reg]);
+                    INFO_LOG(SH4, "LDS.L  PR @%08X -> %08X", ctx->r[ins.src1.reg], ctx->pr);
+                    if (IsTopRegion(ctx->pr))
+                        ERROR_LOG(SH4, "*** HIGH-FF PR value loaded %08X via LDS.L at PC=%08X", ctx->pr, curr_pc);
                     ctx->r[ins.src1.reg] += 4;
                     break;
                 case Op::STS_PR_L:
@@ -638,10 +714,15 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     uint32_t new_addr = ctx->r[ins.dst.reg] - 4;
                     ctx->r[ins.dst.reg] = new_addr;
                     mmu_WriteMem<u32>(new_addr, ctx->pr);
+                    INFO_LOG(SH4, "STS.L  PR @%08X  PR=%08X", new_addr, ctx->pr);
+                    if (IsTopRegion(ctx->pr))
+                        ERROR_LOG(SH4, "*** HIGH-FF PR value stored %08X via STS.L at PC=%08X", ctx->pr, curr_pc);
                     break;
                 }
                 case Op::RTE:
                     INFO_LOG(SH4, "RTE from %08X -> %08X", curr_pc, ctx->spc);
+                    if (IsTopRegion(ctx->spc))
+                        ERROR_LOG(SH4, "*** HIGH-FF RTE target at %08X -> %08X", curr_pc, ctx->spc);
                     ctx->sr.setFull(ctx->ssr);
                     UpdateSR();
                     branch_target = ctx->spc;
@@ -653,9 +734,15 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     ctx->r[ins.src1.reg] += 4;
                     break;
                 case Op::LDC_SPC_L:
-                    ctx->spc = mmu_ReadMem<u32>(ctx->r[ins.src1.reg]);
+                {
+                    uint32_t val = mmu_ReadMem<u32>(ctx->r[ins.src1.reg]);
+                    INFO_LOG(SH4, "LDC.L  SPC <- %08X from @%08X (R%u)", val, ctx->r[ins.src1.reg], ins.src1.reg);
+                    if (IsTopRegion(val))
+                        ERROR_LOG(SH4, "*** HIGH-FF SPC value loaded %08X via LDC.L at PC=%08X", val, curr_pc);
+                    ctx->spc = val;
                     ctx->r[ins.src1.reg] += 4;
                     break;
+                }
                 case Op::LDC_SGR_L:
                     ctx->sgr = mmu_ReadMem<u32>(ctx->r[ins.src1.reg]);
                     ctx->r[ins.src1.reg] += 4;
@@ -681,6 +768,12 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::FDIV:
                     ctx->fr[ins.dst.reg] = ctx->fr[ins.dst.reg] / ctx->fr[ins.src1.reg];
                     break;
+                case Op::FSQRT:
+                    ctx->fr[ins.dst.reg] = std::sqrtf(ctx->fr[ins.dst.reg]);
+                    break;
+                case Op::FABS:
+                    ctx->fr[ins.dst.reg] = std::fabsf(ctx->fr[ins.src1.reg]);
+                    break;
                 case Op::FCMP_EQ:
                     ctx->sr.T = (ctx->fr[ins.dst.reg] == ctx->fr[ins.src1.reg]);
                     break;
@@ -692,10 +785,18 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     uint32_t disp8 = static_cast<uint32_t>(ins.extra);
                     uint32_t base = (curr_pc & ~3u) + 4u;
                     uint32_t addr = base + (disp8 << 2);
+                    uint32_t val;
                     if (u8* p = FastRamPtr(addr))
-                        ctx->r[ins.dst.reg] = *reinterpret_cast<u32*>(p);
+                        val = *reinterpret_cast<u32*>(p);
                     else
-                        ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(addr);
+                        val = mmu_ReadMem<u32>(addr);
+                    ctx->r[ins.dst.reg] = val;
+                    uint32_t lit_rom = 0xDEADBEEF;
+                    if (addr < 0x00200000)
+                        lit_rom = *reinterpret_cast<const u32*>(nvmem::getBiosData() + (addr & 0x001FFFFF));
+                    DEBUG_LOG(SH4, "LOAD32_PC disp=%02X addr=%08X literal=%08X -> %08X into R%u at PC=%08X", disp8, addr, lit_rom, val, ins.dst.reg, curr_pc);
+                    if (IsTopRegion(val))
+                        DEBUG_LOG(SH4, "LOAD32_PC loaded HIGH-FF literal %08X into R%u at PC=%08X", val, ins.dst.reg, curr_pc);
                     break;
                 }
                 case Op::FMOV_LOAD_R0:
@@ -719,21 +820,61 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         mmu_WriteMem<u32>(addr, val);
                     break;
                 }
+                case Op::CLRMAC:
+                    ctx->mac.h = 0;
+                    ctx->mac.l = 0;
+                    break;
                 default:
-                    // Unimplemented opcode – fall back to legacy interpreter via IllegalInstr exception
-                    ERROR_LOG(SH4, "IR executor unimplemented opcode %s at %08X", GetOpName(static_cast<size_t>(ins.op)), curr_pc);
-                    DumpTrace();
-                    g_opExecCounts[static_cast<size_t>(ins.op)] = 0;
-                    throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
+                     {
+                         uint16_t raw16 = mmu_ReadMem<u16>(curr_pc);
+                         // If this is an FPU group opcode (0xFxxx) and interpreter is available, use fallback
+                         if ((raw16 & 0xF000) == 0xF000 && Sh4Interpreter::Instance)
+                         {
+                             DEBUG_LOG(SH4, "IR fallback to interpreter FPU for raw=%04X at PC=%08X", raw16, curr_pc);
+                             Sh4Interpreter::Instance->ExecuteOpcode(raw16); // advances PC internally
+                             return; // leave block; new block will be fetched next tick
+                         }
+                         // Otherwise throw illegal as before
+                         ERROR_LOG(SH4, "IR executor fell through: raw=%04X pc=%08X", raw16, curr_pc);
+                         ERROR_LOG(SH4, "IR executor unimplemented opcode %s (%zu) at %08X", GetOpName(static_cast<size_t>(ins.op)), static_cast<size_t>(ins.op), curr_pc);
+                         sh4::ir::DumpTrace();
+                         g_opExecCounts[static_cast<size_t>(ins.op)] = 0;
+                         throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
+                     }
                 }
             } // end switch
         } // end else dispatch
+
+        // PR write tracking – log any change made by the executed instruction
+        if (ctx->pr != old_pr)
+        {
+            INFO_LOG(SH4, "PR write: %08X -> %08X at PC=%08X op=%s",
+                     old_pr, ctx->pr, curr_pc, GetOpName(static_cast<size_t>(ins.op)));
+        }
+
+        // --------- Idle filler detection ---------------------------------------
+        static int idle_run = 0;
+        bool is_idle_op = (ins.op == Op::NOP || ins.op == Op::END);
+        if (is_idle_op && !branch_pending && ctx->pr == old_pr)
+        {
+            ++idle_run;
+            if (idle_run > 8)
+            {
+                ERROR_LOG(SH4, "*** Executed %d consecutive END/NOP from %08X – likely ran off real code", idle_run, curr_pc);
+                sh4::ir::DumpTrace();
+                throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
+            }
+        }
+        else
+        {
+            idle_run = 0;
+        }
 
         // Advance PC by 2 for the next sequential instruction; this positions the
         // delay-slot instruction (if any) at pc+2. If a branch is pending, the
         // commit step at the top of the next iteration will overwrite pc with
         // the branch target after the delay slot has run.
-        ctx->pc += 2;
+        SetPC(ctx, ctx->pc + 2, "seq");
 
         // Branch delay-slot/commit bookkeeping ----------------------------------
         // If a branch is pending we need to keep track of whether we have just
@@ -749,10 +890,21 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
         {
             if (executed_delay)
             {
-                // Delay slot just executed – jump to the branch target and
-                // finish executing this block so the dispatcher can start a new
-                // one from the branch destination.
-                ctx->pc = branch_target;
+                // Delay slot just executed – about to commit the branch.
+                INFO_LOG(SH4, "BR COMMIT %08X", branch_target);
+                uint16_t raw16_prev = mmu_ReadMem<u16>(curr_pc - 2);
+                if (branch_target == 0)
+                {
+                    ERROR_LOG(SH4, "*** ZERO-TARGET commit! branch raw=%04X src_pc=%08X", raw16_prev, curr_pc - 2);
+                    sh4::ir::DumpTrace();
+                }
+                else if (IsTopRegion(branch_target))
+                {
+                    ERROR_LOG(SH4, "*** HIGH-FF branch commit! raw=%04X src_pc=%08X -> %08X", raw16_prev, curr_pc - 2, branch_target);
+                }
+                // Jump to the branch target and finish executing this block so
+                // the dispatcher can start a new one from the destination.
+                SetPC(ctx, branch_target, "branch_commit");
                 return;
             }
             else

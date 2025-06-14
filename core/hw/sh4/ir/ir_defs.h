@@ -64,19 +64,6 @@ enum class Op : uint8_t {
     CMP_STR,
     BRANCH,
     END,
-    MOV_REG,   // dst = src (both registers)
-    MOV_IMM,   // dst = imm32 (sign-extended immediate)
-    ADD_REG,   // dst += src
-    ADD_IMM,   // dst += imm32
-    BRA,       // pc = pc + disp
-    JSR,       // subroutine call
-    RTS,       // return from subroutine
-    LOAD16_IMM, // dst = *(u16*)addr
-    LOAD32_IMM,  // dst = *(u32*)addr
-    LOAD32_PC,   // dst = *(u32*)((PC&~3)+4+disp8*4)
-    FMOV_LOAD_R0, // FRn = *(f32*)(R0 + Rm)
-    FMOV_STORE_R0, // *(f32*)(R0 + Rn) = FRm
-    ILLEGAL,      // illegal opcode placeholder
     CMP_EQ,
     CMP_PL,
     CMP_HI,
@@ -197,6 +184,8 @@ enum class Op : uint8_t {
     LDC_SSR_L,  // load SSR from @Rn+ (post-increment long)
     LDC_SPC_L,  // load SPC from @Rn+ (post-increment long)
     LDC_SGR_L,  // load SGR from @Rn+ (post-increment long)
+    // the remainder of opcode values is auto-generated to keep numbers stable
+#include "ir_defs_auto.inc"
     NUM_OPS
 };
 
