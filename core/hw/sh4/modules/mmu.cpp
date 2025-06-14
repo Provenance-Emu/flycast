@@ -699,19 +699,6 @@ template u64 mmu_ReadMem(u32 adr);
 
 u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 {
-	// TEMPORARY HACK to trace fetches to handler and force ITLB miss if conditions met
-	if (vaddr == 0x8C000400) { // Check if the target handler address is being fetched for instruction
-		// Force the fault only if SR.BL is already 1 (first fault processed) AND g_itlb_miss_during_handler_fetch is true (first fault handler is being fetched)
-		if (Sh4cntx.sr.BL == 1 && g_itlb_miss_during_handler_fetch) {
-			DEBUG_LOG(SH4, "mmu_IReadMem16: FORCING TLB_MISS (instruction) for handler va=0x%08X. Conditions MET for double fault: SR.BL=%d, g_itlb_miss_during_handler_fetch=%s", vaddr, Sh4cntx.sr.BL, g_itlb_miss_during_handler_fetch ? "true" : "false");
-			mmu_raise_exception(MmuError::TLB_MISS, vaddr, MMU_TT_IREAD);
-			return 0x0009; // Return NOP, exception should take precedence
-		} else {
-			// Log if we are fetching the handler address but conditions for forcing fault are not (yet) met
-			DEBUG_LOG(SH4, "mmu_IReadMem16: Fetching handler va=0x%08X. Conditions for FORCING fault NOT MET: SR.BL=%d, g_itlb_miss_during_handler_fetch=%s", vaddr, Sh4cntx.sr.BL, g_itlb_miss_during_handler_fetch ? "true" : "false");
-		}
-	}
-	// END TEMPORARY HACK
 
 	if (g_just_had_tlb_miss_write_exception && vaddr == 0x00000400) {
 		DEBUG_LOG(SH4, "mmu_IReadMem16: Attempting to fetch handler (0x%08X) immediately after Sh4Ex_TlbMissWrite. Potential double fault.", vaddr);
