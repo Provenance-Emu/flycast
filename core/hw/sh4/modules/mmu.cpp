@@ -619,16 +619,32 @@ void mmu_flush_table()
 template<typename T>
 T DYNACALL mmu_ReadMem(u32 adr)
 {
-	// Fast path for Boot ROM data reads (first 2 MiB, any mode). This avoids
-	// costly MMU translation and, more importantly, prevents fatal TLB-miss
-	// exceptions when the MMU is still enabled but no TLB entries exist yet
-	// for low memory.
-	if (adr < 0x00200000 || (adr >= 0x40000000 && adr < 0x40200000))
+	// Fast path for Boot ROM data reads (2 MiB BIOS mirrored into P0/P1/P2/P3).
+	// This avoids costly MMU translation and — more importantly — stops execution
+	// from running into zero-padded space beyond the real ROM.
+	auto is_bios = [](u32 a, u32& offs) {
+		u32 base = a & 0xE0000000u;
+		if (base == 0x00000000u || base == 0x80000000u || base == 0xA0000000u || base == 0xC0000000u)
+		{
+			offs = a & 0x001FFFFFu; // 2 MiB mirror
+			return true;
+		}
+		return false;
+	};
+
+	u32 bios_offs;
+	if (is_bios(adr, bios_offs))
 	{
-		// BIOS is word-aligned; unaligned byte/halfword reads are still legal
-		// because the SH-4 core provides little-endian ordering. We therefore
-		// fetch the native-width value directly from the ROM buffer.
-		return *reinterpret_cast<const T*>(nvmem::getBiosData() + (adr & 0x001FFFFF));
+		// BIOS is word-aligned; unaligned byte/halfword reads are still legal because
+		// the SH-4 core provides little-endian ordering. Fetch the native-width value
+		// directly from the ROM buffer using the pre-masked offset.
+		if (bios_offs >= settings.platform.bios_size)
+		{
+			// Read past real BIOS contents – raise BADADDR so the core faults instead
+			// of reading 0-fill and eventually falling through to PC = 0.
+			mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DREAD);
+		}
+		return *reinterpret_cast<const T*>(nvmem::getBiosData() + bios_offs);
 	}
 
 	// Fast path for SDRAM access in cached/uncached areas (0x0000_0000–0x5FFF_FFFF).
@@ -663,10 +679,23 @@ template u64 mmu_ReadMem(u32 adr);
 
 u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 {
-	// Fast path: Boot ROM fetch or low SDRAM mirror before MMU translation
-	if (vaddr < 0x00200000 || (vaddr >= 0x40000000 && vaddr < 0x40200000))
+	// Fast path: Boot ROM fetch (2 MiB BIOS mirrored into P0/P1/P2/P3) before MMU translation
+	auto is_bios = [](u32 a) {
+		u32 top = a & 0xE0000000u;
+		return (top == 0x00000000u || top == 0x80000000u || top == 0xA0000000u || top == 0xC0000000u);
+	};
+	if (is_bios(vaddr))
 	{
-		return *reinterpret_cast<u16*>(nvmem::getBiosData() + (vaddr & 0x001FFFFF));
+		// Determine true offset within this 2 MiB mirror *before* the 2 MiB mask
+		u32 seg_base   = vaddr & ~0x001FFFFFu;           // aligned base of mirror segment
+		u32 seg_offset = vaddr - seg_base;              // raw offset (0->0x1FFFFF)
+		if (seg_offset >= settings.platform.bios_size)
+		{
+			// Fetch crosses the real BIOS end – raise BADADDR so the core faults
+			// instead of reading 0x0000 filler and falling through to PC=0.
+			mmu_raise_exception(MmuError::BADADDR, vaddr, MMU_TT_IREAD);
+		}
+		return *reinterpret_cast<const u16*>(nvmem::getBiosData() + seg_offset);
 	}
 	// Mirror cached/uncached areas (0x0000_0000–0x5FFF_FFFF) into physical SDRAM
 	if (vaddr < 0x60000000)
