@@ -619,7 +619,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
         else if ((raw & 0xF0FF) == 0x4011)
         {
             ins.op = Op::DT;
-            ins.src1 = {false, n}; // Rn is in bits 11-8, already extracted as 'n'
+            ins.dst = {false, n}; // Rn is in bits 11-8, already extracted as 'n'
+            ins.dst.type = RegType::GPR; // Explicitly GPR
             blk.pcNext = pc + 2;   // DT is not a branch
             decoded = true;
             INFO_LOG(SH4, "Emitter::CreateNew: Manually decoded DT R%d (0x%04X) at PC=0x%08X", n, raw, pc);
@@ -1384,6 +1385,15 @@ Block& Emitter::CreateNew(uint32_t pc) {
                 ins.op = Op::FMOV_STORE_R0;
                 ins.dst.isImm = false; ins.dst.reg = n; // Rn provides offset for store address
                 ins.src1.isImm = false; ins.src1.reg = m; // FRm source value register
+                break;
+            case 0xD: // FSTS FPUL, FRn (0xFnnD)
+                ins.op = Op::FSTS;
+                ins.src1.isImm = false;
+                ins.src1.reg = (raw >> 8) & 0xF; // FRn
+                ins.src1.type = RegType::FGR;
+                // ins.dst is not used by executor for this op
+                // FPUL is an implicit source for the executor
+                INFO_LOG(SH4, "Emitter::CreateNew: Manually decoded FSTS FPUL,FR%d (0x%04X) at PC=0x%08X", ins.src1.reg, raw, pc);
                 break;
             default:  ins.op = Op::ILLEGAL; break; // other 0xF subcodes not handled yet
             }

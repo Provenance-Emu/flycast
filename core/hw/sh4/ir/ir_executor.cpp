@@ -322,12 +322,6 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::NOT:
                     ctx->r[ins.dst.reg] = ~ctx->r[ins.src1.reg];
                     break;
-                case Op::DT:
-                {
-                    uint32_t v = --ctx->r[ins.src1.reg]; // Corrected from ins.dst.reg
-                    ctx->sr.T = (v == 0);
-                    break;
-                }
                 case Op::SHL1:
                     ctx->r[ins.dst.reg] <<= 1;
                     break;
@@ -819,6 +813,10 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     UTLB_Sync(CCN_MMUCR.URC);
                     break;
                 }
+                case Op::DT: // DT Rn (R[n]--; T = (R[n]==0))
+                    ctx->r[ins.dst.reg]--;
+                    ctx->sr.T = (ctx->r[ins.dst.reg] == 0);
+                    break;
                 case Op::FADD:
                     ctx->fr[ins.dst.reg] = ctx->fr[ins.dst.reg] + ctx->fr[ins.src1.reg];
                     break;
@@ -902,13 +900,52 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     ctx->r[ins.src1.reg] += 4;
 
                     // ins.extra contains the control register ID
+                    // 0:SR, 1:GBR, 2:VBR, 3:SSR, 4:SPC, (5:Rn_BANK - not used by LDC.L), 
+                    // 6:SGR, 7:DBR
+                    switch (ins.extra) {
+                        case 0: // SR
+                            INFO_LOG(SH4, "LDC.L SR <- %08X from @%08X (R%u) at PC=%08X", val, addr, ins.src1.reg, curr_pc);
+                            ctx->sr.setFull(val);
+                            UpdateSR(); // Essential after SR change
+                            break;
+                        case 1: // GBR
+                            INFO_LOG(SH4, "LDC.L GBR <- %08X from @%08X (R%u) at PC=%08X", val, addr, ins.src1.reg, curr_pc);
+                            ctx->gbr = val;
+                            break;
+                        case 2: // VBR
+                            INFO_LOG(SH4, "LDC.L VBR <- %08X from @%08X (R%u) at PC=%08X", val, addr, ins.src1.reg, curr_pc);
+                            ctx->vbr = val;
+                            break;
+                        case 3: // SSR
+                            INFO_LOG(SH4, "LDC.L SSR <- %08X from @%08X (R%u) at PC=%08X", val, addr, ins.src1.reg, curr_pc);
+                            ctx->ssr = val;
+                            break;
+                        case 4: // SPC
+                            INFO_LOG(SH4, "LDC.L SPC <- %08X from @%08X (R%u) at PC=%08X", val, addr, ins.src1.reg, curr_pc);
+                            ctx->spc = val;
+                            break;
+                        // TODO: Add cases for SGR (6) and DBR (7) if they become necessary
+                        default:
+                            ERROR_LOG(SH4, "LDC.L to unhandled CR id %d (val %08X) from @%08X (R%u) at PC=%08X", ins.extra, val, addr, ins.src1.reg, curr_pc);
+                            // Consider throwing an exception for truly unhandled CRs if strictness is desired.
+                            break;
+                    }
+                    break;
+                }
+                // FPU Operations - many will fall through to interpreter for now
+                case Op::FMOV: // Handles FMOV FRm,FRn and FMOV.S @Rm,FRn and FMOV.S @Rm+,FRn
+                {
+                    uint32_t addr = ctx->r[ins.src1.reg];
+                    uint32_t val = mmu_ReadMem<u32>(addr);
+                    ctx->r[ins.src1.reg] += 4;
+
+                    // ins.extra contains the control register ID
                     // 0:SR, 1:GBR, 2:VBR, 3:SSR, 4:SPC, 5:Rn_BANK (not directly used here, split by emitter), 
                     // 6:SGR, 7:DBR, 8-15:R0_BANK-R7_BANK
                     switch (ins.extra) {
                         case 0: // SR
                             INFO_LOG(SH4, "LDC.L SR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
-                            ctx->sr.setFull(val);
-                            UpdateSR();
+                            ctx->vbr = val;
                             break;
                         case 1: // GBR
                             INFO_LOG(SH4, "LDC.L GBR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
@@ -973,8 +1010,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                          g_opExecCounts[static_cast<size_t>(ins.op)] = 0;
                          throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
                      }
-                }
-            } // end switch
+                } // end switch (ins.op)
+            } // end else dispatch
         } // end else dispatch
 
         // PR write tracking – log any change made by the executed instruction
@@ -1046,7 +1083,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 executed_delay = true;
             }
         }
-    } // end outer dispatch block
+    } // end for (const auto& ins : blk->code)
 } // end Executor::ExecuteBlock
 
 } // namespace ir

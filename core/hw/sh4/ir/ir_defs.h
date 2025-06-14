@@ -123,7 +123,6 @@ enum class Op : uint8_t {
     FSUB,
     FTRC,
     FTRV,
-    DT, // Decrement and Test
     JMP,
     LDC,
     LDC_L,
@@ -190,11 +189,20 @@ enum class Op : uint8_t {
     NUM_OPS
 };
 
-// Operand kinds – for now just register index or immediate flag
+enum class RegType : uint8_t {
+    NONE,    // Default or not applicable
+    GPR,     // General Purpose Register (R0-R15)
+    FGR,     // Floating Point Register (FR0-FR15, DR0-DR14, XF0-XF14)
+    SPR,     // System/Special Purpose Register (SR, GBR, VBR, SSR, SPC, SGR, DBR, MACH, MACL, PR, FPUL, FPSCR)
+    PC_REG,  // Program Counter (used as a conceptual register in some ops)
+};
+
+// Operand kinds
 struct Operand {
     bool isImm = false;
-    uint8_t reg = 0;   // if !isImm, general-purpose reg index
-    int32_t imm = 0;   // valid when isImm
+    uint8_t reg = 0;      // if !isImm, register index
+    RegType type = RegType::NONE; // Type of register if 'reg' is used
+    int32_t imm = 0;      // valid when isImm
 };
 
 struct Instr {
