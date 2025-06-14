@@ -1,4 +1,8 @@
 #include "mmu.h"
+
+// External flag from sh4_interrupts.cpp to detect if last exception was Sh4Ex_TlbMissWrite
+extern bool g_just_had_tlb_miss_write_exception;
+extern bool g_itlb_miss_during_handler_fetch; // True if ITLB miss occurs while SR.BL=1 (fetching handler)
 #include "hw/mem/addrspace.h"
 #include "hw/sh4/sh4_if.h"
 #include "hw/sh4/sh4_interrupts.h"
@@ -97,7 +101,8 @@ static void mmuException(MmuError mmu_error, u32 address, u32 am, F raise)
 		return;
 
 	case MmuError::TLB_MISS:
-		printf_mmu("MmuError::UTLB_MISS 0x%X, handled", address);
+		printf_mmu("MmuError::TLB_MISS (UTLB) fault_pc=0x%08X, fault_addr=0x%08X, VBR=0x%08X, access_type=%s. Raising SH4 exception.", Sh4cntx.pc, address, Sh4cntx.vbr, (am == MMU_TT_DWRITE ? "write" : "read"));
+		DEBUG_LOG(SH4, "mmuException: TLB_MISS. Before raise. Sh4cntx.pc=0x%08X, SR.BL=%d, fault_addr=0x%08X, access_type=%s, event to be passed=0x%X", Sh4cntx.pc, Sh4cntx.sr.BL, address, (am == MMU_TT_DWRITE ? "write" : "read"), (am == MMU_TT_DWRITE ? Sh4Ex_TlbMissWrite : Sh4Ex_TlbMissRead));
 		if (am == MMU_TT_DWRITE)
 			raise(Sh4Ex_TlbMissWrite);
 		else
@@ -165,7 +170,10 @@ static void mmuException(MmuError mmu_error, u32 address, u32 am, F raise)
 
 void DoMMUException(u32 address, MmuError mmu_error, u32 access_type)
 {
+	DEBUG_LOG(SH4, "DoMMUException: fault_addr=0x%08X, mmu_error=%d, access_type=%d, current_Sh4cntx.pc=0x%08X, SR.BL=%d", address, static_cast<int>(mmu_error), access_type, Sh4cntx.pc, Sh4cntx.sr.BL);
+
 	mmuException(mmu_error, address, access_type, [](Sh4ExceptionCode event) {
+		DEBUG_LOG(SH4, "DoMMUException: About to call Do_Exception with event=0x%X, Sh4cntx.pc=0x%08X", event, Sh4cntx.pc);
 		Do_Exception(Sh4cntx.pc, event);
 	});
 }
@@ -473,8 +481,18 @@ MmuError mmu_instruction_translation(u32 va, u32& rv)
 
 	const TLB_Entry *entry;
 	MmuError lookup = mmu_instruction_lookup(va, &entry, rv);
-	if (lookup != MmuError::NONE)
+	INFO_LOG(SH4, "MMU_ITRANS_CHECK: va=0x%08X, current SR.BL=%d", va, Sh4cntx.sr.BL);
+	if (Sh4cntx.sr.BL == 1) {
+		INFO_LOG(SH4, "MMU_ITRANS: SR.BL=1 active, va=0x%08X. mmu_instruction_lookup returned %d. Translated rv=0x%08X", va, static_cast<int>(lookup), rv);
+	}
+	if (lookup != MmuError::NONE) {
+		// If any MMU error occurs during instruction translation AND we are already in an exception (SR.BL=1)
+		if (Sh4cntx.sr.BL == 1) {
+			DEBUG_LOG(SH4, "MMU: Error (type %d) at 0x%08X while fetching handler for previous exception (SR.BL=1). Setting g_itlb_miss_during_handler_fetch.", static_cast<int>(lookup), va);
+			g_itlb_miss_during_handler_fetch = true;
+		}
 		return lookup;
+	}
 
 	u32 md = entry->Data.PR >> 1;
 
@@ -489,6 +507,8 @@ MmuError mmu_instruction_translation(u32 va, u32& rv)
 
 MmuError mmu_instruction_lookup(u32 va, const TLB_Entry** tlb_entry_ret, u32& rv)
 {
+	// PREVIOUS HACK REMOVED - ineffective due to mmu_IReadMem16 fast path
+
 	bool mmach = false;
 retry_ITLB_Match:
 	*tlb_entry_ret = nullptr;
@@ -679,6 +699,30 @@ template u64 mmu_ReadMem(u32 adr);
 
 u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 {
+	// TEMPORARY HACK to trace fetches to handler and force ITLB miss if conditions met
+	if (vaddr == 0x8C000400) { // Check if the target handler address is being fetched for instruction
+		// Force the fault only if SR.BL is already 1 (first fault processed) AND g_itlb_miss_during_handler_fetch is true (first fault handler is being fetched)
+		if (Sh4cntx.sr.BL == 1 && g_itlb_miss_during_handler_fetch) {
+			DEBUG_LOG(SH4, "mmu_IReadMem16: FORCING TLB_MISS (instruction) for handler va=0x%08X. Conditions MET for double fault: SR.BL=%d, g_itlb_miss_during_handler_fetch=%s", vaddr, Sh4cntx.sr.BL, g_itlb_miss_during_handler_fetch ? "true" : "false");
+			mmu_raise_exception(MmuError::TLB_MISS, vaddr, MMU_TT_IREAD);
+			return 0x0009; // Return NOP, exception should take precedence
+		} else {
+			// Log if we are fetching the handler address but conditions for forcing fault are not (yet) met
+			DEBUG_LOG(SH4, "mmu_IReadMem16: Fetching handler va=0x%08X. Conditions for FORCING fault NOT MET: SR.BL=%d, g_itlb_miss_during_handler_fetch=%s", vaddr, Sh4cntx.sr.BL, g_itlb_miss_during_handler_fetch ? "true" : "false");
+		}
+	}
+	// END TEMPORARY HACK
+
+	if (g_just_had_tlb_miss_write_exception && vaddr == 0x00000400) {
+		DEBUG_LOG(SH4, "mmu_IReadMem16: Attempting to fetch handler (0x%08X) immediately after Sh4Ex_TlbMissWrite. Potential double fault.", vaddr);
+	}
+	// Reset the flag after the first check within an instruction fetch context.
+	// This ensures it's only active for the *very first* fetch attempt after the specific exception.
+	if (g_just_had_tlb_miss_write_exception) {
+	    g_just_had_tlb_miss_write_exception = false;
+	    DEBUG_LOG(SH4, "mmu_IReadMem16: Reset g_just_had_tlb_miss_write_exception to false.");
+	}
+
 	// Fast path: Boot ROM fetch (2 MiB BIOS mirrored into P0/P1/P2/P3) before MMU translation
 	auto is_bios = [](u32 a) {
 		u32 top = a & 0xE0000000u;

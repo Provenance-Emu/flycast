@@ -173,6 +173,7 @@ static const char* kOpNames[] = {
     "LDC_SSR_L,  // load SSR from @Rn+ (post-increment long)",
     "LDC_SPC_L,  // load SPC from @Rn+ (post-increment long)",
     "LDC_SGR_L,  // load SGR from @Rn+ (post-increment long)",
+    "LDC_SR_L,   // load SR from @Rn+ (post-increment long)",
     "ADD_IMM",
     "ADD_REG",
     "BRA",

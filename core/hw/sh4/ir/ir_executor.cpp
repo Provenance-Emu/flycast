@@ -719,6 +719,17 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         ERROR_LOG(SH4, "*** HIGH-FF PR value stored %08X via STS.L at PC=%08X", ctx->pr, curr_pc);
                     break;
                 }
+                case Op::LDC_SR_L: // LDC.L @Rm+, SR
+                {
+                    uint8_t rm_idx = ins.src1.reg;
+                    uint32_t addr = ctx->r[rm_idx];
+                    uint32_t value = mmu_ReadMem<u32>(addr);
+                    ctx->sr.setFull(value);
+                    UpdateSR(); // Apply SR changes (interrupts, mode, etc.)
+                    ctx->r[rm_idx] += 4;
+                    INFO_LOG(SH4, "LDC.L SR <- %08X from @%08X (R%u) at PC=%08X", value, addr, rm_idx, curr_pc);
+                    break;
+                }
                 case Op::RTE:
                     INFO_LOG(SH4, "RTE from %08X -> %08X", curr_pc, ctx->spc);
                     if (IsTopRegion(ctx->spc))
@@ -740,70 +751,89 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     if (IsTopRegion(val))
                         ERROR_LOG(SH4, "*** HIGH-FF SPC value loaded %08X via LDC.L at PC=%08X", val, curr_pc);
                     ctx->spc = val;
-                    ctx->r[ins.src1.reg] += 4;
+                    // ctx->sr.Set(ctx->r[ins.src1.reg]); // This was incorrect for LDC_SPC_L
                     break;
                 }
-                case Op::LDC_SGR_L:
-                    ctx->sgr = mmu_ReadMem<u32>(ctx->r[ins.src1.reg]);
-                    ctx->r[ins.src1.reg] += 4;
+                case Op::STC: // STC <CR>, Rn
+                {
+                    uint32_t val_to_store = 0;
+                    // Emitter sets ins.extra:
+                    // 0:SR, 1:GBR, 2:VBR, 3:SSR, 4:SPC
+                    // 0xF (15): DBR
+                    // 8-14: R0_BANK-R6_BANK (extra = 8 + bank_idx)
+                    // 15: R7_BANK (extra = 8 + 7, distinct from DBR's 0xF due to emitter order)
+                    switch (ins.extra) {
+                        case 0:  val_to_store = ctx->sr.getFull(); break; // Use getFull()
+                        case 1:  val_to_store = ctx->gbr; break;
+                        case 2:  val_to_store = ctx->vbr; break;
+                        case 3:  val_to_store = ctx->ssr; break;
+                        case 4:  val_to_store = ctx->spc; break;
+                        case 7:  val_to_store = ctx->dbr; break; // DBR (emitter now uses 7)
+                        case 8:  val_to_store = ctx->r_bank[0]; break; // R0_BANK
+                        case 9:  val_to_store = ctx->r_bank[1]; break; // R1_BANK
+                        case 10: val_to_store = ctx->r_bank[2]; break; // R2_BANK
+                        case 11: val_to_store = ctx->r_bank[3]; break; // R3_BANK
+                        case 12: val_to_store = ctx->r_bank[4]; break; // R4_BANK
+                        case 13: val_to_store = ctx->r_bank[5]; break; // R5_BANK
+                        case 14: val_to_store = ctx->r_bank[6]; break; // R6_BANK
+                        case 15: val_to_store = ctx->r_bank[7]; break; // R7_BANK
+                        default:
+                            ERROR_LOG(SH4, "STC: Unhandled ins.extra=0x%X for Rn=R%d at PC=0x%08X", ins.extra, ins.dst.reg, curr_pc);
+                            throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
+                    }
+                    ctx->r[ins.dst.reg] = val_to_store;
+                    DEBUG_LOG(SH4, "Executor: STC [extra=0x%X] -> R%d (val=0x%08X) at PC=0x%08X", ins.extra, ins.dst.reg, val_to_store, curr_pc);
                     break;
+                }
                 case Op::LDC: // LDC Rm, <CR>
                 {
-                    uint32_t val = ctx->r[ins.src1.reg];
-                    // ins.extra contains the control register ID
-                    // 0:SR, 1:GBR, 2:VBR, 3:SSR, 4:SPC, 5:Rn_BANK (not directly used here, split by emitter), 
-                    // 6:SGR, 7:DBR, 8-15:R0_BANK-R7_BANK
+                    uint32_t val_to_load = ctx->r[ins.src1.reg]; // Value from Rm
+                    // Emitter for LDC (0x4mcE) sets ins.extra:
+                    // c_val (middle nibble of opcode) if not Rn_BANK: 0:SR, 1:GBR, 2:VBR, 3:SSR, 4:SPC, 6:SGR, 7:DBR
+                    // 8 + bank_idx (0-7) if Rn_BANK (c_val=5): 8:R0_BANK .. 15:R7_BANK
+                    DEBUG_LOG(SH4, "Executor: LDC R%d (val=0x%08X) -> [extra=0x%X] at PC=0x%08X", ins.src1.reg, val_to_load, ins.extra, curr_pc);
+
                     switch (ins.extra) {
                         case 0: // SR
-                            INFO_LOG(SH4, "LDC SR <- %08X (R%u)", val, ins.src1.reg);
-                            ctx->sr.setFull(val);
+                            ctx->sr.setFull(val_to_load); // Use setFull()
                             UpdateSR();
                             break;
                         case 1: // GBR
-                            INFO_LOG(SH4, "LDC GBR <- %08X (R%u)", val, ins.src1.reg);
-                            ctx->gbr = val;
+                            ctx->gbr = val_to_load;
                             break;
                         case 2: // VBR
-                            INFO_LOG(SH4, "LDC VBR <- %08X (R%u)", val, ins.src1.reg);
-                            ctx->vbr = val;
+                            ctx->vbr = val_to_load;
                             break;
                         case 3: // SSR
-                            INFO_LOG(SH4, "LDC SSR <- %08X (R%u)", val, ins.src1.reg);
-                            ctx->ssr = val;
+                            ctx->ssr = val_to_load;
                             break;
                         case 4: // SPC
-                            INFO_LOG(SH4, "LDC SPC <- %08X (R%u)", val, ins.src1.reg);
-                            if (IsTopRegion(val))
-                                ERROR_LOG(SH4, "*** HIGH-FF SPC value %08X loaded via LDC from R%u at PC=%08X", val, ins.src1.reg, curr_pc);
-                            ctx->spc = val;
-                            break;
-                        // Cases 5, 6, 7 for Rn_BANK (direct), SGR, DBR
-                        case 5: // This case should ideally not be hit if emitter splits Rn_BANK to 8-15
-                            ERROR_LOG(SH4, "LDC direct Rn_BANK (id 5) hit in executor @%08X. This should be 8-15.", curr_pc);
+                            if (IsTopRegion(val_to_load))
+                                ERROR_LOG(SH4, "*** HIGH-FF SPC value %08X loaded via LDC from R%u at PC=%08X", val_to_load, ins.src1.reg, curr_pc);
+                            ctx->spc = val_to_load;
                             break;
                         case 6: // SGR
-                            INFO_LOG(SH4, "LDC SGR <- %08X (R%u)", val, ins.src1.reg);
-                            ctx->sgr = val;
+                            ctx->sgr = val_to_load;
                             break;
                         case 7: // DBR
-                            INFO_LOG(SH4, "LDC DBR <- %08X (R%u)", val, ins.src1.reg);
-                            ctx->dbr = val;
+                            ctx->dbr = val_to_load;
                             break;
-                        // Banked registers R0_BANK to R7_BANK (IDs 8-15)
-                        case 8: case 9: case 10: case 11: case 12: case 13: case 14: case 15:
-                        {
-                            int bank_reg_idx = ins.extra - 8; // 0 for R0_BANK, ..., 7 for R7_BANK
-                            INFO_LOG(SH4, "LDC R%d_BANK <- %08X (R%u)", bank_reg_idx, val, ins.src1.reg);
-                            ctx->r_bank[bank_reg_idx] = val;
-                            break;
-                        }
+                        // R0_BANK to R7_BANK
+                        case 8: ctx->r_bank[0] = val_to_load; break;
+                        case 9: ctx->r_bank[1] = val_to_load; break;
+                        case 10: ctx->r_bank[2] = val_to_load; break;
+                        case 11: ctx->r_bank[3] = val_to_load; break;
+                        case 12: ctx->r_bank[4] = val_to_load; break;
+                        case 13: ctx->r_bank[5] = val_to_load; break;
+                        case 14: ctx->r_bank[6] = val_to_load; break;
+                        case 15: ctx->r_bank[7] = val_to_load; break;
                         default:
-                            ERROR_LOG(SH4, "LDC unimplemented control reg ID %d at PC=%08X", ins.extra, curr_pc);
-                            sh4::ir::DumpTrace();
+                            ERROR_LOG(SH4, "LDC: Unhandled ins.extra=0x%X for Rm=R%d at PC=0x%08X", ins.extra, ins.src1.reg, curr_pc);
                             throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
                     }
                     break;
                 }
+
                 case Op::LDTLB:
                 {
                     // Mirror interpreter behaviour: load current PTE registers into UTLB[URC]

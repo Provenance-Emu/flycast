@@ -1,6 +1,8 @@
 #pragma once
 #include "sh4_if.h"
 
+extern bool g_itlb_miss_during_handler_fetch;
+
 enum InterruptID
 {
 	//internal interrupts

@@ -184,6 +184,7 @@ enum class Op : uint8_t {
     LDC_SSR_L,  // load SSR from @Rn+ (post-increment long)
     LDC_SPC_L,  // load SPC from @Rn+ (post-increment long)
     LDC_SGR_L,  // load SGR from @Rn+ (post-increment long)
+    LDC_SR_L,   // load SR from @Rn+ (post-increment long)
     // the remainder of opcode values is auto-generated to keep numbers stable
 #include "ir_defs_auto.inc"
     NUM_OPS

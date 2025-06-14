@@ -266,7 +266,7 @@ public:
 			// miss
 			if (line.dirty && line.valid)
 				// write-back needed
-				doWriteBack(index, line);
+				doWriteBack(address, index, line);
 			line.address = tag;
 			readCacheLine(physAddr, line);
 		}
@@ -301,7 +301,7 @@ public:
 			{
 				if (line.dirty && line.valid)
 					// write-back needed
-					doWriteBack(index, line);
+					doWriteBack(address, index, line);
 				line.address = tag;
 				readCacheLine(physAddr, line);
 			}
@@ -343,7 +343,7 @@ public:
 		if (!line.valid || tag != line.address)
 			return;
 		if (write_back && line.dirty)
-			doWriteBack(index, line);
+			doWriteBack(address, index, line);
 		line.valid = !invalidate;
 		line.dirty = false;
 	}
@@ -365,7 +365,7 @@ public:
 		if (line.valid && tag == line.address)
 			return;
 		if (line.valid && line.dirty)
-			doWriteBack(index, line);
+			doWriteBack(0, index, line); // original_va is not directly known here
 		line.address = tag;
 		readCacheLine(physAddr, line);
 	}
@@ -406,7 +406,7 @@ public:
 		if (!associative)
 		{
 			if (line.valid && line.dirty)
-				doWriteBack(index, line);
+				doWriteBack(0, index, line); // original_va is not directly known here
 			line.address = (data >> 10) & 0x7ffff;
 		}
 		else
@@ -427,7 +427,7 @@ public:
 				// Ignore the write
 				return;
 			if ((data & 3) != 0 && line.dirty)
-				doWriteBack(index, line);
+				doWriteBack(data & ~0x3ff, index, line); // data is the new VA for associative write
 		}
 		line.valid = data & 1;
 		line.dirty = (data >> 1) & 1;
@@ -452,7 +452,7 @@ public:
 		for (cache_line& line : lines)
 		{
 			if (line.valid && line.dirty)
-				doWriteBack((u32)(&line - &lines[0]), line);
+				doWriteBack(0, (u32)(&line - &lines[0]), line); // original_va is not applicable for bulk flush
 			line.valid = false;
 			line.dirty = false;
 		}
@@ -493,11 +493,12 @@ private:
 		sh4cycles.addReadAccessCycles(address, 32);
 	}
 
-	void doWriteBack(u32 index, cache_line& line)
+	void doWriteBack(u32 original_va, u32 index, cache_line& line)
 	{
 		if (CCN_CCR.ORA && (index & 0x80))
 			return;
 		u32 line_addr = (line.address << 10) | ((index & 0x1F) << 5);
+		DEBUG_LOG(SH4, "OCache::doWriteBack: Evicting for original_va=0x%08X. Writing back line_addr=0x%08X (tag=0x%05X, index=0x%X)", original_va, line_addr, line.address, index);
 		u8* memPtr = GetMemPtr(line_addr, sizeof(line.data));
 		if (memPtr != nullptr)
 			memcpy(memPtr, line.data, sizeof(line.data));

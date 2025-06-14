@@ -381,6 +381,8 @@ void Sh4Interpreter::Reset(bool hard)
 	sh4cycles.reset();
 	ctx->cycle_counter = SH4_TIMESLICE;
 
+	g_itlb_miss_during_handler_fetch = false;
+
 	INFO_LOG(INTERPRETER, "Sh4 Reset");
 }
 

@@ -9,6 +9,11 @@
 	is very fast !
 */
 
+
+// Flag to indicate if the last exception was Sh4Ex_TlbMissWrite
+// Defined here, declared extern in mmu.cpp for diagnostics
+bool g_just_had_tlb_miss_write_exception = false;
+bool g_itlb_miss_during_handler_fetch = false; // True if ITLB miss occurs while SR.BL=1 (fetching handler)
 #include "types.h"
 #include "sh4_interrupts.h"
 #include "sh4_core.h"
@@ -17,6 +22,7 @@
 #include "oslib/oslib.h"
 #include "debug/gdb_server.h"
 #include "serialize.h"
+#include "emulator.h"
 #include <cassert>
 
 //these are fixed
@@ -199,31 +205,54 @@ static void Do_Interrupt(Sh4ExceptionCode intEvn)
 
 void Do_Exception(u32 epc, Sh4ExceptionCode expEvn)
 {
+    DEBUG_LOG(SH4, "Do_Exception: Called with expEvn=0x%03X, epc=0x%08X, Sh4cntx.vbr=0x%08X, CCN_TEA=0x%08X. SR.BL=%d", (u32)expEvn, epc, Sh4cntx.vbr, CCN_TEA, Sh4cntx.sr.BL);
+
 	assert((expEvn >= Sh4Ex_TlbMissRead && expEvn <= Sh4Ex_SlotIllegalInstr)
 			|| expEvn == Sh4Ex_FpuDisabled || expEvn == Sh4Ex_SlotFpuDisabled || expEvn == Sh4Ex_UserBreak);
 	if (Sh4cntx.sr.BL != 0) {
-		char msg[256];
-		u16 opcode = 0xFFFF;
-		try {
-			opcode = mmu_IReadMem16(epc);
-		} catch (const SH4ThrownException&) {
-			// ignore - can't safely fetch opcode when MMU raises.
-		}
-		std::snprintf(msg, sizeof(msg), "Fatal: SH4 exception evn %d opcode %04X at %08X", expEvn, opcode, epc);
-		throw FlycastException(msg);
-	}
+		DEBUG_LOG(SH4, "Do_Exception: Double fault detected. SR.BL=1 at entry. Current event=0x%03X, EPC=0x%08X", (u32)expEvn, epc);
+		if (g_itlb_miss_during_handler_fetch && (expEvn == Sh4Ex_TlbMissRead || expEvn == Sh4Ex_TlbMissWrite)) {
+             DEBUG_LOG(SH4, "Do_Exception: Double fault cause: MMU error during handler fetch. Current (second) exception event: 0x%03X, EPC: 0x%08X", (u32)expEvn, epc);
+        }
+        WARN_LOG(SH4, "Do_Exception: DOUBLE FAULT DETECTED. Initiating CPU Reset. Event: 0x%03X, EPC: 0x%08X", (u32)expEvn, epc);
+        emu.getSh4Executor()->Reset(false); // false for programmatic reset
+        return; // CPU reset will take over
+    }
+
+    // Clear the flag that we just had a TLB miss write exception, as we are now processing an exception
+    // (either the original one, or a double fault that will lead to reset)
+    // This reset should happen *before* a potential double fault causes a CPU reset and return.
+    // So, if we reach here, it's not a double fault, or it's the first fault.
+    if (g_just_had_tlb_miss_write_exception && expEvn != Sh4Ex_TlbMissWrite) {
+        g_just_had_tlb_miss_write_exception = false;
+    }
+
 	CCN_EXPEVT = expEvn;
 
-	Sh4cntx.ssr = Sh4cntx.sr.getFull();
+	Sh4cntx.ssr = Sh4cntx.sr.status;
 	Sh4cntx.spc = epc;
 	Sh4cntx.sgr = Sh4cntx.r[15];
 	Sh4cntx.sr.BL = 1;
 	Sh4cntx.sr.MD = 1;
 	Sh4cntx.sr.RB = 1;
+	g_itlb_miss_during_handler_fetch = true; // Now in an exception state, flag that handler fetch is next critical step
 	UpdateSR();
 
-	Sh4cntx.pc = Sh4cntx.vbr + (expEvn == Sh4Ex_TlbMissRead || expEvn == Sh4Ex_TlbMissWrite ? 0x400 : 0x100);
-	debugger::subroutineCall();
+	DEBUG_LOG(SH4, "Do_Exception: Pre-handler jump. SR.BL=%d, g_itlb_miss_during_handler_fetch=%s. Current expEvn=0x%03X, epc=0x%08X", Sh4cntx.sr.BL, g_itlb_miss_during_handler_fetch ? "true" : "false", (u32)expEvn, epc);
+
+	// Set flag based on the current exception type before jumping to handler
+	if (expEvn == Sh4Ex_TlbMissWrite) {
+	    g_just_had_tlb_miss_write_exception = true;
+	    DEBUG_LOG(SH4, "Do_Exception: Setting g_just_had_tlb_miss_write_exception=true for Sh4Ex_TlbMissWrite (expEvn=0x%X)", expEvn);
+	} else {
+	    g_just_had_tlb_miss_write_exception = false;
+	}
+
+	u32 vector_offset = (expEvn == Sh4Ex_TlbMissRead || expEvn == Sh4Ex_TlbMissWrite ? 0x400 : 0x100);
+	u32 new_pc = Sh4cntx.vbr + vector_offset;
+	DEBUG_LOG(SH4, "Do_Exception: Calculated Handler. VectorOffset=0x%X, Target Handler PC=0x%08X. SR.BL is now %d.", vector_offset, new_pc, Sh4cntx.sr.BL);
+	Sh4cntx.pc = new_pc;
+	// debugger::subroutineCall(); // Temporarily commented out for double fault diagnosis
 
 	// Diagnostic: log MMU/TLB exceptions with offending address to aid IR bring-up
 	if (expEvn == Sh4Ex_TlbMissRead || expEvn == Sh4Ex_TlbMissWrite ||

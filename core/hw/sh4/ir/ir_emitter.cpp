@@ -246,7 +246,10 @@ Block& Emitter::CreateNew(uint32_t pc) {
         blk.pcStart = pc;
         INFO_LOG(SH4, "Emitter::CreateNew: Entered for PC=0x%08X", pc);
         uint16_t raw = mmu_IReadMem16(pc);
-        INFO_LOG(SH4, "Emitter::CreateNew: PC=0x%08X, raw=0x%04X", pc, raw);
+    if (pc == 0x8C00B6B8 || pc == 0x8C00B6BA || pc == 0x8C00B6BC) {
+        INFO_LOG(SH4, "Emitter::CreateNew: At critical PC=%08X, raw=0x%04X", pc, raw);
+    }
+    // INFO_LOG(SH4, "Emitter::CreateNew: PC=%08X, raw=0x%04X", pc, raw);
 
         // Simple decode for a few key opcodes
         uint8_t n = (raw >> 8) & 0xF;
@@ -523,6 +526,90 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.src1.reg = n;
             decoded = true;
             blk.pcNext = pc + 4; // delay slot
+        }
+        // STC SR, Rn (0000 nnnn 0000 0010 -> 0x0n02)
+        else if ((raw & 0xF0FF) == 0x0002)
+        {
+            ins.op = Op::STC;
+            ins.dst.isImm = false;
+            ins.dst.reg = n;    // Rn
+            ins.extra = 0;      // 0 for SR
+            decoded = true;
+            blk.pcNext = pc + 2;
+            INFO_LOG(SH4, "Emitter: Decoded STC SR, R%d (0x%04X) at PC=0x%08X", n, raw, pc);
+        }
+        // STC GBR, Rn (0000 nnnn 0001 0010 -> 0x0n12)
+        else if ((raw & 0xF0FF) == 0x0012)
+        {
+            ins.op = Op::STC;
+            ins.dst.isImm = false;
+            ins.dst.reg = n;    // Rn
+            ins.extra = 1;      // 1 for GBR
+            decoded = true;
+            blk.pcNext = pc + 2;
+            INFO_LOG(SH4, "Emitter: Decoded STC GBR, R%d (0x%04X) at PC=0x%08X", n, raw, pc);
+        }
+        // STC VBR, Rn (0000 nnnn 0010 0010 -> 0x0n22)
+        else if ((raw & 0xF0FF) == 0x0022)
+        {
+            ins.op = Op::STC;
+            ins.dst.isImm = false;
+            ins.dst.reg = n;    // Rn
+            ins.extra = 2;      // 2 for VBR
+            decoded = true;
+            blk.pcNext = pc + 2;
+            INFO_LOG(SH4, "Emitter: Decoded STC VBR, R%d (0x%04X) at PC=0x%08X", n, raw, pc);
+        }
+        // STC SSR, Rn (0000 nnnn 0011 0010 -> 0x0n32)
+        else if ((raw & 0xF0FF) == 0x0032)
+        {
+            ins.op = Op::STC;
+            ins.dst.isImm = false;
+            ins.dst.reg = n;    // Rn
+            ins.extra = 3;      // 3 for SSR
+            decoded = true;
+            blk.pcNext = pc + 2;
+            INFO_LOG(SH4, "Emitter: Decoded STC SSR, R%d (0x%04X) at PC=0x%08X", n, raw, pc);
+        }
+        // STC SPC, Rn (0000 nnnn 0100 0010 -> 0x0n42)
+        else if ((raw & 0xF0FF) == 0x0042)
+        {
+            ins.op = Op::STC;
+            ins.dst.isImm = false;
+            ins.dst.reg = n;    // Rn
+            ins.extra = 4;      // 4 for SPC
+            decoded = true;
+            blk.pcNext = pc + 2;
+            INFO_LOG(SH4, "Emitter: Decoded STC SPC, R%d (0x%04X) at PC=0x%08X", n, raw, pc);
+        }
+        // STC DBR, Rn (0000 nnnn 1111 0010 -> 0x0nF2)
+        // This must be before STC Rj_BANK, Rn to correctly identify DBR vs R7_BANK (both can have 0xF in middle nibble)
+        else if ((raw & 0xF0FF) == 0x00F2)
+        {
+            ins.op = Op::STC;
+            ins.dst.isImm = false;
+            ins.dst.reg = n;    // Rn
+            ins.extra = 7;      // Use 7 for DBR (consistent with LDC and unique for STC to Rn)
+            decoded = true;
+            blk.pcNext = pc + 2;
+            INFO_LOG(SH4, "Emitter: Decoded STC DBR, R%d (0x%04X) at PC=0x%08X", n, raw, pc);
+        }
+        // STC Rj_BANK, Rn (0000 nnnn jjjj 1010 -> 0x0njA, j=bank 0-7)
+        else if ((raw & 0xF00F) == 0x000A) // Matches 0x0njA pattern
+        {
+            uint8_t j_bank_field = (raw >> 4) & 0xF;
+            // This handles R0_BANK (j=0) through R7_BANK (j=7).
+            // ins.extra will be 8 (for R0_BANK) through 15 (for R7_BANK).
+            // This is now distinct from DBR's 0xF if DBR rule is checked first.
+            if (j_bank_field <= 0x7) { 
+                ins.op = Op::STC;
+                ins.dst.isImm = false;
+                ins.dst.reg = n; // Rn
+                ins.extra = 8 + j_bank_field; 
+                decoded = true;
+                blk.pcNext = pc + 2;
+                INFO_LOG(SH4, "Emitter: Decoded STC R%d_BANK, R%d (0x%04X) at PC=0x%08X", j_bank_field, n, raw, pc);
+            }
         }
         // STS.L PR,@-Rn (0x4n22)
         else if ((raw & 0xF0FF) == 0x4022)
@@ -1259,6 +1346,18 @@ Block& Emitter::CreateNew(uint32_t pc) {
                 // c_val will be 0, 1, 2, 3, 4, 6, or 7.
                 ins.extra = c_val;
             }
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // LDC.L @Rm+, SR (0x4m3E)
+        else if ((raw & 0xF0FF) == 0x403E)
+        {
+            ins.op = Op::LDC_SR_L;
+            ins.src1.isImm = false;
+            ins.src1.reg = (raw >> 8) & 0xF; // Rm
+            ins.src1.type = RegType::GPR;
+            // SR is the implicit destination
+            // Rm is post-incremented by 4 by the executor
             decoded = true;
             blk.pcNext = pc + 2;
         }
