@@ -90,6 +90,36 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+    // MOV.L @Rm+,Rn 0x6nm6  (post-increment long load)
+    if ((raw & 0xF00F) == 0x6006) {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::LOAD32_POST;
+        ins.dst = {false, n};
+        ins.src1 = {false, m};
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // MOV.W @Rm+,Rn 0x6nm5
+    if ((raw & 0xF00F) == 0x6005) {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::LOAD16_POST;
+        ins.dst = {false, n};
+        ins.src1 = {false, m};
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // MOV.B @Rm+,Rn 0x6nm4
+    if ((raw & 0xF00F) == 0x6004) {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::LOAD8_POST;
+        ins.dst = {false, n};
+        ins.src1 = {false, m};
+        blk.pcNext = pc + 2;
+        return true;
+    }
 
     if ((raw & 0xF000) == 0xE000) // MOV #imm,Rn
     {
@@ -98,6 +128,15 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         ins.dst = {false, n};
         ins.src1.isImm = true;
         ins.src1.imm = static_cast<int8_t>(raw & 0xFF);
+        blk.pcNext = pc + 2;
+        return true;
+    }
+
+    // FRCHG 0xFBFD
+    if (raw == 0xFBFD)
+    {
+        ins.op = Op::FRCHG;
+        // FRCHG has no operands
         blk.pcNext = pc + 2;
         return true;
     }
@@ -242,13 +281,136 @@ Block& Emitter::CreateNew(uint32_t pc) {
                 uint32_t slot_pc = pc + 2;
                 uint16_t slot_raw = mmu_IReadMem16(slot_pc);
                 Instr slot{};
-                if (!FastDecode(slot_raw, slot_pc, slot, blk))
+                // For decoding the slot, use a dummy block to prevent FastDecode from altering the main block's pcNext.
+                // The main block's pcNext is determined by the primary branch instruction.
+                Block dummy_slot_blk_for_decode; 
+                dummy_slot_blk_for_decode.pcStart = slot_pc; 
+
+                bool slot_decoded = FastDecode(slot_raw, slot_pc, slot, dummy_slot_blk_for_decode);
+
+                if (!slot_decoded)
                 {
-                    // Fall-back to ILLEGAL so executor will raise exception and fall back to legacy path
-                    slot.op = Op::ILLEGAL;
-                    blk.pcNext = slot_pc + 2;
-                }
-                blk.code.push_back(slot);
+                    // Manual decode for the slot instruction if FastDecode failed
+                    uint8_t slot_n_val = (slot_raw >> 8) & 0xF;
+                    uint8_t slot_m_val = (slot_raw >> 4) & 0xF;
+                    
+                    // RTS (0x000B)
+                    if (slot_raw == 0x000B) 
+                    {
+                        slot.op = Op::RTS;
+                        slot_decoded = true;
+                    }
+                    // MOV Rm -> Rn  (0x6nm3)
+                    else if ((slot_raw & 0xF00F) == 0x6003) 
+                    {
+                        slot.op = Op::MOV_REG;
+                        slot.dst.isImm = false;
+                        slot.dst.reg = slot_n_val;
+                        slot.src1.isImm = false;
+                        slot.src1.reg = slot_m_val;
+                        slot_decoded = true;
+                    }
+                    // MOV #imm,Rn  (0xE000 | Rn<<8 | imm8)
+                    else if ((slot_raw & 0xF000) == 0xE000)
+                    {
+                        slot.op = Op::MOV_IMM;
+                        slot.dst.isImm = false;
+                        slot.dst.reg = slot_n_val;
+                        slot.src1.isImm = true;
+                        slot.src1.imm = static_cast<int8_t>(slot_raw & 0xFF);
+                        slot_decoded = true;
+                    }
+                    // ADD #imm,Rn  (0x7000 | Rn<<8 | imm8)
+                    else if ((slot_raw & 0xF000) == 0x7000)
+                    {
+                        slot.op = Op::ADD_IMM;
+                        slot.dst.isImm = false;
+                        slot.dst.reg = slot_n_val;
+                        slot.src1.isImm = true;
+                        slot.src1.imm = static_cast<int8_t>(slot_raw & 0xFF);
+                        slot_decoded = true;
+                    }
+                    // MOV.L @Rm+,Rn (0x6nm6) -> Op::LOAD32_POST
+                    else if ((slot_raw & 0xF00F) == 0x6006)
+                    {
+                        slot.op = Op::LOAD32_POST;
+                        slot.dst.isImm = false;
+                        slot.dst.reg = slot_n_val; // Rn
+                        slot.src1.isImm = false;
+                        slot.src1.reg = slot_m_val; // Rm
+                        slot_decoded = true;
+                    }
+                    // MOV.W @Rm+,R0 (0x6005, n must be 0) -> Op::LOAD16_POST
+                    else if (slot_raw == 0x6005) // Check for specific R0 variant: MOV.W @Rm+,R0 (0x6m05 -> raw 6005 for R0,m) - n fixed to 0
+                    {
+                        slot.op = Op::LOAD16_POST;
+                        slot.dst.isImm = false;
+                        slot.dst.reg = 0; // R0
+                        slot.src1.isImm = false;
+                        slot.src1.reg = slot_m_val; // Rm
+                        slot_decoded = true;
+                    }
+                    // MOV.B @Rm+,R0 (0x6004, n must be 0) -> Op::LOAD8_POST
+                    else if (slot_raw == 0x6004) // Check for specific R0 variant: MOV.B @Rm+,R0 (0x6m04 -> raw 6004 for R0,m) - n fixed to 0
+                    {
+                        slot.op = Op::LOAD8_POST;
+                        slot.dst.isImm = false;
+                        slot.dst.reg = 0; // R0
+                        slot.src1.isImm = false;
+                        slot.src1.reg = slot_m_val; // Rm
+                        slot_decoded = true;
+                    }
+                    // LDC Rm, <CR> (0x4mcE, where 'c' is control reg index, 'm' is source GPR Rm)
+                    else if ((slot_raw & 0xF00F) == 0x400E) // Matches 0x4mcE pattern
+                    {
+                        slot.op = Op::LDC;
+                        slot.src1.isImm = false;
+                        slot.src1.reg = (slot_raw >> 8) & 0xF;    // Rm (source GPR)
+                        uint8_t c_val = (slot_raw >> 4) & 0xF;    // c-field from opcode (control register category)
+
+                        if (c_val == 5) // LDC Rm, Rn_BANK (opcode 0x4m5dE, d = bank reg index 0-7)
+                        {
+                            slot.extra = 8 + (slot_raw & 0x7); // R0_BANK -> 8, ..., R7_BANK -> 15
+                        }
+                        else
+                        {
+                            slot.extra = c_val;
+                        }
+                        slot_decoded = true;
+                    }
+                    // FRCHG (0xFBFD)
+                    else if (slot_raw == 0xFBFD)
+                    {
+                        slot.op = Op::FRCHG;
+                        slot_decoded = true;
+                    }
+                    // NOP (0x0009) is common in delay slots
+                    else if (slot_raw == 0x0009)
+                    {
+                        slot.op = Op::NOP;
+                        slot_decoded = true;
+                    }
+                    // STS.L PR,@-Rn (0x4n22)
+                    else if ((slot_raw & 0xF0FF) == 0x4022)
+                    {
+                        slot.op = Op::STS_PR_L;
+                        slot.dst.isImm = false;
+                        slot.dst.reg = slot_n_val;
+                        slot_decoded = true;
+                    }
+                    // LDS.L @Rn+,PR (0x4n6A)
+                    else if ((slot_raw & 0xF0FF) == 0x406A)
+                    {
+                        slot.op = Op::LDS_PR_L;
+                        slot.src1.isImm = false;
+                        slot.src1.reg = slot_n_val;
+                        slot_decoded = true;
+                    }
+                    // If no manual rule matched for the slot
+                    if (!slot_decoded) {
+                        slot.op = Op::ILLEGAL;
+                    }
+                }blk.code.push_back(slot);
             }
 
             Instr end{}; end.op = Op::END;
@@ -515,10 +677,26 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.src1.isImm = false; ins.src1.reg = m;
             decoded = true; blk.pcNext = pc + 2;
         }
-        // CMP/HS Rm,Rn (0x3nm7)
-        else if ((raw & 0xF00F) == 0x3007)
+        // CMP/HS Rm,Rn (0x3nm2)
+        else if ((raw & 0xF00F) == 0x3002)
         {
             ins.op = Op::CMP_HS;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // CMP/GE Rm,Rn (0x3nm3)
+        else if ((raw & 0xF00F) == 0x3003)
+        {
+            ins.op = Op::CMP_GE;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // CMP/GT Rm,Rn (0x3nm7)
+        else if ((raw & 0xF00F) == 0x3007)
+        {
+            ins.op = Op::CMP_GT;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
             decoded = true; blk.pcNext = pc + 2;
@@ -623,6 +801,28 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
+        // LDC.L @Rm+, <CR> (0x4mc7, where 'c' is control reg index, 'm' is GPR Rm for address)
+        // SR(c=0), GBR(c=1), VBR(c=2), SSR(c=3), SPC(c=4),
+        // Rn_BANK(c=5, actual bank reg in bits 3-0 of opcode),
+        // SGR(c=6), DBR(c=7)
+        else if ((raw & 0xF00F) == 0x4007) // Matches 0x4mc7 pattern
+        {
+            ins.op = Op::LDC_L;
+            ins.src1.isImm = false;
+            ins.src1.reg = (raw >> 8) & 0xF;    // Rm (source GPR for address, post-incremented)
+            uint8_t c_val = (raw >> 4) & 0xF;    // c-field from opcode (control register category)
+
+            if (c_val == 5) // LDC.L @Rm+, Rn_BANK (opcode 0x4m5d7, d = bank reg index 0-7)
+            {
+                ins.extra = 8 + (raw & 0x7); // R0_BANK -> 8, ..., R7_BANK -> 15
+            }
+            else
+            {
+                ins.extra = c_val;
+            }
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
         // MOV.L @(disp,PC),Rn  (0xD000 | Rn<<8 | disp8)
         else if ((raw & 0xF000) == 0xD000)
         {
@@ -682,8 +882,7 @@ Block& Emitter::CreateNew(uint32_t pc) {
         {
             ins.op = Op::AND_REG;
             ins.dst.isImm = false; ins.dst.reg = n;
-            ins.src1.isImm = false; ins.src1.reg = m;
-            decoded = true;
+            ins.src1.isImm = false; ins.src1.reg = m;            decoded = true;
             blk.pcNext = pc + 2;
         }
         // TST Rm,Rn 0x2nm8
@@ -990,6 +1189,32 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
+        // LDC Rm, <CR> (0x4mcE, where 'c' is control reg index, 'm' is source GPR Rm)
+        // SR(c=0), GBR(c=1), VBR(c=2), SSR(c=3), SPC(c=4),
+        // Rn_BANK(c=5, actual bank reg in bits 3-0 of opcode),
+        // SGR(c=6), DBR(c=7)
+        else if ((raw & 0xF00F) == 0x400E) // Matches 0x4mcE pattern
+        {
+            ins.op = Op::LDC;
+            ins.src1.isImm = false;
+            ins.src1.reg = (raw >> 8) & 0xF;    // Rm (source GPR)
+            uint8_t c_val = (raw >> 4) & 0xF;    // c-field from opcode (control register category)
+
+            if (c_val == 5) // LDC Rm, Rn_BANK (opcode 0x4m5dE, d = bank reg index 0-7)
+            {
+                // For Rn_BANK, the specific bank register (0-7) is in raw bits 3-0.
+                // Map this to extra = 8 + (bank_reg_idx from bits 3-0 of opcode)
+                ins.extra = 8 + (raw & 0x7); // R0_BANK -> 8, ..., R7_BANK -> 15
+            }
+            else
+            {
+                // For SR, GBR, VBR, SSR, SPC, SGR, DBR, c_val is directly used.
+                // c_val will be 0, 1, 2, 3, 4, 6, or 7.
+                ins.extra = c_val;
+            }
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
         // CMP/STR Rm,Rn 0x2nmE
         else if ((raw & 0xF00F) == 0x200E)
         {
@@ -1163,8 +1388,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
 
 
         // ----------------------------------------------------------------
-        //  Fail-safe: if still not decoded, treat as NOP so execution 
-        //  continues instead of throwing an IllegalInstr exception that 
+        //  Fail-safe: if still not decoded, treat as NOP so execution
+        //  continues instead of throwing an IllegalInstr exception that
         //  trips the fatal error inside BIOS padding or unknown areas.
         // ----------------------------------------------------------------
         if (!decoded)

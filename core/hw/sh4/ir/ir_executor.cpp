@@ -602,6 +602,12 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::CMP_HS:
                     ctx->sr.T = (ctx->r[ins.dst.reg] >= ctx->r[ins.src1.reg]);
                     break;
+                case Op::CMP_GE:
+                    ctx->sr.T = (static_cast<int32_t>(ctx->r[ins.dst.reg]) >= static_cast<int32_t>(ctx->r[ins.src1.reg]));
+                    break;
+                case Op::CMP_GT:
+                    ctx->sr.T = (static_cast<int32_t>(ctx->r[ins.dst.reg]) > static_cast<int32_t>(ctx->r[ins.src1.reg]));
+                    break;
                 case Op::CMP_STR:
                 {
                     uint32_t v = ctx->r[ins.dst.reg] ^ ctx->r[ins.src1.reg];
@@ -747,6 +753,63 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     ctx->sgr = mmu_ReadMem<u32>(ctx->r[ins.src1.reg]);
                     ctx->r[ins.src1.reg] += 4;
                     break;
+                case Op::LDC: // LDC Rm, <CR>
+                {
+                    uint32_t val = ctx->r[ins.src1.reg];
+                    // ins.extra contains the control register ID
+                    // 0:SR, 1:GBR, 2:VBR, 3:SSR, 4:SPC, 5:Rn_BANK (not directly used here, split by emitter), 
+                    // 6:SGR, 7:DBR, 8-15:R0_BANK-R7_BANK
+                    switch (ins.extra) {
+                        case 0: // SR
+                            INFO_LOG(SH4, "LDC SR <- %08X (R%u)", val, ins.src1.reg);
+                            ctx->sr.setFull(val);
+                            UpdateSR();
+                            break;
+                        case 1: // GBR
+                            INFO_LOG(SH4, "LDC GBR <- %08X (R%u)", val, ins.src1.reg);
+                            ctx->gbr = val;
+                            break;
+                        case 2: // VBR
+                            INFO_LOG(SH4, "LDC VBR <- %08X (R%u)", val, ins.src1.reg);
+                            ctx->vbr = val;
+                            break;
+                        case 3: // SSR
+                            INFO_LOG(SH4, "LDC SSR <- %08X (R%u)", val, ins.src1.reg);
+                            ctx->ssr = val;
+                            break;
+                        case 4: // SPC
+                            INFO_LOG(SH4, "LDC SPC <- %08X (R%u)", val, ins.src1.reg);
+                            if (IsTopRegion(val))
+                                ERROR_LOG(SH4, "*** HIGH-FF SPC value %08X loaded via LDC from R%u at PC=%08X", val, ins.src1.reg, curr_pc);
+                            ctx->spc = val;
+                            break;
+                        // Cases 5, 6, 7 for Rn_BANK (direct), SGR, DBR
+                        case 5: // This case should ideally not be hit if emitter splits Rn_BANK to 8-15
+                            ERROR_LOG(SH4, "LDC direct Rn_BANK (id 5) hit in executor @%08X. This should be 8-15.", curr_pc);
+                            break;
+                        case 6: // SGR
+                            INFO_LOG(SH4, "LDC SGR <- %08X (R%u)", val, ins.src1.reg);
+                            ctx->sgr = val;
+                            break;
+                        case 7: // DBR
+                            INFO_LOG(SH4, "LDC DBR <- %08X (R%u)", val, ins.src1.reg);
+                            ctx->dbr = val;
+                            break;
+                        // Banked registers R0_BANK to R7_BANK (IDs 8-15)
+                        case 8: case 9: case 10: case 11: case 12: case 13: case 14: case 15:
+                        {
+                            int bank_reg_idx = ins.extra - 8; // 0 for R0_BANK, ..., 7 for R7_BANK
+                            INFO_LOG(SH4, "LDC R%d_BANK <- %08X (R%u)", bank_reg_idx, val, ins.src1.reg);
+                            ctx->r_bank[bank_reg_idx] = val;
+                            break;
+                        }
+                        default:
+                            ERROR_LOG(SH4, "LDC unimplemented control reg ID %d at PC=%08X", ins.extra, curr_pc);
+                            sh4::ir::DumpTrace();
+                            throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
+                    }
+                    break;
+                }
                 case Op::LDTLB:
                 {
                     // Mirror interpreter behaviour: load current PTE registers into UTLB[URC]
@@ -773,6 +836,11 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::FABS:
                     ctx->fr[ins.dst.reg] = std::fabsf(ctx->fr[ins.src1.reg]);
+                    break;
+                case Op::FRCHG:
+                    // Toggle FR bit (bit 21) in FPSCR
+                    ctx->fpscr.full ^= (1 << 21);
+                    Sh4Context::UpdateFPSCR(ctx); // Update FPSCR after modification
                     break;
                 case Op::FCMP_EQ:
                     ctx->sr.T = (ctx->fr[ins.dst.reg] == ctx->fr[ins.src1.reg]);
@@ -824,6 +892,67 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     ctx->mac.h = 0;
                     ctx->mac.l = 0;
                     break;
+                case Op::LDC_L: // LDC.L @Rm+, <CR>
+                {
+                    uint32_t addr = ctx->r[ins.src1.reg];
+                    uint32_t val = mmu_ReadMem<u32>(addr);
+                    ctx->r[ins.src1.reg] += 4;
+
+                    // ins.extra contains the control register ID
+                    // 0:SR, 1:GBR, 2:VBR, 3:SSR, 4:SPC, 5:Rn_BANK (not directly used here, split by emitter), 
+                    // 6:SGR, 7:DBR, 8-15:R0_BANK-R7_BANK
+                    switch (ins.extra) {
+                        case 0: // SR
+                            INFO_LOG(SH4, "LDC.L SR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
+                            ctx->sr.setFull(val);
+                            UpdateSR();
+                            break;
+                        case 1: // GBR
+                            INFO_LOG(SH4, "LDC.L GBR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
+                            ctx->gbr = val;
+                            break;
+                        case 2: // VBR
+                            INFO_LOG(SH4, "LDC.L VBR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
+                            ctx->vbr = val;
+                            break;
+                        case 3: // SSR
+                            INFO_LOG(SH4, "LDC.L SSR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
+                            ctx->ssr = val;
+                            break;
+                        case 4: // SPC
+                            INFO_LOG(SH4, "LDC.L SPC <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
+                            if (IsTopRegion(val))
+                                ERROR_LOG(SH4, "*** HIGH-FF SPC value loaded %08X via LDC.L at PC=%08X", val, curr_pc);
+                            ctx->spc = val;
+                            break;
+                        // Cases 5, 6, 7 for Rn_BANK (direct), SGR, DBR
+                        case 5: // This case should ideally not be hit if emitter splits Rn_BANK to 8-15
+                            ERROR_LOG(SH4, "LDC.L direct Rn_BANK (id 5) hit in executor @%08X. This should be 8-15.", curr_pc);
+                            // Fallback or error, as emitter should map Rn_BANK to 8-15
+                            break;
+                        case 6: // SGR
+                            INFO_LOG(SH4, "LDC.L SGR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
+                            ctx->sgr = val;
+                            break;
+                        case 7: // DBR
+                            INFO_LOG(SH4, "LDC.L DBR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
+                            ctx->dbr = val;
+                            break;
+                        // Banked registers R0_BANK to R7_BANK (IDs 8-15)
+                        case 8: case 9: case 10: case 11: case 12: case 13: case 14: case 15:
+                        {
+                            int bank_reg_idx = ins.extra - 8; // 0 for R0_BANK, ..., 7 for R7_BANK
+                            INFO_LOG(SH4, "LDC.L R%d_BANK <- %08X from @%08X (R%u)", bank_reg_idx, val, addr, ins.src1.reg);
+                            ctx->r_bank[bank_reg_idx] = val;
+                            break;
+                        }
+                        default:
+                            ERROR_LOG(SH4, "LDC.L unimplemented control reg ID %d at PC=%08X", ins.extra, curr_pc);
+                            sh4::ir::DumpTrace();
+                            throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
+                    }
+                    break;
+                }
                 default:
                      {
                          uint16_t raw16 = mmu_ReadMem<u16>(curr_pc);
