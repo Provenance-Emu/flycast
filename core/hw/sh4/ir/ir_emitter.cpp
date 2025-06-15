@@ -1878,6 +1878,12 @@ Block& Emitter::CreateNew(uint32_t pc) {
                 uint32_t slot_pc = pc + 2;
                 uint16_t slot_raw = mmu_IReadMem16(slot_pc);
                 Instr slot{};
+                // Make sure the slot carries its own PC and raw encoding so the executor
+                // can correctly attribute the instruction.  Omitting this caused the slot
+                // to appear as PC=0 and raw=0, eventually leading to a bogus branch target
+                // and a crash when the executor tried to run from the null page.
+                slot.pc  = slot_pc;
+                slot.raw = slot_raw;
                 INFO_LOG(SH4, "Emitter::DelaySlot: Decoding for slot_pc=0x%08X, slot_raw=0x%04X", slot_pc, slot_raw);
                 // Use a dummy block so that FastDecode does not overwrite blk.pcNext (which already
                 // contains the *branch* target calculated by the main instruction). Overwriting it
