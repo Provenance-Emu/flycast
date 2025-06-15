@@ -187,6 +187,13 @@ enum class Op : uint8_t {
     LDC_SR_L,   // load SR from @Rn+ (post-increment long)
     // the remainder of opcode values is auto-generated to keep numbers stable
 #include "ir_defs_auto.inc"
+        // --- R0 offset addressing variants (R0 + Rn/Rm) ---
+        STORE8_R0,
+        STORE16_R0,
+        STORE32_R0,
+        LOAD8_R0,
+        LOAD16_R0,
+        LOAD32_R0,
     NUM_OPS
 };
 

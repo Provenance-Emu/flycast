@@ -1355,7 +1355,55 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
-        // LDC.L @Rm+, SR (0x4m3E)
+        // MOV.B Rm,@(R0,Rn) 0x0nm4
+        else if ((raw & 0xF00F) == 0x0004)
+        {
+            ins.op = Op::STORE8_R0;
+            ins.dst.isImm = false; ins.dst.reg = n; // Rn base
+            ins.src1.isImm = false; ins.src1.reg = m; // value in Rm
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.W Rm,@(R0,Rn) 0x0nm5
+        else if ((raw & 0xF00F) == 0x0005)
+        {
+            ins.op = Op::STORE16_R0;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.L Rm,@(R0,Rn) 0x0nm6
+        else if ((raw & 0xF00F) == 0x0006)
+        {
+            ins.op = Op::STORE32_R0;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.B @(R0,Rm),Rn 0x0nmC
+        else if ((raw & 0xF00F) == 0x000C)
+        {
+            ins.op = Op::LOAD8_R0;
+            ins.dst.isImm = false; ins.dst.reg = n; // dest value
+            ins.src1.isImm = false; ins.src1.reg = m; // base Rm
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.W @(R0,Rm),Rn 0x0nmD
+        else if ((raw & 0xF00F) == 0x000D)
+        {
+            ins.op = Op::LOAD16_R0;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.L @(R0,Rm),Rn 0x0nmE
+        else if ((raw & 0xF00F) == 0x000E)
+        {
+            ins.op = Op::LOAD32_R0;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // LDC.L @Rm+,SR  (0x4m3E)
         else if ((raw & 0xF0FF) == 0x403E)
         {
             ins.op = Op::LDC_SR_L;
@@ -1456,6 +1504,22 @@ Block& Emitter::CreateNew(uint32_t pc) {
         else if ((raw & 0xF00F) == 0x2004)
         {
             ins.op = Op::STORE8_POST;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.W Rm,@Rn+ (0x2nm5)
+        else if ((raw & 0xF00F) == 0x2005)
+        {
+            ins.op = Op::STORE16_POST;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // MOV.L Rm,@Rn+ (0x2nm6)
+        else if ((raw & 0xF00F) == 0x2006)
+        {
+            ins.op = Op::STORE32_POST;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
             decoded = true; blk.pcNext = pc + 2;
