@@ -268,8 +268,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             // Reuse a single stub block for 0x0000 to avoid excessive allocations, but update PC fields each time
             if (zero_blk.code.empty())
             {
-                Instr nop{}; nop.op = Op::NOP; zero_blk.code.push_back(nop);
-                Instr end{}; end.op = Op::END; zero_blk.code.push_back(end);
+                Instr nop{}; nop.op = Op::NOP; nop.pc = 0; nop.raw = 0; zero_blk.code.push_back(nop);
+                Instr end{}; end.op = Op::END; end.pc = 0; end.raw = 0; zero_blk.code.push_back(end);
             }
             zero_blk.pcStart = pc;
             zero_blk.pcNext  = pc + 2;
@@ -281,6 +281,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
         INFO_LOG(SH4, "Emitter::CreateNew: PC=0x%08X, raw=0x%04X, FastDecode returned %d, blk.pcNext=0x%08X", pc, raw, fast_decoded_main_instr, blk.pcNext);
         if (fast_decoded_main_instr)
         {
+            ins.pc = pc;
+            ins.raw = raw;
             blk.code.push_back(ins);
 
             // If this instruction has a delay slot (pcNext == pc + 4), decode the slot too
@@ -434,7 +436,7 @@ Block& Emitter::CreateNew(uint32_t pc) {
                 blk.code.push_back(slot);
             }
 
-            Instr end{}; end.op = Op::END;
+            Instr end{}; end.op = Op::END; end.pc = blk.pcNext; end.raw = 0;
             blk.code.push_back(end);
             // Store signature mapping
             g_block_sig_cache.emplace(sig, &blk);
@@ -506,6 +508,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             blk.pcNext = pc + 4; // BSR is a delayed branch
             INFO_LOG(SH4, "Emitter::CreateNew: Manual BSR handler (0xB000) hit for PC=0x%08X, raw=0x%04X. Displacement (ins.extra)=0x%08X, Target (calculated by executor)=0x%08X", pc, raw, ins.extra, pc + 4 + ins.extra);
             INFO_LOG(SH4, "Emitter::CreateNew: Manual BSR handler set blk.pcNext=0x%08X", blk.pcNext);
+            ins.pc = pc;
+            ins.raw = raw;
             blk.code.push_back(ins);
             decoded = true;
         }
@@ -718,6 +722,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD32; // Generic load, displacement in ins.extra
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
+            ins.pc = pc;
+            ins.raw = raw;
             ins.extra = (raw & 0xF) * 4; // disp is lower 4 bits, scaled by 4
             decoded = true; blk.pcNext = pc + 2;
             INFO_LOG(SH4, "Emitter::CreateNew: Manually decoded MOV.L @(0x%X,R%d),R%d (0x%04X) at PC=0x%08X", ins.extra, m, n, raw, pc);
@@ -1557,6 +1563,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
         // If we decoded something (including NOP fallback), push instruction
         if (decoded)
         {
+            ins.pc = pc;
+            ins.raw = raw;
             blk.code.push_back(ins);
 
             INFO_LOG(SH4, "Emitter::CreateNew: Before delay slot check for PC=0x%08X, main_raw=0x%04X. blk.pcNext=0x%08X, expected_pc_plus_4=0x%08X", pc, raw, blk.pcNext, pc + 4);
@@ -1602,7 +1610,7 @@ Block& Emitter::CreateNew(uint32_t pc) {
                 INFO_LOG(SH4, "Emitter::DelaySlot: Pushed slot.op=%d. Final blk.pcNext for main block (PC=0x%08X) is 0x%08X", static_cast<int>(slot.op), pc, blk.pcNext);
             }
 
-            Instr end{}; end.op = Op::END;
+            Instr end{}; end.op = Op::END; end.pc = blk.pcNext; end.raw = 0;
             blk.code.push_back(end);
             g_block_sig_cache.emplace(sig, &blk);
             return blk;

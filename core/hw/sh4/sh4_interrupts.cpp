@@ -13,6 +13,7 @@
 // Flag to indicate if the last exception was Sh4Ex_TlbMissWrite
 // Defined here, declared extern in mmu.cpp for diagnostics
 bool g_just_had_tlb_miss_write_exception = false;
+bool g_exception_was_raised = false;
 bool g_itlb_miss_during_handler_fetch = false; // True if ITLB miss occurs while SR.BL=1 (fetching handler)
 #include "types.h"
 #include "sh4_interrupts.h"
@@ -251,7 +252,8 @@ void Do_Exception(u32 epc, Sh4ExceptionCode expEvn)
 	u32 vector_offset = (expEvn == Sh4Ex_TlbMissRead || expEvn == Sh4Ex_TlbMissWrite ? 0x400 : 0x100);
 	u32 new_pc = Sh4cntx.vbr + vector_offset;
 	DEBUG_LOG(SH4, "Do_Exception: Calculated Handler. VectorOffset=0x%X, Target Handler PC=0x%08X. SR.BL is now %d.", vector_offset, new_pc, Sh4cntx.sr.BL);
-	Sh4cntx.pc = new_pc;
+	    Sh4cntx.pc = new_pc;
+    g_exception_was_raised = true;
 	// debugger::subroutineCall(); // Temporarily commented out for double fault diagnosis
 
 	// Diagnostic: log MMU/TLB exceptions with offending address to aid IR bring-up
@@ -273,6 +275,9 @@ void interrupts_init()
 
 void interrupts_reset()
 {
+    g_exception_was_raised = false;
+    g_just_had_tlb_miss_write_exception = false;
+    g_itlb_miss_during_handler_fetch = false;
 	//reset interrupts cache
 	interrupt_vpend = 0;
 	interrupt_vmask = 0xFFFFFFFF;

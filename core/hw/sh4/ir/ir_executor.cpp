@@ -11,6 +11,7 @@
 #include "hw/mem/addrspace.h"
 #include <cstring>
 #include "ir_tables.h" // for Op enum count
+#include "hw/sh4/sh4_interrupts.h"
 #include "hw/sh4/sh4_mmr.h"
 #include "hw/sh4/sh4_interpreter.h"
 #include "hw/flashrom/nvmem.h" // for getBiosData()
@@ -220,6 +221,11 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
     uint32_t branch_target = 0;
     while (ip < blk->code.size())
     {
+        if (unlikely(g_exception_was_raised))
+        {
+            g_exception_was_raised = false;
+            return;
+        }
         // Current PC before executing this instruction
         uint32_t curr_pc = ctx->pc;
         if (curr_pc == 0)
@@ -240,9 +246,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
             ((curr_pc & 0xF0000000u) == 0xA0000000u ||        // P2 BIOS
              (curr_pc & 0xF0000000u) == 0xC0000000u) )        // P1 BIOS
         {
-            uint16_t raw = mmu_IReadMem16(curr_pc);
             INFO_LOG(SH4, "BOOT PC=%08X raw=%04X op=%s",
-                     curr_pc, raw, GetOpName(static_cast<size_t>(ins.op)));
+                     ins.pc, ins.raw, GetOpName(static_cast<size_t>(ins.op)));
             ++boot_trace_lines;
         }
         // ---- statistics & trace ----
@@ -264,7 +269,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 switch (ins.op)
                 {
                 case Op::END:
-                    // normal block end; PC already at next sequential instruction
+                    // Block finished, jump to the next one.
+                    SetPC(ctx, blk->pcNext, "block_end");
                     return;
                 case Op::NOP:
                     break;

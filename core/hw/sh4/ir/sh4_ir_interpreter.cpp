@@ -26,11 +26,13 @@ void Sh4IrInterpreter::Init()
 
 void Sh4IrInterpreter::Reset(bool /*hard*/)
 {
-    // Preserve PC; reinitialise general regs
+    // Set PC to reset vector; reinitialise general regs and VBR
     for (int i = 0; i < 16; ++i)
         ctx_->r[i] = 0;
     ctx_->vbr = 0x8C000000;
     ctx_->sr.T = 0;
+    ctx_->sh4_sched_next = 0; // Reset scheduler/cycle count for IR
+    ctx_->pc = 0xA0000000;     // Set PC to reset vector (0xA0000000 for BIOS)
     ResetCache();
 }
 
@@ -105,7 +107,7 @@ void Sh4IrInterpreter::Run()
             ++step_counter;
             if ((step_counter & 0x1FFFF) == 0) // every 131072 blocks
             {
-                WARN_LOG(SH4, "IR step %llu PC=%08X", static_cast<unsigned long long>(step_counter), ctx_->pc);
+                INFO_LOG(SH4, "PC=%08X", ctx_->pc);
             }
         } catch (const SH4ThrownException& ex) {
             Do_Exception(ex.epc, ex.expEvn);

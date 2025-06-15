@@ -207,10 +207,12 @@ struct Operand {
 };
 
 struct Instr {
-    Op      op {Op::NOP};
+    Op op {Op::NOP};
     Operand dst {};
     Operand src1 {};
     Operand src2 {};
+    uint32_t pc {0};
+    uint16_t raw {0};
     int32_t extra = 0;   // displacement / branch target etc.
 };
 

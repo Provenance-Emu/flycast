@@ -2,6 +2,7 @@
 #include "sh4_if.h"
 
 extern bool g_itlb_miss_during_handler_fetch;
+extern bool g_exception_was_raised;
 
 enum InterruptID
 {
