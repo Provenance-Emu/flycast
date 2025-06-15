@@ -699,50 +699,40 @@ template u64 mmu_ReadMem(u32 adr);
 
 u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 {
-
-	if (g_just_had_tlb_miss_write_exception && vaddr == 0x00000400) {
-		DEBUG_LOG(SH4, "mmu_IReadMem16: Attempting to fetch handler (0x%08X) immediately after Sh4Ex_TlbMissWrite. Potential double fault.", vaddr);
-	}
-	// Reset the flag after the first check within an instruction fetch context.
-	// This ensures it's only active for the *very first* fetch attempt after the specific exception.
-	if (g_just_had_tlb_miss_write_exception) {
-	    g_just_had_tlb_miss_write_exception = false;
-	    DEBUG_LOG(SH4, "mmu_IReadMem16: Reset g_just_had_tlb_miss_write_exception to false.");
-	}
-
-	// Fast path: Boot ROM fetch (2 MiB BIOS mirrored into P0/P1/P2/P3) before MMU translation
-	auto is_bios = [](u32 a) {
-		u32 top = a & 0xE0000000u;
-		return (top == 0x00000000u || top == 0x80000000u || top == 0xA0000000u || top == 0xC0000000u);
-	};
-	if (is_bios(vaddr))
+	// Fast path for BIOS region (P0/U0). Any address in U0 (0x0000_0000–0x7FFF_FFFF)
+	// that falls within the BIOS address range (0x0000_0000–0x001F_FFFF) and its
+	// mirrors (P1, P2, P3) is handled here.
+	u32 area = vaddr & 0xE0000000;
+	if (area == 0x00000000 || area == 0x80000000 || area == 0xA0000000 || area == 0xC0000000)
 	{
-		// Determine true offset within this 2 MiB mirror *before* the 2 MiB mask
-		u32 seg_base   = vaddr & ~0x001FFFFFu;           // aligned base of mirror segment
-		u32 seg_offset = vaddr - seg_base;              // raw offset (0->0x1FFFFF)
-		if (seg_offset >= settings.platform.bios_size)
+		// All these mirrors map to the first 2MB of the address space.
+		u32 bios_offset = vaddr & 0x001FFFFF;
+
+		// Ensure the read is within the bounds of the actual BIOS file size.
+		if (bios_offset < settings.platform.bios_size)
 		{
-			// Fetch crosses the real BIOS end – raise BADADDR so the core faults
-			// instead of reading 0x0000 filler and falling through to PC=0.
-			mmu_raise_exception(MmuError::BADADDR, vaddr, MMU_TT_IREAD);
+			return *reinterpret_cast<const u16*>(nvmem::getBiosData() + bios_offset);
 		}
-		return *reinterpret_cast<const u16*>(nvmem::getBiosData() + seg_offset);
-	}
-	// Mirror cached/uncached areas (0x0000_0000–0x5FFF_FFFF) into physical SDRAM
-	if (vaddr < 0x60000000)
-	{
-		u32 phys = 0x0C000000 | (vaddr & 0x00FFFFFF);
-		return addrspace::read16(phys);
+		else
+		{
+			// If the address is outside the BIOS data, it's an invalid access.
+			// Raise a BADADDR exception to halt execution instead of reading zeroes.
+			mmu_raise_exception(MmuError::BADADDR, vaddr, MMU_TT_IREAD);
+			return 0; // Should not be reached
+		}
 	}
 
-	if (vaddr & (sizeof(u16) - 1))
-		// Unaligned
-		mmu_raise_exception(MmuError::BADADDR, vaddr, MMU_TT_IREAD);
-	u32 addr;
-	MmuError rv = mmu_instruction_translation(vaddr, addr);
-	if (rv != MmuError::NONE)
-		mmu_raise_exception(rv, vaddr, MMU_TT_IREAD);
-	return addrspace::read16(addr);
+	// If not a BIOS read, proceed with standard MMU translation.
+	const TLB_Entry* tlb_entry;
+	u32 paddr;
+	MmuError err = mmu_instruction_lookup(vaddr, &tlb_entry, paddr);
+	if (err != MmuError::NONE)
+	{
+		mmu_raise_exception(err, vaddr, MMU_TT_IREAD);
+		return 0; // Should not be reached
+	}
+
+	return *reinterpret_cast<const u16*>(&mem_b[paddr]);
 }
 
 template<typename T>
