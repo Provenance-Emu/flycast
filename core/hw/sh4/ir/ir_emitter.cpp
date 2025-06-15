@@ -784,6 +784,14 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.src1.isImm = false; ins.src1.reg = m;
             decoded = true; blk.pcNext = pc + 2;
         }
+        // MOV.B Rm,@Rn+ (0x2nm4)
+        else if ((raw & 0xF00F) == 0x2004)
+        {
+            ins.op = Op::STORE8_POST;
+            ins.dst.isImm = false; ins.dst.reg = n; // Rn is destination address register
+            ins.src1.isImm = false; ins.src1.reg = m; // Rm supplies value
+            decoded = true; blk.pcNext = pc + 2;
+        }
         // MOV.W Rm,@Rn+ (0x2nm5)
         else if ((raw & 0xF00F) == 0x2005)
         {
@@ -1233,13 +1241,13 @@ Block& Emitter::CreateNew(uint32_t pc) {
             blk.pcNext = pc + 2;
         }
         // MOV.B @(disp,Rm),Rn 0x8nmd (disp=low4)
-        else if ((raw & 0xF000) == 0x8000 && (raw & 0x0F00) != 0x0400 && (raw & 0x0F00) != 0x0500 && (raw & 0x0F00) != 0x0600)
+        else if ((raw & 0xF000) == 0x8000)
         {
             uint8_t disp4 = raw & 0xF;
             ins.op = Op::LOAD8;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-            ins.extra = disp4;
+            ins.extra = disp4; // byte displacement
             decoded = true;
             blk.pcNext = pc + 2;
         }
