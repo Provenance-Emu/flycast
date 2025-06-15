@@ -73,8 +73,12 @@ def parse_manual_names() -> list:
                 inside = True
                 continue
             if inside:
+                # Keep parsing past the auto-generated include so that
+                # any manually-defined opcodes *after* ir_defs_auto.inc
+                # (e.g. the R0-offset LOAD/STORE helpers) are treated as
+                # manual and therefore excluded from the auto list.
                 if '#include' in line and 'ir_defs_auto.inc' in line:
-                    break
+                    continue
                 if '};' in line:
                     break
                 line = line.strip()

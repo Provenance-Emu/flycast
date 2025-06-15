@@ -1090,23 +1090,34 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     }
                     break;
                 }
+                case Op::ILLEGAL:
+                      {
+                          uint16_t raw16 = mmu_ReadMem<u16>(curr_pc);
+                          if (Sh4Interpreter::Instance)
+                          {
+                              INFO_LOG(SH4, "IR executor delegating ILLEGAL raw=%04X at PC=%08X to interpreter", raw16, curr_pc);
+                              Sh4Interpreter::Instance->ExecuteOpcode(raw16);
+                              return;
+                          }
+                          ERROR_LOG(SH4, "ILLEGAL opcode raw=%04X at PC=%08X with no interpreter fallback", raw16, curr_pc);
+                          sh4::ir::DumpTrace();
+                          throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
+                      }
                 default:
-                     {
-                         uint16_t raw16 = mmu_ReadMem<u16>(curr_pc);
-                         // If this is an FPU group opcode (0xFxxx) and interpreter is available, use fallback
-                         if ((raw16 & 0xF000) == 0xF000 && Sh4Interpreter::Instance)
-                         {
-                             DEBUG_LOG(SH4, "IR fallback to interpreter FPU for raw=%04X at PC=%08X", raw16, curr_pc);
-                             Sh4Interpreter::Instance->ExecuteOpcode(raw16); // advances PC internally
-                             return; // leave block; new block will be fetched next tick
-                         }
-                         // Otherwise throw illegal as before
-                         ERROR_LOG(SH4, "IR executor fell through: raw=%04X pc=%08X", raw16, curr_pc);
-                         ERROR_LOG(SH4, "IR executor unimplemented opcode %s (%zu) at %08X", GetOpName(static_cast<size_t>(ins.op)), static_cast<size_t>(ins.op), curr_pc);
-                         sh4::ir::DumpTrace();
-                         g_opExecCounts[static_cast<size_t>(ins.op)] = 0;
-                         throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
-                     }
+                      {
+                          uint16_t raw16 = mmu_ReadMem<u16>(curr_pc);
+                          // If this is an FPU group opcode (0xFxxx) and interpreter is available, use fallback
+                          if ((raw16 & 0xF000) == 0xF000 && Sh4Interpreter::Instance)
+                          {
+                              DEBUG_LOG(SH4, "IR fallback to interpreter FPU for raw=%04X at PC=%08X", raw16, curr_pc);
+                              Sh4Interpreter::Instance->ExecuteOpcode(raw16); // advances PC internally
+                              return; // leave block; new block will be fetched next tick
+                          }
+                          ERROR_LOG(SH4, "IR executor fell through: raw=%04X pc=%08X", raw16, curr_pc);
+                          ERROR_LOG(SH4, "IR executor unimplemented opcode %s (%zu) at %08X", GetOpName(static_cast<size_t>(ins.op)), static_cast<size_t>(ins.op), curr_pc);
+                          sh4::ir::DumpTrace();
+                          throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
+                      }
                 } // end switch (ins.op)
             } // end else dispatch
         } // end else dispatch
