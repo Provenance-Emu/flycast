@@ -104,6 +104,74 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+    // SHL2/8/16 Rn variants (0x4n08,0x4n18,0x4n28)
+    else if ((raw & 0xF00F) == 0x4008)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t idx = (raw >> 4) & 0xF;
+        uint8_t shift = (idx == 0) ? 2 : (idx == 1 ? 8 : (idx == 2 ? 16 : 1));
+        ins.op = Op::SHL;
+        ins.dst.isImm = false;
+        ins.dst.reg = n;
+        ins.extra = shift;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // SHLR2/8/16 Rn variants (0x4n09,0x4n19,0x4n29)
+    else if ((raw & 0xF00F) == 0x4009)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t idx = (raw >> 4) & 0xF;
+        uint8_t shift = (idx == 0) ? 2 : (idx == 1 ? 8 : 16);
+        ins.op = Op::SHR_OP;
+        ins.dst.isImm = false;
+        ins.dst.reg = n;
+        ins.extra = shift;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // SAR2/8/16 Rn variants (0x4n0A,0x4n1A,0x4n2A)
+    else if ((raw & 0xF00F) == 0x400A)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t idx = (raw >> 4) & 0xF;
+        uint8_t shift = (idx == 0) ? 2 : (idx == 1 ? 8 : 16);
+        ins.op = Op::SAR_OP;
+        ins.dst.isImm = false;
+        ins.dst.reg = n;
+        ins.extra = shift;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // STC Rm_BANK,Rn  (0x00mn1A) – banked register store
+    else if ((raw & 0x00FF) == 0x001A)
+    {
+        uint8_t n = (raw >> 8) & 0xF;          // destination general register
+        uint8_t m_bank = (raw >> 4) & 0xF;     // source bank register index
+        ins.op = Op::STC;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.extra = 8 + m_bank;                // executor expects bank index in extra
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // SHLR1 Rn (0x4n01)
+    else if ((raw & 0xF0FF) == 0x4001)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        ins.op = Op::SHR1;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // TST #imm8, R0  (0xC8ii)
+    else if ((raw & 0xFF00) == 0xC800)
+    {
+        uint8_t imm = raw & 0xFF;
+        ins.op = Op::TST_IMM;
+        ins.src1.isImm = true;  ins.src1.imm = imm;
+        blk.pcNext = pc + 2;
+        return true;
+    }
     // MOV.L @(disp,Rm),Rn 0x5nmd : treat all Rm (including R0)
     if ((raw & 0xF000) == 0x5000) {
         uint8_t n = (raw >> 8) & 0xF;
@@ -319,6 +387,21 @@ Block& Emitter::CreateNew(uint32_t pc) {
             return blk;
         }
 
+        if (raw == 0x0000)
+        {
+            ins.op = Op::NOP;
+            ins.pc = pc;
+            ins.raw = raw;
+            blk.code.push_back(ins);
+            blk.pcNext = pc + 2;
+
+            Instr end{};
+            end.op = Op::END;
+            end.pc = blk.pcNext;
+            blk.code.push_back(end);
+            return blk;
+        }
+
         // Attempt fast-path decode first – if handled, emit block immediately
         bool fast_decoded_main_instr = FastDecode(raw, pc, ins, blk);
         DEBUG_LOG(SH4, "Emitter::CreateNew: PC=0x%08X, raw=0x%04X, FastDecode returned %d, blk.pcNext=0x%08X", pc, raw, fast_decoded_main_instr, blk.pcNext);
@@ -521,7 +604,7 @@ Block& Emitter::CreateNew(uint32_t pc) {
                 blk.pcNext = cur_pc;
             }
             // Append single END terminator
-            Instr end{}; end.op = Op::END; end.pc = blk.pcNext; end.raw = 0;
+            Instr end{}; end.op = Op::END; end.pc = blk.pcNext; end.raw = 0xFFFF;
             blk.code.push_back(end);
         }
         else if (raw == 0x000B)
@@ -1406,7 +1489,13 @@ Block& Emitter::CreateNew(uint32_t pc) {
         // MOV.B @(disp,Rm),R0 0x0nmd (disp = low4)  — allow n=0 too (except 0x0000 and 0x0009)
         else if ((raw & 0xF000) == 0x0000)
         {
-            if (raw != 0x0000 && raw != 0x0009) // exclude NOP variants
+            if (raw == 0x0009 || raw == 0x0000)
+            {
+                ins.op = Op::NOP;
+                decoded = true;
+                blk.pcNext = pc + 2;
+            }
+            else
             {
                 uint8_t disp4 = raw & 0xF;
                 uint8_t n_reg = (raw >> 8) & 0xF;
@@ -1790,7 +1879,12 @@ Block& Emitter::CreateNew(uint32_t pc) {
                 uint16_t slot_raw = mmu_IReadMem16(slot_pc);
                 Instr slot{};
                 INFO_LOG(SH4, "Emitter::DelaySlot: Decoding for slot_pc=0x%08X, slot_raw=0x%04X", slot_pc, slot_raw);
-                bool slot_decoded_fast = FastDecode(slot_raw, slot_pc, slot, blk);
+                // Use a dummy block so that FastDecode does not overwrite blk.pcNext (which already
+                // contains the *branch* target calculated by the main instruction). Overwriting it
+                // with slot_pc+2 would nullify the branch and eventually crash when execution falls
+                // through past valid code.
+                Block dummy_slot_blk_for_decode{};
+                bool slot_decoded_fast = FastDecode(slot_raw, slot_pc, slot, dummy_slot_blk_for_decode);
                 INFO_LOG(SH4, "Emitter::DelaySlot: FastDecode returned %d, slot.op=%d (expected MOV_REG=%d), blk.pcNext=0x%08X", slot_decoded_fast, static_cast<int>(slot.op), static_cast<int>(Op::MOV_REG), blk.pcNext);
 
                 if (!slot_decoded_fast)
@@ -1828,7 +1922,7 @@ Block& Emitter::CreateNew(uint32_t pc) {
                 INFO_LOG(SH4, "Emitter::DelaySlot: Pushed slot.op=%d. Final blk.pcNext for main block (PC=0x%08X) is 0x%08X", static_cast<int>(slot.op), pc, blk.pcNext);
             }
 
-            Instr end{}; end.op = Op::END; end.pc = blk.pcNext; end.raw = 0;
+            Instr end{}; end.op = Op::END; end.pc = blk.pcNext; end.raw = 0xFFFF;
             blk.code.push_back(end);
             g_block_sig_cache.emplace(sig, &blk);
             return blk;
