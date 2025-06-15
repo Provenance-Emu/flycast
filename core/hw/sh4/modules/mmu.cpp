@@ -699,28 +699,23 @@ template u64 mmu_ReadMem(u32 adr);
 
 u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 {
-	// Fast path for BIOS region (P0/U0). Any address in U0 (0x0000_0000–0x7FFF_FFFF)
-	// that falls within the BIOS address range (0x0000_0000–0x001F_FFFF) and its
-	// mirrors (P1, P2, P3) is handled here.
-	u32 area = vaddr & 0xE0000000;
-	if (area == 0x00000000 || area == 0x80000000 || area == 0xA0000000 || area == 0xC0000000)
-	{
-		// All these mirrors map to the first 2MB of the address space.
-		u32 bios_offset = vaddr & 0x001FFFFF;
-
-		// Ensure the read is within the bounds of the actual BIOS file size.
-		if (bios_offset < settings.platform.bios_size)
-		{
-			return *reinterpret_cast<const u16*>(nvmem::getBiosData() + bios_offset);
-		}
-		else
-		{
-			// If the address is outside the BIOS data, it's an invalid access.
-			// Raise a BADADDR exception to halt execution instead of reading zeroes.
-			mmu_raise_exception(MmuError::BADADDR, vaddr, MMU_TT_IREAD);
-			return 0; // Should not be reached
-		}
-	}
+	// BIOS ROM is only visible in the A0/C0 regions (cached + uncached) and their P1/P2 mirrors.
+    // Accesses in P0 (0x00000000–0x7FFFFFFF) should point to SDRAM, NOT to the BIOS. Using the BIOS
+    // there caused the bogus wrap-to-zero bug we are chasing.
+    u32 area = vaddr & 0xE0000000;
+    if (area == 0xA0000000 || area == 0xC0000000 || area == 0x80000000)
+    {
+        // Mirror mask to 2 MiB window.
+        u32 bios_offset = vaddr & 0x001FFFFF;
+        if (bios_offset < settings.platform.bios_size)
+        {
+            return *reinterpret_cast<const u16*>(nvmem::getBiosData() + bios_offset);
+        }
+        // Out of range – log once and raise BADADDR so the core doesn’t silently consume NOPs.
+        INFO_LOG(SH4, "BIOS fetch OOB @ %08X (offset %X / size %u)", vaddr, bios_offset, settings.platform.bios_size);
+        mmu_raise_exception(MmuError::BADADDR, vaddr, MMU_TT_IREAD);
+        return 0;
+    }
 
 	// If not a BIOS read, proceed with standard MMU translation.
 	const TLB_Entry* tlb_entry;

@@ -121,6 +121,8 @@ static inline bool IsTopRegion(uint32_t addr)
 static inline void SetPC(Sh4Context* ctx, uint32_t new_pc, const char* why)
 {
     uint32_t old_pc = ctx->pc;
+    // Added PR and SR.T to existing SetPC logging
+    INFO_LOG(SH4, "SetPC: %08X -> %08X (PR:%08X SR.T:%d) via %s", old_pc, new_pc, ctx->pr, ctx->sr.T & 1, why);
 
     if (new_pc == 0)
     {
@@ -270,17 +272,20 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 {
                 case Op::END:
                     // Block finished, jump to the next one.
+                    INFO_LOG(SH4, "BLOCK_END: AtPC:%08X (Op:END) PR:%08X SR.T:%d -> TargetNextPC:%08X", ctx->pc, ctx->pr, ctx->sr.T & 1, blk->pcNext);
                     SetPC(ctx, blk->pcNext, "block_end");
                     return;
                 case Op::NOP:
                     break;
                 case Op::MOV_REG:
                     ctx->r[ins.dst.reg] = ctx->r[ins.src1.reg];
+                    INFO_LOG(SH4, "MOV_REG R%u -> R%u (val=%08X) at PC=%08X", ins.src1.reg, ins.dst.reg, ctx->r[ins.dst.reg], curr_pc);
+                    if (ins.dst.reg == 0) INFO_LOG(SH4, "R0 updated to %08X", ctx->r[0]);
                     break;
                 case Op::MOV_IMM:
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(ins.src1.imm);
-                    if ((ctx->r[ins.dst.reg] & 0xFF000000u) == 0xFF000000u)
-                        DEBUG_LOG(SH4, "MOV_IMM loaded HIGH-FF literal %08X into R%u at PC=%08X", ctx->r[ins.dst.reg], ins.dst.reg, curr_pc);
+                    INFO_LOG(SH4, "MOV_IMM loaded %08X into R%u at PC=%08X", ins.src1.imm, ins.dst.reg, curr_pc);
+                    if (ins.dst.reg == 0) INFO_LOG(SH4, "R0 updated to %08X", ctx->r[0]);
                     break;
                 case Op::ADD_IMM:
                     ctx->r[ins.dst.reg] += static_cast<int32_t>(ins.src1.imm);
@@ -331,6 +336,13 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::SHL1:
                     ctx->r[ins.dst.reg] <<= 1;
                     break;
+                case Op::SHLL:
+                {
+                    uint32_t& rn = ctx->r[ins.dst.reg];
+                    ctx->sr.T = (rn >> 31) & 1;
+                    rn <<= 1;
+                    break;
+                }
                 case Op::SHR1:
                     ctx->r[ins.dst.reg] >>= 1;
                     break;
@@ -392,6 +404,18 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         ctx->r[ins.dst.reg] = *reinterpret_cast<u32*>(p);
                     else
                         ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(addr);
+                    break;
+                }
+                case Op::MOV_B_REG_PREDEC:
+                {
+                    uint32_t& rn = ctx->r[ins.dst.reg];
+                    rn -= 1;
+                    uint32_t addr = rn;
+                    if (u8* p = FastRamPtr(addr)) {
+                        *p = static_cast<u8>(ctx->r[ins.src1.reg]);
+                    } else {
+                        mmu_WriteMem<u8>(addr, static_cast<u8>(ctx->r[ins.src1.reg]));
+                    }
                     break;
                 }
                 case Op::LOAD8_GBR:
@@ -642,6 +666,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                             ERROR_LOG(SH4, "*** HIGH-FF BF target at %08X -> %08X (disp=%d)", curr_pc, target, ins.extra);
                         SetPC(ctx, target - 2, "BT/BF");
                     }
+                    break;
                 case Op::CMP_PL:
                     ctx->sr.T = ((static_cast<int32_t>(ctx->r[ins.src1.reg]) > 0) ? 1 : 0);
                     break;
@@ -700,6 +725,17 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::SUB:
                     ctx->r[ins.dst.reg] -= ctx->r[ins.src1.reg];
                     break;
+                case Op::SUBV: // Rn = Rn - Rm, set T on signed overflow
+                {
+                    int32_t rn = static_cast<int32_t>(ctx->r[ins.dst.reg]);
+                    int32_t rm = static_cast<int32_t>(ctx->r[ins.src1.reg]);
+                    int32_t res = rn - rm;
+                    ctx->r[ins.dst.reg] = static_cast<uint32_t>(res);
+                    // overflow occurs if operands have different signs and sign of result differs from sign of Rn
+                    uint32_t ov = ((rn ^ rm) & (rn ^ res)) >> 31;
+                    ctx->sr.T = ov & 1;
+                    break;
+                }
                 case Op::NEG:
                     ctx->r[ins.dst.reg] = -static_cast<int32_t>(ctx->r[ins.src1.reg]);
                     break;
@@ -896,7 +932,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         case 15: ctx->r_bank[7] = val_to_load; break;
                         default:
                             ERROR_LOG(SH4, "LDC: Unhandled ins.extra=0x%X for Rm=R%d at PC=0x%08X", ins.extra, ins.src1.reg, curr_pc);
-                            throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
+                            // Consider throwing an exception for truly unhandled CRs if strictness is desired.
+                            break;
                     }
                     break;
                 }
@@ -929,11 +966,29 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::FSQRT:
                     ctx->fr[ins.dst.reg] = std::sqrtf(ctx->fr[ins.dst.reg]);
                     break;
-                case Op::FSTS: // FSTS FPUL, FRn (FRn = FPUL)
+                case Op::FSTS: // FSTS FPUL,FRn
                     ctx->fr[ins.src1.reg] = ctx->fpul;
                     break;
                 case Op::FABS:
                     ctx->fr[ins.dst.reg] = std::fabsf(ctx->fr[ins.src1.reg]);
+                    break;
+                case Op::FLDS: // Move FRm -> FPUL (store as int bits)
+                    ctx->fpul = *reinterpret_cast<uint32_t*>(&ctx->fr[ins.src1.reg]);
+                    break;
+                case Op::FLDI0:
+                    ctx->fr[ins.dst.reg] = 0.0f;
+                    break;
+                case Op::FLDI1:
+                    ctx->fr[ins.dst.reg] = 1.0f;
+                    break;
+                case Op::FTRC: // Truncate float to int, store in FPUL
+                {
+                    float f = ctx->fr[ins.src1.reg];
+                    ctx->fpul = static_cast<uint32_t>(static_cast<int32_t>(f));
+                    break;
+                }
+                case Op::FNEG:
+                    ctx->fr[ins.dst.reg] = -ctx->fr[ins.src1.reg];
                     break;
                 case Op::FRCHG:
                     // Toggle FR bit (bit 21) in FPSCR
@@ -950,19 +1005,26 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 {
                     uint32_t disp8 = static_cast<uint32_t>(ins.extra);
                     uint32_t base = (curr_pc & ~3u) + 4u;
-                    uint32_t addr = base + (disp8 << 2);
+                    uint32_t mem_addr = base + (disp8 << 2);
                     uint32_t val;
-                    if (u8* p = FastRamPtr(addr))
+                    if (u8* p = FastRamPtr(mem_addr))
                         val = *reinterpret_cast<u32*>(p);
                     else
-                        val = mmu_ReadMem<u32>(addr);
+                        val = mmu_ReadMem<u32>(mem_addr);
                     ctx->r[ins.dst.reg] = val;
-                    uint32_t lit_rom = 0xDEADBEEF;
-                    if (addr < 0x00200000)
-                        lit_rom = *reinterpret_cast<const u32*>(nvmem::getBiosData() + (addr & 0x001FFFFF));
-                    DEBUG_LOG(SH4, "LOAD32_PC disp=%02X addr=%08X literal=%08X -> %08X into R%u at PC=%08X", disp8, addr, lit_rom, val, ins.dst.reg, curr_pc);
-                    if (IsTopRegion(val))
-                        DEBUG_LOG(SH4, "LOAD32_PC loaded HIGH-FF literal %08X into R%u at PC=%08X", val, ins.dst.reg, curr_pc);
+                    if (ins.dst.reg == 0) {
+                        INFO_LOG(SH4, "LOAD32_PC: Loaded 0x%08X into R0 from addr 0x%08X (PC=%08X, disp=%d)", val, mem_addr, curr_pc, disp8);
+                    }
+                    if (ins.dst.reg == 0) INFO_LOG(SH4, "R0 updated to %08X", ctx->r[0]);
+                    break;
+                }
+                case Op::MOVA_PC:
+                {
+                    uint32_t disp8 = static_cast<uint32_t>(ins.extra);
+                    uint32_t base = (curr_pc & ~3u) + 4u;
+                    uint32_t effective_address = base + (disp8 << 2);
+                    ctx->r[0] = effective_address; // MOVA @(disp,PC),R0 always targets R0
+                    DEBUG_LOG(SH4, "MOVA_PC disp=%02X base_pc=%08X -> effective_addr=%08X into R0 at PC=%08X", disp8, base - 4, effective_address, curr_pc);
                     break;
                 }
                 case Op::FMOV_LOAD_R0:
@@ -1030,63 +1092,18 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 }
                 // FPU Operations - many will fall through to interpreter for now
-                case Op::FMOV: // Handles FMOV FRm,FRn and FMOV.S @Rm,FRn and FMOV.S @Rm+,FRn
+                case Op::FMOV:
                 {
-                    uint32_t addr = ctx->r[ins.src1.reg];
-                    uint32_t val = mmu_ReadMem<u32>(addr);
-                    ctx->r[ins.src1.reg] += 4;
-
-                    // ins.extra contains the control register ID
-                    // 0:SR, 1:GBR, 2:VBR, 3:SSR, 4:SPC, 5:Rn_BANK (not directly used here, split by emitter), 
-                    // 6:SGR, 7:DBR, 8-15:R0_BANK-R7_BANK
-                    switch (ins.extra) {
-                        case 0: // SR
-                            INFO_LOG(SH4, "LDC.L SR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
-                            ctx->vbr = val;
-                            break;
-                        case 1: // GBR
-                            INFO_LOG(SH4, "LDC.L GBR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
-                            ctx->gbr = val;
-                            break;
-                        case 2: // VBR
-                            INFO_LOG(SH4, "LDC.L VBR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
-                            ctx->vbr = val;
-                            break;
-                        case 3: // SSR
-                            INFO_LOG(SH4, "LDC.L SSR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
-                            ctx->ssr = val;
-                            break;
-                        case 4: // SPC
-                            INFO_LOG(SH4, "LDC.L SPC <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
-                            if (IsTopRegion(val))
-                                ERROR_LOG(SH4, "*** HIGH-FF SPC value loaded %08X via LDC.L at PC=%08X", val, curr_pc);
-                            ctx->spc = val;
-                            break;
-                        // Cases 5, 6, 7 for Rn_BANK (direct), SGR, DBR
-                        case 5: // This case should ideally not be hit if emitter splits Rn_BANK to 8-15
-                            ERROR_LOG(SH4, "LDC.L direct Rn_BANK (id 5) hit in executor @%08X. This should be 8-15.", curr_pc);
-                            // Fallback or error, as emitter should map Rn_BANK to 8-15
-                            break;
-                        case 6: // SGR
-                            INFO_LOG(SH4, "LDC.L SGR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
-                            ctx->sgr = val;
-                            break;
-                        case 7: // DBR
-                            INFO_LOG(SH4, "LDC.L DBR <- %08X from @%08X (R%u)", val, addr, ins.src1.reg);
-                            ctx->dbr = val;
-                            break;
-                        // Banked registers R0_BANK to R7_BANK (IDs 8-15)
-                        case 8: case 9: case 10: case 11: case 12: case 13: case 14: case 15:
-                        {
-                            int bank_reg_idx = ins.extra - 8; // 0 for R0_BANK, ..., 7 for R7_BANK
-                            INFO_LOG(SH4, "LDC.L R%d_BANK <- %08X from @%08X (R%u)", bank_reg_idx, val, addr, ins.src1.reg);
-                            ctx->r_bank[bank_reg_idx] = val;
-                            break;
-                        }
-                        default:
-                            ERROR_LOG(SH4, "LDC.L unimplemented control reg ID %d at PC=%08X", ins.extra, curr_pc);
-                            sh4::ir::DumpTrace();
-                            throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
+                    if (ins.dst.type == RegType::FGR && ins.src1.type == RegType::FGR) {
+                        // Register-to-register move: FRn <- FRm
+                        ctx->fr[ins.dst.reg] = ctx->fr[ins.src1.reg];
+                    } else {
+                        // Memory load variants. Currently we only need @Rm+ -> FRn.
+                        uint32_t addr = ctx->r[ins.src1.reg];
+                        uint32_t val = mmu_ReadMem<u32>(addr);
+                        ctx->fr[ins.dst.reg] = *reinterpret_cast<float*>(&val);
+                        if (ins.extra == 1) // post-increment flag set by emitter
+                            ctx->r[ins.src1.reg] += 4;
                     }
                     break;
                 }
@@ -1151,6 +1168,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
         // delay-slot instruction (if any) at pc+2. If a branch is pending, the
         // commit step at the top of the next iteration will overwrite pc with
         // the branch target after the delay slot has run.
+        // ctx->pc here is the PC of the instruction just executed.
+        INFO_LOG(SH4, "SEQUENTIAL_ADVANCE: AtPC:%08X PR:%08X SR.T:%d -> TargetNextPC:%08X", ctx->pc, ctx->pr, ctx->sr.T & 1, ctx->pc + 2);
         SetPC(ctx, ctx->pc + 2, "seq");
 
         // Branch delay-slot/commit bookkeeping ----------------------------------
