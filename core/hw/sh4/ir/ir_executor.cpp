@@ -337,7 +337,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::SHL:
                     ctx->r[ins.dst.reg] <<= ins.extra & 31;
-                    // TODO: update SR flags (T,C) appropriately
+                    // TODO: set condition codes
                     break;
                 case Op::SWAP_B:
                 {
