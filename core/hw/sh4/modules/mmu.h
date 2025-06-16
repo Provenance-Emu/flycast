@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "hw/sh4/sh4_if.h" // For Sh4ExceptionCode enum and Sh4Context
 #include "hw/sh4/sh4_mmr.h"
 #include "hw/sh4/dyna/ngen.h"
 
@@ -13,10 +14,12 @@
 
 enum class MmuError
 {
-	//Translation was successful
-	NONE,
-	//TLB miss
-	TLB_MISS,
+    //Translation was successful
+    NONE,
+    //UTLB miss (Data TLB)
+    TLB_MISS,
+    //ITLB miss (Instruction TLB)
+    ITLB_MISS,
 	//TLB Multihit
 	TLB_MHIT,
 	//Mem is read/write protected (depends on translation type)

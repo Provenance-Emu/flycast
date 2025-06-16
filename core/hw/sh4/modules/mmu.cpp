@@ -1,4 +1,6 @@
 #include "mmu.h"
+#include "hw/sh4/sh4_if.h"         // For Sh4ExceptionCode enum and Sh4Context
+#include "hw/sh4/sh4_interrupts.h" // For Do_Exception
 
 // External flag from sh4_interrupts.cpp to detect if last exception was Sh4Ex_TlbMissWrite
 extern bool g_just_had_tlb_miss_write_exception;
@@ -100,16 +102,27 @@ static void mmuException(MmuError mmu_error, u32 address, u32 am, F raise)
 		die("Error: mmu_error == MmuError::NONE)");
 		return;
 
-	case MmuError::TLB_MISS:
-		printf_mmu("MmuError::TLB_MISS (UTLB) fault_pc=0x%08X, fault_addr=0x%08X, VBR=0x%08X, access_type=%s. Raising SH4 exception.", Sh4cntx.pc, address, Sh4cntx.vbr, (am == MMU_TT_DWRITE ? "write" : "read"));
-		DEBUG_LOG(SH4, "mmuException: TLB_MISS. Before raise. Sh4cntx.pc=0x%08X, SR.BL=%d, fault_addr=0x%08X, access_type=%s, event to be passed=0x%X", Sh4cntx.pc, Sh4cntx.sr.BL, address, (am == MMU_TT_DWRITE ? "write" : "read"), (am == MMU_TT_DWRITE ? Sh4Ex_TlbMissWrite : Sh4Ex_TlbMissRead));
-		if (am == MMU_TT_DWRITE)
-			raise(Sh4Ex_TlbMissWrite);
-		else
-			raise(Sh4Ex_TlbMissRead);
-		return;
+    case MmuError::TLB_MISS:
+        // This case now specifically handles UTLB (Data TLB) misses.
+        // ITLB misses are handled by MmuError::ITLB_MISS.
+        printf_mmu("MmuError::TLB_MISS (UTLB - Data Access) fault_pc=0x%08X, fault_addr=0x%08X, VBR=0x%08X, access_type=%s. Raising SH4 exception.", Sh4cntx.pc, address, Sh4cntx.vbr, (am == MMU_TT_DWRITE ? "write" : "read"));
+        DEBUG_LOG(SH4, "mmuException: TLB_MISS. Before raise. Sh4cntx.pc=0x%08X, SR.BL=%d, fault_addr=0x%08X, access_type=%s, event to be passed=0x%X", Sh4cntx.pc, Sh4cntx.sr.BL, address, (am == MMU_TT_DWRITE ? "write" : "read"), (am == MMU_TT_DWRITE ? Sh4Ex_TlbMissWrite : Sh4Ex_TlbMissRead));
+        if (am == MMU_TT_DWRITE)
+            raise(Sh4Ex_TlbMissWrite);
+        else
+            raise(Sh4Ex_TlbMissRead);
+        return;
 
-	case MmuError::TLB_MHIT:
+    case MmuError::ITLB_MISS:
+        // Handles Instruction TLB misses.
+        printf_mmu("MmuError::ITLB_MISS (Instruction Fetch) fault_pc=0x%08X, fault_addr=0x%08X, VBR=0x%08X. Raising SH4 exception.", Sh4cntx.pc, address, Sh4cntx.vbr);
+        DEBUG_LOG(SH4, "mmuException: ITLB_MISS. Before raise. Sh4cntx.pc=0x%08X, SR.BL=%d, fault_addr=0x%08X, raising Sh4Ex_TMU0 (0x400)", Sh4cntx.pc, Sh4cntx.sr.BL, address);
+        raise(Sh4Ex_TMU0); // Event 0x400 for ITLB Miss (Instruction TLB Miss Exception)
+        return;
+
+
+
+    case MmuError::TLB_MHIT:
 		ERROR_LOG(SH4, "MmuError::TLB_MHIT @ 0x%X", address);
 		raise(Sh4Ex_TlbMultiHit);
 		break;
@@ -537,11 +550,12 @@ retry_ITLB_Match:
 	if (*tlb_entry_ret == nullptr)
 	{
 #ifndef FAST_MMU
-		verify(!mmach);
+        // No ITLB entry matched; this is a pure ITLB miss (instruction fetch), distinguish from UTLB.
+        return MmuError::ITLB_MISS;
 #else
 		// the matching may be approximative
 		if (mmach)
-			return MmuError::TLB_MISS;
+            return MmuError::ITLB_MISS;
 #endif
 		const TLB_Entry *tlb_entry;
 		MmuError lookup = mmu_full_lookup(va, &tlb_entry, rv);
