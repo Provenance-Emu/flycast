@@ -454,12 +454,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 {
                     uint32_t& rn = ctx->r[ins.dst.reg];
                     rn -= 1;
-                    uint32_t addr = rn;
-                    if (u8* p = FastRamPtrWrite(addr)) {
-                        *p = static_cast<u8>(ctx->r[ins.src1.reg]);
-                    } else {
-                        mmu_WriteMem<u8>(addr, static_cast<u8>(ctx->r[ins.src1.reg]));
-                    }
+                    // Use standard MMU write to respect protection and avoid invalid host pointers.
+                    mmu_WriteMem<u8>(rn, static_cast<u8>(ctx->r[ins.src1.reg]));
                     break;
                 }
                 case Op::LOAD8_GBR:

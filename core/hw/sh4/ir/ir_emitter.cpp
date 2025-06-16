@@ -215,6 +215,17 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         return true;
     }
 
+    // MOV Rm,Rn 0x6nm3 (register to register)
+    if ((raw & 0xF00F) == 0x6003) {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::MOV_REG;
+        ins.dst = {false, n};
+        ins.src1 = {false, m};
+        blk.pcNext = pc + 2;
+        return true;
+    }
+
     if ((raw & 0xF000) == 0xE000) // MOV #imm,Rn
     {
         uint8_t n = (raw >> 8) & 0xF;
@@ -1402,16 +1413,41 @@ Block& Emitter::CreateNew(uint32_t pc) {
             DEBUG_LOG(SH4, "Emitter: Decoded MOVA_PC @(disp=%02X,PC=%08X) -> R0 (0x%04X)", disp, pc, raw);
             decoded = true; blk.pcNext = pc + 2;
         }
-        // MOV.L @(disp,Rm),Rn 0x5nmd  (Rm = m, disp = low4*4). Covers all Rm values, including R0.
-        else if ((raw & 0xF000) == 0x5000)
+        // MOV.L @(disp,PC),Rn (0xDnnn) -- This is a PC-relative literal load.
+        // The previous MOV.L @(disp,Rm),Rn handler was incorrectly matching this.
+        else if ((raw & 0xF000) == 0xD000)
         {
-            uint8_t disp4 = raw & 0xF;
-            ins.op = Op::LOAD32;
+            uint8_t disp8 = raw & 0xFF;
+            ins.op = Op::LOAD32_PC;
             ins.dst.isImm = false;
             ins.dst.reg = n;
-            ins.src1.isImm = false;
-            ins.src1.reg = m;   // base register Rm (bits 7-4)
-            ins.extra = disp4 * 4; // byte displacement
+            ins.extra = disp8; // Pass raw 8-bit displacement to executor
+            DEBUG_LOG(SH4, "Emitter: Decoded LOAD32_PC @(disp=%02X,PC=%08X) -> R%d (0x%04X)", disp8, pc, n, raw);
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.L @(disp,Rm),Rn / @(disp,PC),Rn -- 0x5nmd
+        else if ((raw & 0xF000) == 0x5000)
+        {
+            if (((raw >> 4) & 0xF) == 0) // m == 0, treat as PC-relative based on user feedback
+            {
+                uint8_t disp4 = raw & 0xF;
+                ins.op = Op::LOAD32_PC;
+                ins.dst.isImm = false;
+                ins.dst.reg = n;
+                ins.extra = disp4; // Pass 4-bit displacement
+                DEBUG_LOG(SH4, "Emitter: Decoded LOAD32_PC @(disp=%01X,PC=%08X) -> R%d (0x%04X)", disp4, pc, n, raw);
+            }
+            else
+            {
+                uint8_t disp4 = raw & 0xF;
+                ins.op = Op::LOAD32;
+                ins.dst.isImm = false;
+                ins.dst.reg = n;
+                ins.src1.isImm = false;
+                ins.src1.reg = m;
+                ins.extra = disp4 * 4;
+            }
             decoded = true;
             blk.pcNext = pc + 2;
         }
