@@ -157,7 +157,17 @@ static inline u8* FastRamPtr(uint32_t addr)
         return nvmem::getBiosData() + (addr & 0x001FFFFF);
     }
 
-    // Main RAM 0x0C000000–0x0FFFFFFF (26-bit mask)
+    // Main RAM cached area P0: 0x00000000–0x0FFFFFFF
+    // Skip the first 2 MiB which are the BIOS shadow.
+    if (addr < 0x10000000u && addr >= 0x00200000u)
+    {
+        u32 off = addr & settings.platform.ram_mask;
+        if (off >= settings.platform.ram_size)
+            return nullptr; // out of SDRAM
+        return addrspace::ram_base + off;
+    }
+
+    // Main RAM physical window 0x0C000000–0x0FFFFFFF (26-bit mask)
     if ((addr & 0xFC000000u) == 0x0C000000u)
         return addrspace::ram_base + (addr & 0x03FFFFFF);
 
@@ -173,6 +183,16 @@ static inline u8* FastRamPtr(uint32_t addr)
 // Mirrors in P0/P1/P2/P3 are recognised.  The first 0x200 bytes are excluded
 // because on real SH-4 they map to on-chip I/O (store-queue / cache control)
 // and are writable after reset.
+static bool g_logged_high_r0 = false;
+static inline void LogHighR0(Sh4Context* c, uint32_t pc, Op op)
+{
+    if (!g_logged_high_r0 && c->r[0] >= 0x20000000)
+    {
+        INFO_LOG(SH4, "R0 HIGH: 0x%08X set at PC=0x%08X by %s", c->r[0], pc, GetOpName(static_cast<size_t>(op)));
+        g_logged_high_r0 = true;
+    }
+}
+
 static inline bool IsBiosAddr(uint32_t addr)
 {
     bool in_window = ((addr & 0xFFE00000u) == 0x00000000u ||
@@ -297,7 +317,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
             ++boot_trace_lines;
         }
         // ---- statistics & trace ----
-        TraceLog(curr_pc, ins.op);
+        LogHighR0(ctx, curr_pc, ins.op);
         g_opExecCounts[static_cast<size_t>(ins.op)]++;
         g_totalExecCount++;
 
@@ -437,7 +457,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         // Assuming 'extra' is used for displacement by the emitter for this specific LOAD8 form.
                         // If other LOAD8 forms use src2.imm, that needs to be handled by emitter or here.
                         addr = ctx->r[ins.src1.reg] + ins.extra;
-                        INFO_LOG(LogTypes::SH4, "IR_EXEC: LOAD8 @(0x%X,R%d),R0. PC=0x%08X. R%d(base)=0x%08X, Addr=0x%08X",
+                        INFO_LOG(SH4, "IR_EXEC: LOAD8 @(0x%X,R%d),R0. PC=0x%08X. R%d(base)=0x%08X, Addr=0x%08X",
                                  ins.extra, ins.src1.reg, current_instr_pc,
                                  ins.src1.reg, ctx->r[ins.src1.reg], addr);
                     }
@@ -448,6 +468,12 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     else
                         val = mmu_ReadMem<u8>(addr);
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int8_t>(val)); // Sign-extend byte
+
+                    // DEBUG WATCH: if R0 acquires a near-0x0FFFFFFx value, log once to locate its origin
+                    if (ins.dst.reg == 0 && (ctx->r[0] & 0xFFF00000) == 0x0FF00000)
+                    {
+                        INFO_LOG(SH4, "DEBUG: R0 now 0x%08X after %s at PC 0x%08X (addr 0x%08X)", ctx->r[0], GetOpName(static_cast<size_t>(ins.op)), current_instr_pc, addr);
+                    }
                     break;
                 }
                 case Op::LOAD16:
@@ -1215,6 +1241,18 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 } // end switch (ins.op)
             } // end else dispatch
         } // end else dispatch
+
+        // Early exit if END instruction was executed via an ExecFn handler that
+        // returned normally (i.e., it was not caught by the earlier switch-case
+        // fallback).  Replicate the same logic used in the switch at the top of
+        // the loop so that Op::END always terminates the current IR block and
+        // jumps to the next one, regardless of how it was executed.
+        if (ins.op == Op::END)
+        {
+            INFO_LOG(SH4, "BLOCK_END: AtPC:%08X (Op:END) PR:%08X SR.T:%d -> TargetNextPC:%08X", ctx->pc, ctx->pr, ctx->sr.T & 1, blk->pcNext);
+            SetPC(ctx, blk->pcNext, "block_end");
+            return; // leave ExecuteBlock; caller will schedule next block
+        }
 
         // PR write tracking – log any change made by the executed instruction
         if (ctx->pr != old_pr)
