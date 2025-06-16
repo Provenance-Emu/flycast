@@ -284,6 +284,43 @@ template MmuError mmu_full_SQ<MMU_TT_DWRITE>(u32 va, u32& rv);
 template<u32 translation_type>
 MmuError mmu_data_translation(u32 va, u32& rv)
 {
+    // Check if MMU is disabled via CCN_MMUCR.AT
+    if (CCN_MMUCR.AT == 0)
+    {
+        // When MMU is off (AT=0), U0, P0, P1, P2, P3 are physical.
+        // P4 is always physical (can be caught by fast_reg_lut or later specific checks if AT=1, but explicit here for AT=0 clarity).
+        if ((va & 0xE0000000) == 0xE0000000) // P4 (includes 0xFxxxxxxx regions like ROM/Flash)
+        {
+            rv = va; // P4 is always physical
+        }
+        else if ((va & 0xFC000000) == 0x7C000000) // On-chip RAM (0x7C000000 - 0x7FFFFFFF)
+        {
+             rv = va; // On-chip RAM is always physical
+        }
+        else if ((va & 0x80000000) == 0) // U0/P0 (0x00000000 - 0x3FFFFFFF)
+        {
+            // This covers the problematic 0x00000064 address
+            rv = va; // U0/P0 are physical when AT=0
+        }
+        else if ((va & 0xE0000000) == 0x80000000 || // P1 (0x80000000 - 0x9FFFFFFF)
+                 (va & 0xE0000000) == 0xA0000000 || // P2 (0xA0000000 - 0xBFFFFFFF)
+                 (va & 0xE0000000) == 0xC0000000)   // P3 (0xC0000000 - 0xDFFFFFFF)
+        {
+            // SH4 manual: P1, P2, P3 are physical when AT=0.
+            // Common implementation practice is to mirror them to the main RAM window (0x0Cxxxxxx).
+            rv = 0x0C000000 | (va & 0x00FFFFFF);
+        }
+        else
+        {
+            // Fallback for any other address when AT=0. This case should ideally not be hit
+            // if the above conditions correctly cover all specified physical regions for AT=0.
+            // Defaulting to 'va' makes it behave as physical.
+            rv = va;
+        }
+        return MmuError::NONE;
+    }
+
+    // Original fastmmu.cpp logic follows if CCN_MMUCR.AT == 1
 	if (fast_reg_lut[va >> 29] != 0)
 	{
 		if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000 || (va & 0xE0000000) == 0xC0000000)
