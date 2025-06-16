@@ -175,7 +175,7 @@ static void mmuException(MmuError mmu_error, u32 address, u32 am, F raise)
 	mmuException(mmu_error, address, am, [](Sh4ExceptionCode event) {
 		debugger::debugTrap(event);	// FIXME CCN_TEA and CCN_PTEH have been updated already
 
-		throw SH4ThrownException(Sh4cntx.pc - 2, event);
+		throw SH4ThrownException(Sh4cntx.pc, event);
 	});
 	die("Unknown mmu_error");
 }
