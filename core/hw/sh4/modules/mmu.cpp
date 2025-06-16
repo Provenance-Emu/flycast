@@ -12,6 +12,7 @@ extern bool g_itlb_miss_during_handler_fetch; // True if ITLB miss occurs while 
 #include "debug/gdb_server.h"
 #include "serialize.h"
 #include "hw/flashrom/nvmem.h"
+#include "log/Log.h"
 
 TLB_Entry UTLB[64];
 TLB_Entry ITLB[4];
@@ -318,19 +319,15 @@ template MmuError mmu_full_SQ<MMU_TT_DWRITE>(u32 va, u32& rv);
 template<u32 translation_type>
 MmuError mmu_data_translation(u32 va, u32& rv)
 {
-	// Uncached low memory (Areas 0–3 : 0x0000_0000–0x5FFF_FFFF) is directly accessible
-	// even with the MMU on. The BIOS performs block moves/clears across this entire
-	// 1.5 GiB space before setting up any TLBs, so permit a straight mirror to the
-	// physical SDRAM window to prevent UTLB miss exceptions.
-	if (va < 0x60000000)
-	{
-		rv = 0x0C000000 | (va & 0x00FFFFFF);
-		return MmuError::NONE;
+	if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) {
+		INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): Entry. SR.MD=%d", Sh4cntx.sr.MD);
 	}
 
 	// P4 area (on-chip I/O, ROM) is always direct-mapped regardless of MMU enable state.
 	if ((va & 0xE0000000) == 0xE0000000)
 	{
+		if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): P4 direct map check.");
+
 		rv = va;
 		return MmuError::NONE;
 	}
@@ -339,6 +336,8 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 	{
 		if ((va & 0xFC000000) == 0xE0000000)
 		{
+			if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): SQ Write check.");
+
 			MmuError lookup = mmu_full_SQ<MMU_TT_DWRITE>(va, rv);
 			if (lookup != MmuError::NONE)
 				return lookup;
@@ -348,6 +347,7 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 		}
 	}
 
+	if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): Evaluating CCN_MMUCR.AT check.");
 	if (CCN_MMUCR.AT == 0)
 	{
 		if (va < 0x02000000)
@@ -378,6 +378,7 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 		return MmuError::NONE;
 	}
 
+	if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): Privileged mode user space access check (MD=%d, va_top_bit=%d).", Sh4cntx.sr.MD, (va & 0x80000000) != 0);
 	if (Sh4cntx.sr.MD == 0 && (va & 0x80000000) != 0)
 		//if on kernel, and not SQ addr -> error
 		return MmuError::BADADDR;
@@ -385,23 +386,30 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 	// P1 (0x80000000-0x9FFFFFFF) and P2 (0xA0000000-BFFFFFFF) are always direct-mapped
 	if ((va & 0xE0000000) == 0x80000000)
 	{
+		if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): P1 direct map check.");
+
 		rv = 0x0C000000 | (va & 0x00FFFFFF); // mirror to main RAM window
 		return MmuError::NONE;
 	}
 
 	if ((va & 0xE0000000) == 0xA0000000)
 	{
+		if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): P2 direct map check.");
+
 		rv = 0x0C000000 | (va & 0x00FFFFFF);
 		return MmuError::NONE;
 	}
 
 	if ((va & 0xFC000000) == 0x7C000000)
 	{
+		if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): P0/U0 non-translated (0x7Cxxxxxx) check.");
+
 		// 7C000000 to 7FFFFFFF in P0/U0 not translated
 		rv = va;
 		return MmuError::NONE;
 	}
 
+	if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): fast_reg_lut[0] check (value=%d).", fast_reg_lut[0]);
 	if (fast_reg_lut[va >> 29] != 0)
 	{
 		// P1, P2 and P4 aren't translated
@@ -410,7 +418,9 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 	}
 
 	const TLB_Entry *entry;
+	if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): Calling mmu_full_lookup.");
 	MmuError lookup = mmu_full_lookup(va, &entry, rv);
+	if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): mmu_full_lookup returned %d.", static_cast<int>(lookup));
 
 	if (lookup != MmuError::NONE)
 		return lookup;
@@ -429,14 +439,21 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 	if (translation_type == MMU_TT_DWRITE)
 	{
 		if ((entry->Data.PR & 1) == 0)
+		{
+			if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): Write protected (PR&1 == 0). Entry PR=0x%X", entry->Data.PR);
 			return MmuError::PROTECTED;
+		}
 		else if (entry->Data.D == 0)
+		{
+			if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): First write (D=0). Entry PR=0x%X, D=%d", entry->Data.PR, entry->Data.D);
 			return MmuError::FIRSTWRITE;
+		}
 	}
 	if ((rv & 0x1C000000) == 0x1C000000)
 		// map 1C000000-1FFFFFFF to P4 memory-mapped registers
 		rv |= 0xF0000000;
 
+	if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): Returning NONE (successful translation at end of function).");
 	return MmuError::NONE;
 }
 template MmuError mmu_data_translation<MMU_TT_DREAD>(u32 va, u32& rv);
@@ -444,6 +461,7 @@ template MmuError mmu_data_translation<MMU_TT_DWRITE>(u32 va, u32& rv);
 
 MmuError mmu_instruction_translation(u32 va, u32& rv)
 {
+    DEBUG_LOG(SH4, "mmu_instruction_translation: Entry. va=0x%08X, mmuOn=%d, CCN_MMUCR.AT=%d, SR.MD=%d, SR.BL=%d", va, mmuOn, CCN_MMUCR.AT, Sh4cntx.sr.MD, Sh4cntx.sr.BL);
 	// Always map Areas 0–3 (0x0000_0000–0x5FFF_FFFF) directly to SDRAM regardless
 	// of MMU state. This avoids UTLB misses during the very early boot stages when
 	// instruction fetches occur from P0/P2 before the ITLB is populated.
@@ -507,6 +525,19 @@ MmuError mmu_instruction_translation(u32 va, u32& rv)
 		INFO_LOG(SH4, "MMU_ITRANS: SR.BL=1 active, va=0x%08X. mmu_instruction_lookup returned %d. Translated rv=0x%08X", va, static_cast<int>(lookup), rv);
 	}
 	if (lookup != MmuError::NONE) {
+        // Placed before SR.BL check to log for initial faults too.
+        if (lookup == MmuError::TLB_MISS) {
+            DEBUG_LOG(SH4, "mmu_instruction_translation: Detected ITLB Miss (MmuError::TLB_MISS from lookup) for va=0x%08X. ASID=0x%X, SR.BL=%d", va, CCN_PTEH.ASID, Sh4cntx.sr.BL);
+        } else if (lookup == MmuError::BADADDR) {
+            DEBUG_LOG(SH4, "mmu_instruction_translation: Detected Address Error (MmuError::BADADDR) for va=0x%08X. SR.BL=%d", va, Sh4cntx.sr.BL);
+        } else if (lookup == MmuError::PROTECTED) {
+            DEBUG_LOG(SH4, "mmu_instruction_translation: Detected Protection Violation (MmuError::PROTECTED) for va=0x%08X. SR.BL=%d, SR.MD=%d", va, Sh4cntx.sr.BL, Sh4cntx.sr.MD);
+        } else if (lookup == MmuError::TLB_MHIT) {
+            DEBUG_LOG(SH4, "mmu_instruction_translation: Detected TLB Multi-Hit (MmuError::TLB_MHIT) for va=0x%08X. SR.BL=%d", va, Sh4cntx.sr.BL);
+        } else {
+            DEBUG_LOG(SH4, "mmu_instruction_translation: Detected MmuError %d for va=0x%08X. SR.BL=%d", static_cast<int>(lookup), va, Sh4cntx.sr.BL);
+        }
+
 		// If any MMU error occurs during instruction translation AND we are already in an exception (SR.BL=1)
 		if (Sh4cntx.sr.BL == 1) {
 			DEBUG_LOG(SH4, "MMU: Error (type %d) at 0x%08X while fetching handler for previous exception (SR.BL=1). Setting g_itlb_miss_during_handler_fetch.", static_cast<int>(lookup), va);
@@ -721,6 +752,7 @@ template u64 mmu_ReadMem(u32 adr);
 
 u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 {
+    DEBUG_LOG(SH4, "mmu_IReadMem16: Entry. vaddr=0x%08X, mmuOn=%d, CCN_MMUCR.AT=%d", vaddr, mmuOn, CCN_MMUCR.AT);
 	// BIOS ROM is only visible in the A0/C0 regions (cached + uncached) and their P1/P2 mirrors.
     // Accesses in P0 (0x00000000–0x7FFFFFFF) should point to SDRAM, NOT to the BIOS. Using the BIOS
     // there caused the bogus wrap-to-zero bug we are chasing.
@@ -755,26 +787,52 @@ u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 template<typename T>
 void DYNACALL mmu_WriteMem(u32 adr, T data)
 {
-	// Fast path for early BIOS memset/ memcpy using normal stores. Any address
-	// in cached/uncached areas 0x0000_0000–0x5FFF_FFFF is mirrored directly into
-	// physical SDRAM, matching the fast path in mmu_ReadMem.
-	if (adr < 0x60000000)
-	{
-		u32 phys = 0x0C000000 | (adr & 0x00FFFFFF);
-		addrspace::writet<T>(phys, data);
-		return;
-	}
+    // Fast path for P0/P1/P2 regions (0x00000000–0x5FFFFFFF) when MMU is OFF.
+    // This path bypasses MMU translation and protection, assuming these regions
+    // alias the physical SDRAM starting at 0x0C000000 (first 16MB of it via adr & 0x00FFFFFF).
+    INFO_LOG(MEMORY, "mmu_WriteMem: adr=0x%08X, mmuOn=%d, sizeof(T)=%zu", adr, mmuOn, sizeof(T));
+    if (!mmuOn && adr < 0x60000000)
+    {
+        // If MMU is off, but we're writing to address 0x00000000, treat it as an error
+        // to test the exception handling pathway, as per debugging requirements.
+        if (adr == 0x00000000)
+        {
+            INFO_LOG(MEMORY, "mmu_WriteMem: Fast path write to 0x%08X with MMU off, raising BADADDR exception", adr);
+            mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DWRITE);
+            return;
+        }
 
-	if ((adr & 0xE0000000) != 0xE0000000)
-	{
-		if (adr & (std::min((int)sizeof(T), 4) - 1))
-			mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DWRITE);
-	}
-	u32 addr;
-	MmuError rv = mmu_data_translation<MMU_TT_DWRITE>(adr, addr);
-	if (rv != MmuError::NONE)
-		mmu_raise_exception(rv, adr, MMU_TT_DWRITE);
-	addrspace::writet<T>(addr, data);
+        u32 phys = 0x0C000000 | (adr & 0x00FFFFFF); // Maps VA in P0/P1/P2's first 16MB to physical 0x0Cxxxxxx
+        addrspace::writet<T>(phys, data);
+        return;
+    }
+
+    // Standard path (MMU is ON, or address not in mmuOff fast-path regions)
+
+    // 1. Alignment Check (on Virtual Address for relevant regions)
+    // Applicable to U0, P0, P1, P2, P3 (VA < 0xC0000000)
+    if (adr < 0xC0000000) // Equivalent to (adr & 0xC0000000) != 0xC0000000
+    {
+        if (adr & (sizeof(T) - 1)) // Corrected alignment check for any power-of-2 sizeof(T)
+        {
+            mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DWRITE);
+            return; // Exception raised, stop further processing.
+        }
+    }
+
+    // 2. MMU Translation
+    u32 physical_address; // To store the translated physical address
+    MmuError translation_status = mmu_data_translation<MMU_TT_DWRITE>(adr, physical_address);
+
+    if (translation_status != MmuError::NONE)
+    {
+        mmu_raise_exception(translation_status, adr, MMU_TT_DWRITE);
+        return; // Exception was raised by mmu_raise_exception.
+    }
+
+    // 3. Write to Physical Address
+    // If mmu_data_translation succeeded, physical_address is valid.
+    addrspace::writet<T>(physical_address, data);
 }
 template void mmu_WriteMem(u32 adr, u8 data);
 template void mmu_WriteMem(u32 adr, u16 data);

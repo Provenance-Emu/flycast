@@ -206,7 +206,7 @@ static void Do_Interrupt(Sh4ExceptionCode intEvn)
 
 void Do_Exception(u32 epc, Sh4ExceptionCode expEvn)
 {
-    DEBUG_LOG(SH4, "Do_Exception: Called with expEvn=0x%03X, epc=0x%08X, Sh4cntx.vbr=0x%08X, CCN_TEA=0x%08X. SR.BL=%d", (u32)expEvn, epc, Sh4cntx.vbr, CCN_TEA, Sh4cntx.sr.BL);
+    DEBUG_LOG(SH4, "Do_Exception: Called with expEvn=0x%03X, epc=0x%08X, VBR=0x%08X, TEA=0x%08X, PTEH=0x%08X, SR.BL=%d, SR.MD=%d, MMUCR.AT=%d, mmuOn=%d", (u32)expEvn, epc, Sh4cntx.vbr, CCN_TEA, CCN_PTEH, Sh4cntx.sr.BL, Sh4cntx.sr.MD, CCN_MMUCR.AT, mmuOn);
 
 	assert((expEvn >= Sh4Ex_TlbMissRead && expEvn <= Sh4Ex_SlotIllegalInstr)
 			|| expEvn == Sh4Ex_FpuDisabled || expEvn == Sh4Ex_SlotFpuDisabled || expEvn == Sh4Ex_UserBreak);
