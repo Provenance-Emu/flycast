@@ -1431,12 +1431,13 @@ Block& Emitter::CreateNew(uint32_t pc) {
         {
             if (((raw >> 4) & 0xF) == 0) // m == 0, treat as PC-relative based on user feedback
             {
-                uint8_t disp4 = raw & 0xF;
+                // Per user instruction, use special displacement for this case.
+                uint32_t disp = (raw & 0x0FFF) >> 2;
                 ins.op = Op::LOAD32_PC;
                 ins.dst.isImm = false;
                 ins.dst.reg = n;
-                ins.extra = disp4; // Pass 4-bit displacement
-                DEBUG_LOG(SH4, "Emitter: Decoded LOAD32_PC @(disp=%01X,PC=%08X) -> R%d (0x%04X)", disp4, pc, n, raw);
+                ins.extra = disp;
+                INFO_LOG(SH4, "Emitter: Decoded LOAD32_PC (5nmd special) @(disp=%03X,PC=%08X) -> R%d (0x%04X)", disp, pc, n, raw);
             }
             else
             {
