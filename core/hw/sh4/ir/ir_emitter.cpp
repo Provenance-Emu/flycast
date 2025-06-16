@@ -205,6 +205,30 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+    // MOV.B @(Rm,Rn),R0  (0x00mn2) -> R0 = mem[Rm+Rn]
+    // For 0x0082: Rm=R0 (n=0), Rn=R8 (m=8) -> R0 = mem[R0+R8]
+    else if ((raw & 0xFF0F) == 0x0002) // Mask for 0000nnnnmmmm0010
+    {
+        uint8_t rm_idx = (raw >> 8) & 0xF; // Manual: Rm, our nnnn field
+        uint8_t rn_idx = (raw >> 4) & 0xF; // Manual: Rn, our mmmm field
+
+        ins.op = Op::LOAD8;      // The operation is a byte load to R0
+        ins.dst.isImm = false;
+        ins.dst.reg = 0;         // Destination is R0
+        ins.dst.type = RegType::GPR;
+
+        ins.src1.isImm = false;
+        ins.src1.reg = rm_idx;    // Base register (Rm)
+        ins.src1.type = RegType::GPR;
+
+        ins.src2.isImm = false;
+        ins.src2.reg = rn_idx;    // Offset register (Rn)
+        ins.src2.type = RegType::GPR;
+        // Executor for LOAD8 will check if src2 is used for reg+reg addressing.
+
+        blk.pcNext = pc + 2;
+        return true;
+    }
     // MOV.B @Rm+,Rn 0x6nm4
     else if ((raw & 0xF00F) == 0x6004) {
         uint8_t n = (raw >> 8) & 0xF;
