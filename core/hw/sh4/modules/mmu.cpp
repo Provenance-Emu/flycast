@@ -267,8 +267,16 @@ MmuError mmu_full_SQ(u32 va, u32& rv)
 		}
 	}
 
-	if ((va & 3) || (CCN_MMUCR.SQMD == 1 && Sh4cntx.sr.MD == 0))
-		//here, or after ?
+	if (translation_type == MMU_TT_IREAD) {
+		if (va & 1)
+			return MmuError::BADADDR;
+	} else {
+		if (va & 3)
+			return MmuError::BADADDR;
+	}
+
+	// SQMD applies only to the first 512 bytes of the SQ space
+	if ((va & 0xFFFFF200) == 0xE0000000 && CCN_MMUCR.SQMD == 1 && Sh4cntx.sr.MD == 0)
 		return MmuError::BADADDR;
 
 	if (CCN_MMUCR.AT)
