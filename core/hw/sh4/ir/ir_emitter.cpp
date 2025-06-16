@@ -173,7 +173,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         return true;
     }
     // MOV.L @(disp,Rm),Rn 0x5nmd : treat all Rm (including R0)
-    if ((raw & 0xF000) == 0x5000) {
+    else if ((raw & 0xF000) == 0x5000) {
         uint8_t n = (raw >> 8) & 0xF;
         uint8_t m = (raw >> 4) & 0xF;
         uint8_t disp4 = raw & 0xF;
@@ -185,7 +185,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         return true;
     }
     // MOV.L @Rm+,Rn 0x6nm6  (post-increment long load)
-    if ((raw & 0xF00F) == 0x6006) {
+    else if ((raw & 0xF00F) == 0x6006) {
         uint8_t n = (raw >> 8) & 0xF;
         uint8_t m = (raw >> 4) & 0xF;
         ins.op = Op::LOAD32_POST;
@@ -195,7 +195,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         return true;
     }
     // MOV.W @Rm+,Rn 0x6nm5
-    if ((raw & 0xF00F) == 0x6005) {
+    else if ((raw & 0xF00F) == 0x6005) {
         uint8_t n = (raw >> 8) & 0xF;
         uint8_t m = (raw >> 4) & 0xF;
         ins.op = Op::LOAD16_POST;
@@ -205,7 +205,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         return true;
     }
     // MOV.B @Rm+,Rn 0x6nm4
-    if ((raw & 0xF00F) == 0x6004) {
+    else if ((raw & 0xF00F) == 0x6004) {
         uint8_t n = (raw >> 8) & 0xF;
         uint8_t m = (raw >> 4) & 0xF;
         ins.op = Op::LOAD8_POST;
@@ -216,7 +216,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
     }
 
     // MOV Rm,Rn 0x6nm3 (register to register)
-    if ((raw & 0xF00F) == 0x6003) {
+    else if ((raw & 0xF00F) == 0x6003) {
         uint8_t n = (raw >> 8) & 0xF;
         uint8_t m = (raw >> 4) & 0xF;
         ins.op = Op::MOV_REG;
@@ -226,7 +226,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         return true;
     }
 
-    if ((raw & 0xF000) == 0xE000) // MOV #imm,Rn
+    else if ((raw & 0xF000) == 0xE000) // MOV #imm,Rn
     {
         uint8_t n = (raw >> 8) & 0xF;
         ins.op = Op::MOV_IMM;
@@ -238,7 +238,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
     }
 
     // FRCHG 0xFBFD
-    if (raw == 0xFBFD)
+    else if (raw == 0xFBFD)
     {
         ins.op = Op::FRCHG;
         // FRCHG has no operands
