@@ -421,13 +421,33 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::LOAD8:
                 {
-                    uint32_t addr = ctx->r[ins.src1.reg] + static_cast<uint32_t>(ins.extra);
+                    uint32_t addr;
+                    // Current instruction's PC for logging
+                    const uint32_t current_instr_pc = ins.pc;
+                    if (!ins.src2.isImm && ins.src2.type != RegType::NONE) // MOV.B @(Rm,Rn),R0. Emitter: ins.src1.reg=Rm, ins.src2.reg=Rn, ins.src2.type should be GPR
+                    {
+                        addr = ctx->r[ins.src1.reg] + ctx->r[ins.src2.reg];
+                        INFO_LOG(SH4, "IR_EXEC: LOAD8 @(R%d,R%d),R0. PC=0x%08X. R%d(base)=0x%08X, R%d(offs)=0x%08X, Addr=0x%08X",
+                                 ins.src1.reg, ins.src2.reg, current_instr_pc,
+                                 ins.src1.reg, ctx->r[ins.src1.reg],
+                                 ins.src2.reg, ctx->r[ins.src2.reg], addr);
+                    }
+                    else // MOV.B @(disp,Rm),R0. Emitter: ins.src1.reg=Rm, ins.extra=disp (or ins.src2.imm for other forms)
+                    {
+                        // Assuming 'extra' is used for displacement by the emitter for this specific LOAD8 form.
+                        // If other LOAD8 forms use src2.imm, that needs to be handled by emitter or here.
+                        addr = ctx->r[ins.src1.reg] + ins.extra;
+                        INFO_LOG(LogTypes::SH4, "IR_EXEC: LOAD8 @(0x%X,R%d),R0. PC=0x%08X. R%d(base)=0x%08X, Addr=0x%08X",
+                                 ins.extra, ins.src1.reg, current_instr_pc,
+                                 ins.src1.reg, ctx->r[ins.src1.reg], addr);
+                    }
+
                     u8 val;
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         val = *p;
                     else
                         val = mmu_ReadMem<u8>(addr);
-                    ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int8_t>(val));
+                    ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int8_t>(val)); // Sign-extend byte
                     break;
                 }
                 case Op::LOAD16:
