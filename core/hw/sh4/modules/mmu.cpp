@@ -320,7 +320,7 @@ template<u32 translation_type>
 MmuError mmu_data_translation(u32 va, u32& rv)
 {
 	// Cascade: Added general entry log
-	INFO_LOG(MEMORY, "mmu_data_translation: Entry. va=0x%08X, type=%s, mmuOn=%d, CCN_MMUCR.AT=%d, SR.MD=%d", // Changed to MEMORY channel
+	INFO_LOG(MMU, "mmu_data_translation: Entry. va=0x%08X, type=%s, mmuOn=%d, CCN_MMUCR.AT=%d, SR.MD=%d",
 	         va, (translation_type == MMU_TT_DWRITE ? "DWRITE" : "DREAD"),
 	         mmuOn, CCN_MMUCR.AT, Sh4cntx.sr.MD);
 
@@ -738,7 +738,14 @@ T DYNACALL mmu_ReadMem(u32 adr)
 	// mapping the address into physical area C (0x0C00_0000).
 	if (adr < 0x60000000)
 	{
-		u32 phys = 0x0C000000 | (adr & 0x00FFFFFF);
+		// Map to physical SDRAM window. Guard against out-of-bounds offsets so a bad
+		// guest address cannot crash the host.
+		u32 offset = adr & 0x00FFFFFF; // 16-MB window used by Dreamcast BIOS init
+		const u32 ram_size = settings.platform.ram_size ? settings.platform.ram_size : 0x01000000; // fallback 16 MiB
+		if (offset >= ram_size)
+			mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DREAD);
+
+		u32 phys = 0x0C000000 | offset;
 		return addrspace::readt<T>(phys);
 	}
 
@@ -768,9 +775,9 @@ u16 DYNACALL mmu_IReadMem16(u32 vaddr)
     // Accesses in P0 (0x00000000–0x7FFFFFFF) should point to SDRAM, NOT to the BIOS. Using the BIOS
     // there caused the bogus wrap-to-zero bug we are chasing.
     u32 area = vaddr & 0xE0000000;
-    if (area == 0xA0000000 || area == 0xC0000000 || area == 0x80000000)
+    if ((area == 0x00000000 && mmuOn == 0) || area == 0xA0000000 || area == 0xC0000000 || area == 0x80000000)
     {
-        // Mirror mask to 2 MiB window.
+        // Mirror mask to 2 MiB window for all ROM aliases.
         u32 bios_offset = vaddr & 0x001FFFFF;
         if (bios_offset < settings.platform.bios_size)
         {
