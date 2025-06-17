@@ -43,7 +43,7 @@
 #define TARGET_NO_REC
 #endif
 #if defined(TARGET_MAC) && HOST_CPU == CPU_ARM64
-#define TARGET_ARM_MAC
+#define TARGET_NO_REC // TARGET_ARM_MAC
 #endif
 #endif
 
