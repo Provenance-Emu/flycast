@@ -473,6 +473,9 @@ extern Option<bool> CustomGpuDriver;
 extern Option<bool, false> VideoRouting;
 extern Option<bool, false> VideoRoutingScale;
 extern Option<int, false> VideoRoutingVRes;
+extern Option<std::string, false> VideoRoutingAddress;
+extern Option<int, false> VideoRoutingPort;
+extern Option<int, false> VideoRoutingHRes;
 #endif
 
 // Misc

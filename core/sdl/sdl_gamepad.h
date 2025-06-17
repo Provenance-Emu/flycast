@@ -3,6 +3,7 @@
 #include "input/mouse.h"
 #include "stdclass.h"
 #include "sdl.h"
+#include <SDL_gamecontroller.h>
 
 template<bool Arcade = false, bool Gamepad = false>
 class DefaultInputMapping : public InputMapping

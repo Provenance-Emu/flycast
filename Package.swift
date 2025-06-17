@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "flycast-jitless",
+    defaultLocalization: "en",
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
@@ -33,11 +34,15 @@ let package = Package(
                 "Config.xcconfig",
                 "flycast.entitlements",
                 "LICENSE",
-                "MoltenVK_Compatibility.md"
+                "MoltenVK_Compatibility.md",
+                "core/deps/breakpad/",
+                "core/deps/Syphon/",
+                "core/deps/"
             ],
-            sources: [
-                
-            ]
+            sources:
+                Consts.hw,
+            publicHeadersPath: "core/",
+            cSettings: Consts.include.map{.headerSearchPath($0)}
         ),
         .testTarget(
             name: "flycast-jitlessTests",
@@ -325,6 +330,7 @@ enum Consts {
     ]
 
     static let include: [String] = [
+        "core/",
         "core/deps/libretro-common/include",
 		"core/log/",
         "core/audio/",

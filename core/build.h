@@ -36,57 +36,37 @@
 	#error Unsupported architecture
 #endif
 
-#if defined(__APPLE__)
-#include "TargetConditionals.h"
-#if TARGET_OS_SIMULATOR || defined(LIBRETRO)
-// iOS simulator
-#define TARGET_NO_REC
-#endif
-#if defined(TARGET_MAC) && HOST_CPU == CPU_ARM64
-#define TARGET_NO_REC // TARGET_ARM_MAC
-#endif
-#endif
+// --- Start of new recompiler feature flag logic ---
 
-#if defined(TARGET_NO_REC)
+// 1. Default all recompiler features to NONE initially
 #define FEAT_SHREC DYNAREC_NONE
 #define FEAT_AREC DYNAREC_NONE
 #define FEAT_DSPREC DYNAREC_NONE
-#endif
 
-#if defined(TARGET_NO_AREC)
-#define FEAT_SHREC DYNAREC_JIT
-#define FEAT_AREC DYNAREC_NONE
-#define FEAT_DSPREC DYNAREC_NONE
+// 2. Enable features if corresponding CMake compile definitions are set
+// JIT recompilers are forcefully disabled here as requested to ensure the
+// SH4 IR interpreter is used for testing. This prevents crashes on platforms
+// that lack JIT entitlements, such as macOS.
+
+// --- End of new recompiler feature flag logic ---
+
+// Platform-specific overrides. For example, iOS simulator always has them off.
+#if defined(__APPLE__)
+#include "TargetConditionals.h"
+#if TARGET_OS_SIMULATOR
+    #undef FEAT_SHREC
+    #define FEAT_SHREC DYNAREC_NONE
+    #undef FEAT_AREC
+    #define FEAT_AREC DYNAREC_NONE
+    #undef FEAT_DSPREC
+    #define FEAT_DSPREC DYNAREC_NONE
+#endif
+// Add other specific platform overrides here if truly necessary,
+// e.g. if a platform CANNOT support a JIT even if CMake tried to enable it.
 #endif
 
 #ifdef __SWITCH__
 #define FEAT_NO_RWX_PAGES
-#endif
-
-//defaults
-
-#ifndef FEAT_SHREC
-	#if HOST_CPU == CPU_ARM || HOST_CPU == CPU_ARM64 || HOST_CPU == CPU_X86 || HOST_CPU == CPU_X64
-		#define FEAT_SHREC DYNAREC_JIT
-	#else
-		#define FEAT_SHREC DYNAREC_NONE
-	#endif
-#endif
-
-#ifndef FEAT_AREC
-	#if HOST_CPU == CPU_ARM || HOST_CPU == CPU_ARM64 || HOST_CPU == CPU_X64
-		#define FEAT_AREC DYNAREC_JIT
-	#else
-		#define FEAT_AREC DYNAREC_NONE
-	#endif
-#endif
-
-#ifndef FEAT_DSPREC
-	#if HOST_CPU == CPU_ARM || HOST_CPU == CPU_ARM64 || HOST_CPU == CPU_X86 || HOST_CPU == CPU_X64
-		#define FEAT_DSPREC DYNAREC_JIT
-	#else
-		#define FEAT_DSPREC DYNAREC_NONE
-	#endif
 #endif
 
 // Some restrictions on FEAT_NO_RWX_PAGES

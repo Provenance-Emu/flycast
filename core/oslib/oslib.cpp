@@ -40,7 +40,9 @@
 #include <shlobj.h>
 #endif
 #include "profiler/fc_profiler.h"
+#ifndef FLYCAST_TEST_BUILD
 #include "input/gamepad_device.h"
+#endif
 
 namespace hostfs
 {
@@ -379,7 +381,9 @@ void os_UpdateInputState()
 {
 	FC_PROFILE_SCOPE;
 
+#ifndef FLYCAST_TEST_BUILD
 	GamepadDevice::RampAnalog();
+#endif
 #if defined(USE_SDL)
 	input_sdl_handle();
 #elif defined(USE_EVDEV)

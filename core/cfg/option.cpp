@@ -117,6 +117,9 @@ Option<bool> CustomGpuDriver("rend.CustomGpuDriver", false);
 Option<bool, false> VideoRouting("rend.VideoRouting", false);
 Option<bool, false> VideoRoutingScale("rend.VideoRoutingScale", false);
 Option<int, false> VideoRoutingVRes("rend.VideoRoutingVRes", 720);
+Option<std::string, false> VideoRoutingAddress("rend.VideoRoutingAddress", "localhost");
+Option<int, false> VideoRoutingPort("rend.VideoRoutingPort", 12345);
+Option<int, false> VideoRoutingHRes("rend.VideoRoutingHRes", 640);
 #endif
 
 // Misc

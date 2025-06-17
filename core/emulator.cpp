@@ -534,7 +534,7 @@ void Emulator::init()
 	interpreter = Get_Sh4Interpreter(); // This will be Sh4IrInterpreter if ENABLE_SH4_IR, or Sh4Interpreter otherwise
 	interpreter->Init();
 
-#ifndef ENABLE_SH4_IR
+#ifndef SH4_IR_ENABLED
 	// If not using IR, the 'interpreter' IS the Sh4Interpreter, so log its Instance
 	if (Sh4Interpreter::Instance)
 	{

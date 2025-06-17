@@ -434,7 +434,7 @@ static void gui_newFrame()
 	io.AddKeyEvent(ImGuiKey_GamepadDpadRight, ((kcode[0] & DC_DPAD_RIGHT) == 0));
 	io.AddKeyEvent(ImGuiKey_GamepadDpadUp, ((kcode[0] & DC_DPAD_UP) == 0));
 	io.AddKeyEvent(ImGuiKey_GamepadDpadDown, ((kcode[0] & DC_DPAD_DOWN) == 0));
-	
+
 	float analog;
 	analog = joyx[0] < 0 ? -(float)joyx[0] / 32768.f : 0.f;
 	io.AddKeyAnalogEvent(ImGuiKey_GamepadLStickLeft, analog > 0.1f, analog);
@@ -669,14 +669,14 @@ static void gui_display_commands()
 		}
 		else
 		{
-			ImGui::Columns(4, "buttons", false);
-			ImGui::SetColumnWidth(0, uiScaled(100.f)  + ImGui::GetStyle().ItemSpacing.x);
-			ImGui::SetColumnWidth(1, uiScaled(columnWidth));
-			ImGui::SetColumnWidth(2, uiScaled(columnWidth));
-			const ImVec2 vmuPos = ImGui::GetStyle().WindowPadding + ScaledVec2(0.f, 100.f)
-					+ ImVec2(insetLeft, ImGui::GetStyle().ItemSpacing.y);
-			ImguiVmuTexture::displayVmus(vmuPos);
-			ImGui::NextColumn();
+			// ImGui::Columns(4, "buttons", false);
+			// ImGui::SetColumnWidth(0, uiScaled(100.f)  + ImGui::GetStyle().ItemSpacing.x);
+			// ImGui::SetColumnWidth(1, uiScaled(columnWidth));
+			// ImGui::SetColumnWidth(2, uiScaled(columnWidth));
+			// const ImVec2 vmuPos = ImGui::GetStyle().WindowPadding + ScaledVec2(0.f, 100.f)
+			// 		+ ImVec2(insetLeft, ImGui::GetStyle().ItemSpacing.y);
+			// ImguiVmuTexture::displayVmus(vmuPos);
+			// ImGui::NextColumn();
 		}
 		ImguiStyleVar _1{ImGuiStyleVar_FramePadding, ScaledVec2(12.f, 3.f)};
 
@@ -820,8 +820,8 @@ const char *maple_device_types[] =
 //	"Dreameye",
 };
 
-const char *maple_expansion_device_types[] = 
-{ 
+const char *maple_expansion_device_types[] =
+{
 	"None",
 	"Sega VMU",
 	"Vibration Pack",
@@ -3268,7 +3268,7 @@ static void gui_display_content()
 		const int itemsPerLine = std::max<int>(totalWidth / (uiScaled(150) + ImGui::GetStyle().ItemSpacing.x), 1);
 		const float responsiveBoxSize = totalWidth / itemsPerLine - ImGui::GetStyle().FramePadding.x * 2;
 		const ImVec2 responsiveBoxVec2 = ImVec2(responsiveBoxSize, responsiveBoxSize);
-		
+
 		if (config::BoxartDisplayMode)
 			ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.5f, 0.5f));
 		else
@@ -3679,18 +3679,18 @@ void gui_draw_osd()
 			std::string message = getFPSNotification();
 			if (!message.empty())
 			{
-				const float maxW = uiScaled(640.f);
-				ImDrawList *dl = ImGui::GetForegroundDrawList();
-				const ScaledVec2 padding(5.f, 5.f);
-				const ImVec2 size = largeFont->CalcTextSizeA(largeFont->FontSize, FLT_MAX, maxW, &message.front(), &message.back() + 1)
-						+ padding * 2.f;
-				ImVec2 pos(insetLeft, ImGui::GetIO().DisplaySize.y - size.y);
-				constexpr float alpha = 0.7f;
-				const ImU32 bg_col = alphaOverride(0x00202020, alpha / 2.f);
-				dl->AddRectFilled(pos, pos + size, bg_col, 0.f);
-				pos += padding;
-				const ImU32 col = alphaOverride(0x0000FFFF, alpha);
-				dl->AddText(largeFont, largeFont->FontSize, pos, col, &message.front(), &message.back() + 1, maxW);
+				// const float maxW = uiScaled(640.f);
+				// ImDrawList *dl = ImGui::GetForegroundDrawList();
+				// const ScaledVec2 padding(5.f, 5.f);
+				// const ImVec2 size = largeFont->CalcTextSizeA(largeFont->FontSize, FLT_MAX, maxW, &message.front(), &message.back() + 1)
+				// 		+ padding * 2.f;
+				// ImVec2 pos(insetLeft, ImGui::GetIO().DisplaySize.y - size.y);
+				// constexpr float alpha = 0.7f;
+				// const ImU32 bg_col = alphaOverride(0x00202020, alpha / 2.f);
+				// dl->AddRectFilled(pos, pos + size, bg_col, 0.f);
+				// pos += padding;
+				// const ImU32 col = alphaOverride(0x0000FFFF, alpha);
+				// dl->AddText(largeFont, largeFont->FontSize, pos, col, &message.front(), &message.back() + 1, maxW);
 			}
 		}
 
@@ -3737,7 +3737,7 @@ void gui_display_profiler()
 			ImGui::Unindent();
 		}
 	}
-	
+
 	for (const fc_profiler::ProfileThread* profileThread : fc_profiler::ProfileThread::s_allThreads)
 	{
 		fc_profiler::drawGraph(*profileThread);

@@ -25,6 +25,10 @@
 #include <glsym/glsym.h>
 #include <glsm/glsm.h>
 
+#ifndef GL_PRIMITIVE_RESTART
+#define GL_PRIMITIVE_RESTART 0x8F9D
+#endif
+
 #ifndef GL_DEPTH_CLAMP
 #define GL_DEPTH_CLAMP                    0x864F
 #define GL_RASTERIZER_DISCARD             0x8C89

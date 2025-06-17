@@ -16,6 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with reicast.  If not, see <https://www.gnu.org/licenses/>.
  */
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "gui_util.h"
 #include <string>
 #include <vector>

@@ -29,13 +29,8 @@ else()
 	project(flycast LANGUAGES C CXX OBJC OBJCXX)
 endif()
 
-
-
 # Define the core static library
-
-
-add_library(flycast_lib STATIC ${lib_sources})
-target_sources(flycast_lib PRIVATE core/sdl/sdl.cpp)
+add_library(flycast_lib STATIC "")
 
 target_include_directories(flycast_lib PRIVATE
 		${CMAKE_CURRENT_SOURCE_DIR}/core
@@ -49,36 +44,9 @@ target_include_directories(flycast_lib PRIVATE
 		${CMAKE_CURRENT_SOURCE_DIR}/core/deps/json
 		${CMAKE_CURRENT_SOURCE_DIR}/core/deps/asio/asio/include
 		${CMAKE_CURRENT_SOURCE_DIR}/core/deps/miniupnpc/include
-		${CMAKE_CURRENT_SOURCE_DIR}/core/deps/Vulkan-Headers/include
 )
 
-target_include_directories(flycast_lib PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/core/deps/imgui # For ImGui
-    ${CMAKE_CURRENT_SOURCE_DIR}/core/deps/imgui/backends # For ImGui backends
-    $ENV{HOME}/VulkanSDK/macOS/include
-)
-
-if(APPLE AND NOT GLES)
-    target_link_libraries(flycast_lib PUBLIC "-framework OpenGL")
-    target_compile_definitions(flycast_lib PUBLIC USE_OPENGL)
-endif()
-
-if(USE_VULKAN)
-    target_compile_definitions(flycast_lib PUBLIC HAVE_VULKAN VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
-    if(APPLE)
-        target_link_libraries(flycast_lib PUBLIC
-            "-F/System/Library/PrivateFrameworks"
-            "-framework Metal"
-            "-framework QuartzCore"
-            "-framework Cocoa"
-            "-framework MultitouchSupport"
-            "$ENV{HOME}/VulkanSDK/macOS/lib/libMoltenVK.dylib"
-        )
-        target_compile_definitions(flycast_lib PUBLIC VK_USE_PLATFORM_METAL_EXT)
-    endif()
-endif()
-
-target_compile_definitions(flycast_lib PUBLIC IMGUI_DISABLE_DEMO_WINDOWS IMGUI_DEFINE_MATH_OPERATORS)
+target_include_directories(flycast_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core/deps/imgui) # For ImGui
 message(STATUS "Always including ImGui directory (PUBLIC) for flycast_lib.")
 	target_compile_features(flycast_lib PRIVATE cxx_std_17)
 
@@ -295,7 +263,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE flycast_lib)
 		set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
 	endif()
 elseif(APPLE)
-	add_executable(${PROJECT_NAME} MACOSX_BUNDLE shell/dummy.cpp)
+	add_executable(${PROJECT_NAME} MACOSX_BUNDLE)
 # Core sources are now in flycast_lib. ${PROJECT_NAME} will contain shell/UI sources.
 target_link_libraries(${PROJECT_NAME} PRIVATE flycast_lib)
 else()
@@ -371,7 +339,7 @@ if(USE_BREAKPAD AND NOT LIBRETRO)
 		target_link_libraries(${PROJECT_NAME} PUBLIC breakpad_client)
 		target_compile_definitions(${PROJECT_NAME} PRIVATE USE_BREAKPAD)
 	elseif(APPLE AND NOT IOS)
-		target_sources(flycast_lib PRIVATE
+		target_sources(${PROJECT_NAME} PRIVATE
 			core/deps/breakpad/src/client/minidump_file_writer-inl.h
 			core/deps/breakpad/src/client/minidump_file_writer.cc
 			core/deps/breakpad/src/client/minidump_file_writer.h
@@ -504,13 +472,6 @@ if(USE_VULKAN)
 		add_library(glslang::SPIRV ALIAS SPIRV)
 	endif()
 	target_link_libraries(${PROJECT_NAME} PRIVATE glslang::glslang-default-resource-limits glslang::SPIRV)
-	target_link_libraries(flycast_lib PUBLIC
-		glslang # Main glslang library
-		glslang::SPIRV
-		OGLCompiler
-		OSDependent
-		glslang::glslang-default-resource-limits
-	)
 endif()
 
 if(NOT LIBRETRO)
@@ -557,7 +518,14 @@ if(NOT LIBRETRO)
 		endif()
 
 		target_compile_definitions(${PROJECT_NAME} PRIVATE USE_SDL USE_SDL_AUDIO)
-
+		target_sources(${PROJECT_NAME} PRIVATE
+			core/sdl/sdl.cpp
+			core/sdl/sdl.h
+			core/sdl/sdl_gamepad.h
+			core/sdl/sdl_keyboard.h
+			core/sdl/sdl_keyboard_mac.h
+			core/sdl/dreamconn.cpp
+			core/sdl/dreamconn.h)
 
 		if((UNIX AND NOT APPLE) OR NINTENDO_SWITCH)
 			find_package(ZLIB REQUIRED)
@@ -771,7 +739,7 @@ if(ANDROID AND NOT LIBRETRO)
 	target_link_libraries(${PROJECT_NAME} PRIVATE oboe)
 endif()
 
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 		core/deps/chdpsr/cdipsr.cpp
 		core/deps/chdpsr/cdipsr.h)
 
@@ -812,6 +780,7 @@ if(NOT LIBZIP_FOUND OR NINTENDO_SWITCH)
 	option(BUILD_EXAMPLES "Build examples" OFF)
 	option(BUILD_DOC "Build documentation" OFF)
 	option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+	option(LIBZIP_DO_INSTALL "Install libzip and the related files" OFF)
 	if(APPLE AND TARGET ZLIB::ZLIB)
 		get_target_property(ZLIB_IMPORTED_LOCATION ZLIB::ZLIB IMPORTED_LOCATION)
 		if("${ZLIB_IMPORTED_LOCATION}" STREQUAL "-lz")
@@ -859,7 +828,7 @@ if(WIN32)
 endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE core/deps/picotcp/include core/deps/picotcp/modules)
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 		core/deps/picotcp/include/arch/pico_arm9.h
 		core/deps/picotcp/include/arch/pico_atsamd21j18.h
 		core/deps/picotcp/include/arch/pico_avr.h
@@ -919,8 +888,7 @@ target_sources(flycast_lib PRIVATE
 		core/deps/picotcp/stack/pico_tree.c)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE _7ZIP_ST)
-target_compile_definitions(flycast_lib PRIVATE _7ZIP_ST)
-target_sources(flycast_lib PRIVATE core/deps/lzma/7zArcIn.c core/deps/lzma/7zBuf.c core/deps/lzma/7zCrc.c core/deps/lzma/7zCrcOpt.c core/deps/lzma/7zDec.c core/deps/lzma/7zFile.c core/deps/lzma/7zStream.c core/deps/lzma/Alloc.c core/deps/lzma/Bcj2.c core/deps/lzma/Bra86.c core/deps/lzma/Bra.c core/deps/lzma/BraIA64.c core/deps/lzma/CpuArch.c core/deps/lzma/Delta.c core/deps/lzma/LzFind.c core/deps/lzma/Lzma2Dec.c core/deps/lzma/Lzma86Dec.c core/deps/lzma/Lzma86Enc.c core/deps/lzma/LzmaDec.c core/deps/lzma/LzmaEnc.c core/deps/lzma/LzmaLib.c core/deps/lzma/Sort.c)
+target_sources(${PROJECT_NAME} PRIVATE core/deps/lzma/7zArcIn.c core/deps/lzma/7zBuf.c core/deps/lzma/7zCrc.c core/deps/lzma/7zCrcOpt.c core/deps/lzma/7zDec.c core/deps/lzma/7zFile.c core/deps/lzma/7zStream.c core/deps/lzma/Alloc.c core/deps/lzma/Bcj2.c core/deps/lzma/Bra86.c core/deps/lzma/Bra.c core/deps/lzma/BraIA64.c core/deps/lzma/CpuArch.c core/deps/lzma/Delta.c core/deps/lzma/LzFind.c core/deps/lzma/Lzma2Dec.c core/deps/lzma/Lzma86Dec.c core/deps/lzma/Lzma86Enc.c core/deps/lzma/LzmaDec.c core/deps/lzma/LzmaEnc.c core/deps/lzma/LzmaLib.c core/deps/lzma/Sort.c)
 add_subdirectory(core/deps/libelf)
 target_link_libraries(flycast_lib PUBLIC elf)
 if(NOT LIBRETRO)
@@ -937,15 +905,15 @@ target_sources(flycast_lib PRIVATE
 
 	if(ENABLE_FC_PROFILER)
 		target_include_directories(${PROJECT_NAME} PRIVATE core/deps/implot)
-		target_sources(flycast_lib PRIVATE
+		target_sources(${PROJECT_NAME} PRIVATE
 			core/deps/implot/implot.h
 			core/deps/implot/implot.cpp
 			core/deps/implot/implot_internal.h
 			core/deps/implot/implot_items.cpp)
 	endif()
 endif()
-target_sources(flycast_lib PRIVATE core/deps/xbrz/xbrz.cpp)
-target_sources(flycast_lib PRIVATE core/deps/md5/md5.cpp)
+target_sources(${PROJECT_NAME} PRIVATE core/deps/xbrz/xbrz.cpp)
+target_sources(${PROJECT_NAME} PRIVATE core/deps/md5/md5.cpp)
 
 if(USE_DISCORD AND NOT LIBRETRO)
 	option(BUILD_EXAMPLES "Build example apps" OFF)
@@ -953,7 +921,7 @@ if(USE_DISCORD AND NOT LIBRETRO)
 	target_include_directories(${PROJECT_NAME} PRIVATE core/deps/discord-rpc/include)
 	target_link_libraries(${PROJECT_NAME} PRIVATE discord-rpc)
 	target_compile_definitions(${PROJECT_NAME} PRIVATE USE_DISCORD)
-	target_sources(flycast_lib PRIVATE core/ui/discord.cpp)
+	target_sources(${PROJECT_NAME} PRIVATE core/ui/discord.cpp)
 endif()
 
 cmrc_add_resource_library(flycast-resources ALIAS flycast::res NAMESPACE flycast)
@@ -961,7 +929,7 @@ target_link_libraries(flycast_lib PUBLIC flycast::res) # Resources used by core
 
 if(LIBRETRO)
 	target_include_directories(${PROJECT_NAME} PRIVATE core/deps/libretro-common/include)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 		core/deps/libretro-common/memmap/memalign.c
 		core/deps/libretro-common/file/file_path.c
 		core/deps/libretro-common/vfs/vfs_implementation.c
@@ -972,18 +940,18 @@ if(LIBRETRO)
 		core/deps/libretro-common/file/retro_dirent.c
 		core/deps/libretro-common/string/stdstring.c)
 	if(USE_OPENGL)
-		target_sources(flycast_lib PRIVATE
+		target_sources(${PROJECT_NAME} PRIVATE
 			core/deps/libretro-common/glsm/glsm.c
 			core/deps/libretro-common/glsym/rglgen.c)
 		if(ANDROID OR IOS OR USE_GLES)
-			target_sources(flycast_lib PRIVATE core/deps/libretro-common/glsym/glsym_es3.c)
+			target_sources(${PROJECT_NAME} PRIVATE core/deps/libretro-common/glsym/glsym_es3.c)
 		elseif(USE_GLES2)
-			target_sources(flycast_lib PRIVATE core/deps/libretro-common/glsym/glsym_es2.c)
+			target_sources(${PROJECT_NAME} PRIVATE core/deps/libretro-common/glsym/glsym_es2.c)
 		else()
-			target_sources(flycast_lib PRIVATE core/deps/libretro-common/glsym/glsym_gl.c)
+			target_sources(${PROJECT_NAME} PRIVATE core/deps/libretro-common/glsym/glsym_gl.c)
 		endif()
 	endif()
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 		shell/libretro/audiostream.cpp
 		shell/libretro/keyboard_map.h
 		shell/libretro/libretro_core_option_defines.h
@@ -996,14 +964,14 @@ if(LIBRETRO)
 		shell/libretro/oslib.cpp
 		shell/libretro/vmu_xhair.cpp)
 	if(APPLE)
-		target_sources(flycast_lib PRIVATE shell/libretro/oslib_apple.mm)
+		target_sources(${PROJECT_NAME} PRIVATE shell/libretro/oslib_apple.mm)
 	endif()
 	if(WIN32)
 		target_link_libraries(${PROJECT_NAME} PRIVATE mswsock)
 	endif()
 endif()
 
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 		core/archive/7zArchive.cpp
 		core/archive/7zArchive.h
 		core/archive/archive.cpp
@@ -1015,7 +983,7 @@ target_sources(flycast_lib PRIVATE
 		core/cfg/option.h)
 
 	if(NOT LIBRETRO)
-		target_sources(flycast_lib PRIVATE
+		target_sources(${PROJECT_NAME} PRIVATE
 				core/cfg/cfg.h
 				core/cfg/cl.cpp
 				core/cfg/ini.h)
@@ -1483,7 +1451,7 @@ if(SDL2_FOUND AND NOT LIBRETRO)
 		target_include_directories(flycast_lib PUBLIC ${SDL2_INCLUDE_DIRS})
 		target_link_libraries(flycast_lib PUBLIC ${SDL2_LIBRARIES})
 	endif()
-	target_include_directories(flycast_lib PUBLIC core/hw/arm7 core/deps/ggpo/include core/deps/ggpo/lib/ggpo core/deps/picotcp/include core/deps/picotcp/modules core/deps/Vulkan-Headers/include core/deps/VulkanMemoryAllocator/include core/deps/glslang)
+	target_include_directories(flycast_lib PUBLIC core/hw/arm7 core/deps/ggpo/include core/deps/ggpo/lib/ggpo core/deps/picotcp/include core/deps/picotcp/modules core/deps/Vulkan-Headers)
 endif()
 
 # Link MiniUPnP
@@ -1552,7 +1520,7 @@ if(NOT LIBRETRO)
 	endif()
 endif()
 
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 		core/imgread/cdi.cpp
 		core/imgread/cdio.cpp
 		core/imgread/chd.cpp
@@ -1566,7 +1534,7 @@ target_sources(flycast_lib PRIVATE
 		core/imgread/isofs.h)
 
 if(NOT LIBRETRO)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/input/gamepad.h
 			core/input/gamepad_device.cpp
 			core/input/gamepad_device.h
@@ -1578,19 +1546,19 @@ if(NOT LIBRETRO)
 endif()
 
 if(WIN32)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/windows/comptr.h
 			core/windows/fault_handler.cpp
 			core/windows/unwind_info.cpp
 			core/windows/win_vmem.cpp)
 else()
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/linux/common.cpp
 			core/linux/context.cpp
 			core/linux/posix_vmem.cpp
 			core/linux/unwind_info.cpp)
 	if(NINTENDO_SWITCH)
-		target_sources(flycast_lib PRIVATE
+		target_sources(${PROJECT_NAME} PRIVATE
 				shell/switch/libnx_vmem.cpp
 				shell/switch/stubs.c
 				shell/switch/context_switch.S
@@ -1602,7 +1570,7 @@ else()
 endif()
 
 if(NOT LIBRETRO)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/linux-dist/evdev.cpp
 			core/linux-dist/evdev.h
 			core/linux-dist/icon.h
@@ -1611,12 +1579,12 @@ if(NOT LIBRETRO)
 			core/linux-dist/x11_keyboard.h)
 endif()
 
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 		core/log/BitSet.h
 		core/log/Log.h
 		core/log/StringUtil.h)
 if(NOT LIBRETRO)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/log/ConsoleListener.h
 			core/log/ConsoleListenerDroid.cpp
 			core/log/ConsoleListenerNix.cpp
@@ -1625,7 +1593,7 @@ if(NOT LIBRETRO)
 			core/log/LogManager.h)
 endif()
 
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 		core/network/alienfnt_modem.cpp
 		core/network/alienfnt_modem.h
 		core/network/dns.cpp
@@ -1648,12 +1616,12 @@ target_sources(flycast_lib PRIVATE
 		core/network/dcnet.h)
 
 if(ANDROID)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/network/ifaddrs.c)
 endif()
 
 if(NOT LIBRETRO)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/audio/audiobackend_alsa.cpp
 			core/audio/audiobackend_coreaudio.cpp
 			core/audio/audiobackend_directsound.cpp
@@ -1670,7 +1638,7 @@ if(NOT LIBRETRO)
 			core/oslib/oslib.cpp)
 endif()
 
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 		core/audio/audiostream.h
 		core/oslib/directory.h
 		core/oslib/host_context.h
@@ -1685,7 +1653,7 @@ target_sources(flycast_lib PRIVATE
 		core/lua/lua.h)
 
 if (ENABLE_DC_PROFILER)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 		core/profiler/dc_profiler.cpp
 		core/profiler/dc_profiler.h)
 
@@ -1693,14 +1661,14 @@ if (ENABLE_DC_PROFILER)
 endif()
 
 if (ENABLE_FC_PROFILER)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 		core/profiler/fc_profiler.cpp
 		core/profiler/fc_profiler.h)
 
 		target_compile_definitions(${PROJECT_NAME} PRIVATE FC_PROFILER)
 endif()
 
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 		core/reios/descrambl.cpp
 		core/reios/descrambl.h
 		core/reios/gdrom_hle.cpp
@@ -1711,13 +1679,13 @@ target_sources(flycast_lib PRIVATE
 		core/reios/reios_elf.h)
 cmrc_add_resources(flycast-resources fonts/biosfont.bin.zip)
 
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 			core/achievements/achievements.cpp
 			core/achievements/achievements.h)
 
-target_sources(flycast_lib PRIVATE core/nullDC.cpp)
+target_sources(${PROJECT_NAME} PRIVATE core/nullDC.cpp)
 if(NOT LIBRETRO)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/deps/rcheevos/src/rc_client_raintegration.c
 			core/deps/rcheevos/src/rc_client.c
 			core/deps/rcheevos/src/rc_compat.c
@@ -1746,11 +1714,11 @@ if(NOT LIBRETRO)
 			core/deps/rcheevos/src/rhash/cdreader.c
 			core/deps/rcheevos/src/rhash/hash.c
 			core/deps/rcheevos/src/rhash/md5.c)
-	target_include_directories(flycast_lib PUBLIC core/deps/rcheevos/include)
-	target_compile_definitions(flycast_lib PUBLIC USE_RACHIEVEMENTS RC_DISABLE_LUA)
+	target_include_directories(${PROJECT_NAME} PRIVATE core/deps/rcheevos/include)
+	target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RACHIEVEMENTS RC_DISABLE_LUA)
 endif()
 
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 		core/wsi/context.h
 		core/wsi/libretro.cpp
 		core/wsi/libretro.h
@@ -1758,7 +1726,7 @@ target_sources(flycast_lib PRIVATE
 
 if(USE_OPENGL)
 	target_compile_definitions(${PROJECT_NAME} PRIVATE USE_OPENGL)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/wsi/egl.cpp
 			core/wsi/egl.h
 			core/wsi/gl_context.cpp
@@ -1768,7 +1736,7 @@ if(USE_OPENGL)
 			core/wsi/sdl.cpp
 			core/wsi/sdl.h)
 
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/rend/gles/glcache.h
 			core/rend/gles/gldraw.cpp
 			core/rend/gles/gles.cpp
@@ -1781,7 +1749,7 @@ if(USE_OPENGL)
 			core/rend/gles/naomi2.h)
 
 	if(NOT LIBRETRO)
-		target_sources(flycast_lib PRIVATE
+		target_sources(${PROJECT_NAME} PRIVATE
 				core/deps/imgui/backends/imgui_impl_opengl3.cpp
 				core/deps/imgui/backends/imgui_impl_opengl3.h
 				core/rend/gles/opengl_driver.cpp
@@ -1789,7 +1757,7 @@ if(USE_OPENGL)
 	endif()
 
 	if(NOT (APPLE OR ANDROID OR USE_GLES OR USE_GLES2))
-		target_sources(flycast_lib PRIVATE
+		target_sources(${PROJECT_NAME} PRIVATE
 				core/rend/gl4/abuffer.cpp
 				core/rend/gl4/gl4.h
 				core/rend/gl4/gldraw.cpp
@@ -1799,7 +1767,7 @@ if(USE_OPENGL)
 	endif()
 endif()
 
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 		core/build.h
 		core/cheats.cpp
 		core/cheats.h
@@ -1812,7 +1780,7 @@ target_sources(flycast_lib PRIVATE
 		core/types.h
 		core/debug/gdb_server.h)
 
-target_sources(flycast_lib PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
 		core/rend/CustomTexture.cpp
 		core/rend/CustomTexture.h
 		core/rend/osd.cpp
@@ -1826,7 +1794,7 @@ target_sources(flycast_lib PRIVATE
 		core/rend/texconv.h
 		core/rend/norend/norend.cpp)
 if(NOT LIBRETRO)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/ui/game_scanner.cpp
 			core/ui/game_scanner.h
 			core/ui/imgui_driver.h
@@ -1861,6 +1829,9 @@ if(USE_VULKAN)
 		target_compile_definitions(${PROJECT_NAME} PUBLIC VK_USE_PLATFORM_METAL_EXT)
 	endif()
 
+	add_subdirectory(core/deps/Vulkan-Headers)
+	target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Headers)
+
 	add_subdirectory(core/deps/VulkanMemoryAllocator)
 	target_compile_options(VulkanMemoryAllocator INTERFACE $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:AppleClang,Clang>>:-Wno-nullability-completeness>)
 	target_link_libraries(${PROJECT_NAME} PRIVATE GPUOpen::VulkanMemoryAllocator)
@@ -1870,8 +1841,8 @@ if(USE_VULKAN)
 		target_link_libraries(${PROJECT_NAME} PRIVATE adrenotools)
 	endif()
 
-	target_compile_definitions(flycast_lib PRIVATE USE_VULKAN HAVE_VULKAN)
-	target_sources(flycast_lib PRIVATE
+	target_compile_definitions(${PROJECT_NAME} PRIVATE USE_VULKAN HAVE_VULKAN)
+	target_sources(${PROJECT_NAME} PRIVATE
 			core/rend/vulkan/oit/oit_buffer.h
 			core/rend/vulkan/oit/oit_drawer.cpp
 			core/rend/vulkan/oit/oit_drawer.h
@@ -1914,14 +1885,14 @@ if(USE_VULKAN)
 			core/rend/vulkan/pixel_neon.cpp)
 
 	# Add compile definition to enable NEON optimizations
-	target_compile_definitions(flycast_lib PRIVATE USE_NEON_OPTIMIZATIONS)
+	target_compile_definitions(${PROJECT_NAME} PRIVATE USE_NEON_OPTIMIZATIONS)
 	if(LIBRETRO)
-		target_sources(flycast_lib PRIVATE
+		target_sources(${PROJECT_NAME} PRIVATE
 				core/rend/vulkan/vk_context_lr.cpp
 				core/rend/vulkan/vk_context_lr.h)
 	else()
-		target_compile_definitions(flycast_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
-		target_sources(flycast_lib PRIVATE
+		target_compile_definitions(${PROJECT_NAME} PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
+		target_sources(${PROJECT_NAME} PRIVATE
 				core/rend/vulkan/vulkan_driver.h
 				core/rend/vulkan/vulkan_context.cpp
 				core/deps/imgui/backends/imgui_impl_vulkan.cpp
@@ -1947,7 +1918,7 @@ if(WIN32 AND USE_DX9 AND NOT LIBRETRO AND NOT WINDOWS_STORE AND ("x86" IN_LIST A
 		core/rend/dx9/dxcontext.h
 		core/deps/imgui/backends/imgui_impl_dx9.h
 		core/deps/imgui/backends/imgui_impl_dx9.cpp)
-	target_sources(flycast_lib PRIVATE ${REND_DX9_FILES})
+	target_sources(${PROJECT_NAME} PRIVATE ${REND_DX9_FILES})
 
 	if(NOT MINGW)
 		set_source_files_properties(${REND_DX9_FILES} PROPERTIES INCLUDE_DIRECTORIES "$ENV{DXSDK_DIR}/Include")
@@ -1957,11 +1928,11 @@ endif()
 
 if(WIN32 AND USE_DX11)
 	if(NOT LIBRETRO)
-		target_sources(flycast_lib PRIVATE
+		target_sources(${PROJECT_NAME} PRIVATE
 			core/deps/imgui/backends/imgui_impl_dx11.cpp
 			core/deps/imgui/backends/imgui_impl_dx11.h)
 	endif()
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 		core/rend/dx11/dx11_driver.h
 		core/rend/dx11/dx11_overlay.cpp
 		core/rend/dx11/dx11_overlay.h
@@ -2040,7 +2011,7 @@ if("arm64" IN_LIST ARCHITECTURE)
 		target_compile_options(${PROJECT_NAME} PRIVATE "/Zc:__cplusplus")
 	endif()
 	target_include_directories(${PROJECT_NAME} PRIVATE core/deps/vixl)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 		core/deps/vixl/aarch64/abi-aarch64.h
 		core/deps/vixl/aarch64/assembler-aarch64.cc
 		core/deps/vixl/aarch64/assembler-aarch64.h
@@ -2108,7 +2079,7 @@ endif()
 
 if(NOT LIBRETRO)
 	target_include_directories(${PROJECT_NAME} PRIVATE core/deps/ggpo/include core/deps/ggpo/lib/ggpo)
-	target_sources(flycast_lib PRIVATE
+	target_sources(${PROJECT_NAME} PRIVATE
 		core/deps/ggpo/lib/ggpo/bitvector.cpp
 		core/deps/ggpo/lib/ggpo/bitvector.h
 		core/deps/ggpo/lib/ggpo/game_input.cpp
@@ -2145,7 +2116,7 @@ if(NOT LIBRETRO)
 	if(ANDROID)
 		target_compile_definitions(${PROJECT_NAME} PRIVATE GLES GLES3)
 
-		target_sources(flycast_lib PRIVATE
+		target_sources(${PROJECT_NAME} PRIVATE
 			shell/android-studio/flycast/src/main/jni/src/Android.cpp
 			shell/android-studio/flycast/src/main/jni/src/android_gamepad.h
 			shell/android-studio/flycast/src/main/jni/src/android_storage.h
@@ -2163,7 +2134,7 @@ if(NOT LIBRETRO)
 			add_subdirectory(shell/apple/emulator-ios/AltKit)
 			target_link_libraries(${PROJECT_NAME} PRIVATE AltKit)
 
-			target_sources(flycast_lib PRIVATE
+			target_sources(${PROJECT_NAME} PRIVATE
 					shell/apple/common/http_client.mm
 					shell/apple/common/util.mm
 					shell/apple/emulator-ios/emulator/AppDelegate.h
@@ -2194,7 +2165,7 @@ if(NOT LIBRETRO)
 				shell/apple/emulator-ios/emulator/LaunchScreen.storyboard
 				shell/apple/emulator-ios/emulator/PadViewController.xib
 				shell/apple/emulator-ios/emulator/EditPadViewController.xib)
-			target_sources(flycast_lib PRIVATE ${IOS_RESOURCES})
+			target_sources(${PROJECT_NAME} PRIVATE ${IOS_RESOURCES})
 			source_group("Resources" FILES ${IOS_RESOURCES})
 			set_source_files_properties(${IOS_RESOURCES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
@@ -2251,21 +2222,19 @@ if(NOT LIBRETRO)
 
 			add_subdirectory(core/deps/Syphon)
 			target_link_libraries(${PROJECT_NAME} PRIVATE Syphon)
-
-            # Ensure the Syphon Metal library is bundled correctly
-            if(SYPHON_METALLIB_FILE AND EXISTS "${SYPHON_METALLIB_FILE}")
-                set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY MACOSX_BUNDLE_RESOURCES "${SYPHON_METALLIB_FILE}")
-            endif()
+			add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy ${SYPHON_METALLIB}
+				$<TARGET_FILE_DIR:flycast>/../Resources/)
 			target_compile_definitions(${PROJECT_NAME} PRIVATE VIDEO_ROUTING)
 
-			target_sources(flycast_lib PRIVATE
+			target_sources(${PROJECT_NAME} PRIVATE
 					shell/apple/common/http_client.mm
 					shell/apple/common/util.mm
 					shell/apple/emulator-osx/emulator-osx/SDLApplicationDelegate.h
 					shell/apple/emulator-osx/emulator-osx/SDLApplicationDelegate.mm
 					shell/apple/emulator-osx/emulator-osx/osx-main.mm)
 			set(ASSETS shell/apple/emulator-osx/emulator-osx/Images.xcassets)
-			target_sources(flycast_lib PRIVATE ${ASSETS})
+			target_sources(${PROJECT_NAME} PRIVATE ${ASSETS})
 			source_group("Resources" FILES ${ASSETS})
 			set_source_files_properties(${ASSETS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
@@ -2312,16 +2281,16 @@ if(NOT LIBRETRO)
 		endif()
 	elseif(UNIX)
 		if(NOT BUILD_TESTING)
-			target_sources(flycast_lib PRIVATE
+			target_sources(${PROJECT_NAME} PRIVATE
 					core/linux-dist/main.cpp)
 		endif()
 	elseif(WIN32)
-		target_sources(flycast_lib PRIVATE
+		target_sources(${PROJECT_NAME} PRIVATE
 			core/windows/clock.c
 			core/windows/rawinput.cpp
 			core/windows/rawinput.h)
 		if(NOT BUILD_TESTING)
-			target_sources(flycast_lib PRIVATE core/windows/winmain.cpp)
+			target_sources(${PROJECT_NAME} PRIVATE core/windows/winmain.cpp)
 		endif()
 		if(WINDOWS_STORE)
 			file(READ shell/uwp/Package.appxmanifest MANIFEST)
@@ -2336,11 +2305,11 @@ if(NOT LIBRETRO)
 					shell/uwp/flycast44.targetsize-48_altform-lightunplated.png
 					core/deps/SDL/src/main/winrt/SDL2-WinRTResource_BlankCursor.cur
 					core/deps/SDL/src/main/winrt/SDL2-WinRTResources.rc)
-			target_sources(flycast_lib PRIVATE
+			target_sources(${PROJECT_NAME} PRIVATE
 				${ResourceFiles}
 				shell/uwp/http_client.cpp)
 			if(NOT BUILD_TESTING)
-				target_sources(flycast_lib PRIVATE core/deps/SDL/src/main/winrt/SDL_winrt_main_NonXAML.cpp)
+				target_sources(${PROJECT_NAME} PRIVATE core/deps/SDL/src/main/winrt/SDL_winrt_main_NonXAML.cpp)
 			endif()
 			set_target_properties(${PROJECT_NAME} PROPERTIES RESOURCE "${ResourceFiles}")
 		else()
@@ -2356,7 +2325,7 @@ if(NOT LIBRETRO)
 				target_compile_definitions(${PROJECT_NAME} PRIVATE VIDEO_ROUTING)
 			endif()
 
-			target_sources(flycast_lib PRIVATE shell/windows/flycast.rc)
+			target_sources(${PROJECT_NAME} PRIVATE shell/windows/flycast.rc)
 			target_link_libraries(${PROJECT_NAME} PRIVATE dsound winmm ws2_32 wsock32 xinput9_1_0 cfgmgr32 wininet psapi)
 		endif()
 	endif()

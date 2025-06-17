@@ -80,7 +80,7 @@ public:
 
 		ImguiStyleVar _(ImGuiStyleVar_WindowRounding, 0);
 		ImguiStyleVar _1(ImGuiStyleVar_WindowBorderSize, 0);
-		ImGui::SetNextWindowPos(ImVec2(settings.display.width / 2, settings.display.height) - ScaledVec2(200.f, 220.f), ImGuiCond_FirstUseEver);
+		// ImGui::SetNextWindowPos(ImVec2(settings.display.width / 2, settings.display.height) - ScaledVec2(200.f, 220.f), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ScaledVec2(400, 220), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowBgAlpha(0.7f);
 		ImGui::SetNextWindowFocus();

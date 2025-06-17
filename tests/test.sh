@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+PROJECT_ROOT_DIR="${SCRIPT_DIR}/.."
 
 LIBRETRO="OFF"
 BUILD_TYPE="Debug"
@@ -22,7 +23,7 @@ RUN_BUILD="ON"
 set -euo pipefail
 
 # Pick build directory from first argument or use default
-BUILD_DIR="${1:-build/tests}"
+BUILD_DIR="${1:-${PROJECT_ROOT_DIR}/build_for_tests}"
 if [[ $# -gt 0 ]]; then
   shift # remove build dir param so remaining args go to cmake
 fi
@@ -31,11 +32,9 @@ fi
 #rm -rf "${BUILD_DIR}"
 
 # Configure with CMake
-export VULKAN_SDK="$HOME/VulkanSDK/1.3.296.0/macOS"
-cmake -S "${SCRIPT_DIR}/.." -B "${BUILD_DIR}" \
+cmake -S "${PROJECT_ROOT_DIR}" -B "${BUILD_DIR}" \
       -DCMAKE_TOOLCHAIN_FILE="${SCRIPT_DIR}/macos_clang_toolchain.cmake" \
        -DLIBRETRO=${LIBRETRO} \
-       -DVulkan_INCLUDE_DIR=$HOME/VulkanSDK/1.3.296.0/macOS/include \
       -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
       -DCMAKE_POSITION_INDEPENDENT_CODE=${PIC} \
       -DCMAKE_SYSTEM_NAME=${SYSTEM_NAME} \
@@ -55,19 +54,34 @@ cmake -S "${SCRIPT_DIR}/.." -B "${BUILD_DIR}" \
 
 # Build all (tests are linked to the main target by the root CMakeLists)
 echo "Build log in ${BUILD_DIR}/build.log"
-cmake --build "${BUILD_DIR}" --target flycast -- VERBOSE=1 -j 12 > "${BUILD_DIR}/build.log" 2>&1 || {
+(cd ${BUILD_DIR} && make) > "${BUILD_DIR}/build.log" 2>&1 || {
     tail -n100 "${BUILD_DIR}/build.log"
     echo "Build failed. See ${BUILD_DIR}/build.log"
     exit 1
 }
 
+# Build flycast_tests
+cmake --build "${BUILD_DIR}" --config Debug --target flycast_tests -j 12 > "${BUILD_DIR}/build.log" 2>&1
+echo "--- Build log for flycast_tests ---"
+cat "${BUILD_DIR}/build.log"
+echo "--- End of build log ---"
+
 # Run unit tests
 cd "${BUILD_DIR}"
 TEST_LOG_FILE="${SCRIPT_DIR}/../test_log.txt"
 rm -f "${TEST_LOG_FILE}"
-echo "Test log in ${TEST_LOG_FILE}"
-ctest --verbose --output-on-failure -R Sh4InterpreterTest > "${TEST_LOG_FILE}" 2>&1 || {
-    tail -n100 "${TEST_LOG_FILE}"
-    echo "Tests failed. See ${TEST_LOG_FILE}"
-    exit 1
-}
+echo "--- Running tests ---"
+# Execute tests and capture their true exit code
+../build_for_tests/tests/flycast_tests > "${TEST_LOG_FILE}" 2>&1
+TEST_EXIT_CODE=$?
+
+if [ ${TEST_EXIT_CODE} -eq 0 ]; then
+    echo "All tests passed."
+    # You can uncomment the next line to see the full log on success if desired
+    # cat "${TEST_LOG_FILE}"
+else
+    echo "Tests failed with exit code ${TEST_EXIT_CODE}."
+    tail -n 150 "${TEST_LOG_FILE}" # Show more lines from the log on failure
+    echo "Full test log in ${TEST_LOG_FILE}"
+    exit ${TEST_EXIT_CODE} # Propagate the actual test failure code
+fi

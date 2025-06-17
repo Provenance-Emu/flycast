@@ -5,6 +5,8 @@
 //  Created by admin on 8/5/15.
 //  Copyright (c) 2015 reicast. All rights reserved.
 //
+#define VK_USE_PLATFORM_METAL_EXT
+#define VK_USE_PLATFORM_MACOS_MVK
 #import <Carbon/Carbon.h>
 #import <AppKit/AppKit.h>
 #include <sys/stat.h>
@@ -32,11 +34,11 @@ int darw_printf(const char* text, ...)
     va_start(args, text);
     vsnprintf(temp, sizeof(temp), text, args);
     va_end(args);
-    
+
     NSString* log = [NSString stringWithCString:temp encoding: NSUTF8StringEncoding];
     NSDictionary<NSString *, NSString *>* env = [[NSProcessInfo processInfo] environment];
     static bool isXcode = [env[@"OS_ACTIVITY_DT_MODE"] boolValue] || [env[@"COMMAND_MODE"] isEqualToString:@"unix2003"] || [env[@"TERM"] isEqualToString:@"dumb"];
-	
+
     if (isXcode) // Xcode console does not support colors
     {
         log = [log stringByReplacingOccurrencesOfString:@"\x1b[0m" withString:@""];
@@ -72,7 +74,7 @@ extern "C" int SDL_main(int argc, char *argv[])
         std::string config_dir = std::string(home) + "/.flycast/";
 		if (!file_exists(config_dir))
 			config_dir = std::string(home) + "/Library/Application Support/Flycast/";
-		
+
 		/* Different config folder for multiple instances */
 		if (getppid() == 1)
 		{
@@ -106,7 +108,7 @@ extern "C" int SDL_main(int argc, char *argv[])
     CFRelease(mainBundle);
 
 	emu_flycast_init();
-	
+
 	int boardId = cfgLoadInt("naomi", "BoardId", 0);
 	if (boardId > 0)
 	{
@@ -126,7 +128,7 @@ extern "C" int SDL_main(int argc, char *argv[])
 		}
 		[[NSApp dockTile] setBadgeLabel:label];
 	}
-	
+
 #ifdef USE_BREAKPAD
 	auto async = std::async(std::launch::async, uploadCrashes, "/tmp");
 #endif
@@ -155,9 +157,9 @@ static int emu_flycast_init()
 			continue;
 		argv[paramCount++] = strdup(arg);
 	}
-	
+
 	int rc = flycast_init(paramCount, argv);
-	
+
 	for (unsigned long i = 0; i < paramCount; i++)
 		free(argv[i]);
 	free(argv);
@@ -169,12 +171,12 @@ static int emu_flycast_init()
                                        MACH_PORT_NULL,
                                        EXCEPTION_DEFAULT,
                                        0);
-    
+
     if (ret != KERN_SUCCESS) {
         printf("task_set_exception_ports: %s\n", mach_error_string(ret));
     }
 #endif
-	
+
 	return rc;
 }
 
@@ -235,17 +237,17 @@ void os_VideoRoutingPublishFrameTexture(const vk::Device& device, const vk::Imag
 		vk::ExportMetalDeviceInfoEXT deviceInfo;
 		auto objectsInfo = vk::ExportMetalObjectsInfoEXT(&deviceInfo);
 		device.exportMetalObjectsEXT(&objectsInfo);
-		
+
 		int boardID = cfgLoadInt("naomi", "BoardId", 0);
 		syphonMtlServer = [[SyphonMetalServer alloc] initWithName:[NSString stringWithFormat:(boardID == 0 ? @"Video Content" : @"Video Content - %d"), boardID] device:deviceInfo.mtlDevice options:nil];
 	}
-	
+
 	auto textureInfo = vk::ExportMetalTextureInfoEXT(image);
 	auto commandInfo = vk::ExportMetalCommandQueueInfoEXT(queue);
 	commandInfo.pNext = &textureInfo;
 	auto objectsInfo = vk::ExportMetalObjectsInfoEXT(&commandInfo);
 	device.exportMetalObjectsEXT(&objectsInfo);
-	
+
 	auto commandBuffer = [commandInfo.mtlCommandQueue commandBufferWithUnretainedReferences];
 	[syphonMtlServer publishFrameTexture:textureInfo.mtlTexture onCommandBuffer:commandBuffer imageRegion:NSMakeRect(x, y, w, h) flipped:YES];
 	[commandBuffer commit];

@@ -35,9 +35,11 @@ void dc_serialize(Serializer& ser)
 	sh4::serialize(ser);
 
 	ser << config::EmulateBBA.get();
+#if !defined(FEAT_NO_NETWORKING)
 	if (config::EmulateBBA)
 		bba_Serialize(ser);
 	ModemSerialize(ser);
+#endif
 
 	sh4::serialize2(ser);
 
@@ -75,9 +77,11 @@ void dc_deserialize(Deserializer& deser)
 	sh4::deserialize(deser);
 
 	deser >> config::EmulateBBA.get();
+#if !defined(FEAT_NO_NETWORKING)
 	if (config::EmulateBBA)
 		bba_Deserialize(deser);
 	ModemDeserialize(deser);
+#endif
 
 	sh4::deserialize2(deser);
 

@@ -29,6 +29,26 @@
 #define GL_R8 0x8229
 #endif
 
+#ifndef GL_HIGH_FLOAT
+#define GL_HIGH_FLOAT 0x8DF2
+#endif
+
+#ifndef GL_NUM_EXTENSIONS
+#define GL_NUM_EXTENSIONS 0x821D
+#endif
+
+#ifndef GL_RGB565
+#define GL_RGB565 0x8D62
+#endif
+
+#ifndef GL_IMPLEMENTATION_COLOR_READ_FORMAT
+#define GL_IMPLEMENTATION_COLOR_READ_FORMAT 0x8B9B
+#endif
+
+#ifndef GL_IMPLEMENTATION_COLOR_READ_TYPE
+#define GL_IMPLEMENTATION_COLOR_READ_TYPE 0x8B9A
+#endif
+
 #define glCheck() do { if (unlikely(config::OpenGlChecks)) { verify(glGetError()==GL_NO_ERROR); } } while(0)
 
 #define VERTEX_POS_ARRAY 0
