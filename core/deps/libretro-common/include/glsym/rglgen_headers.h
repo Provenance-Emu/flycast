@@ -28,24 +28,24 @@
 #include <EGL/eglext.h>
 #endif
 
-#if defined(IOS)
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#include <compat/apple_compat.h> /* Keep for broader Apple compatibility */
 
-#if defined(HAVE_OPENGLES3)
-#include <OpenGLES/ES3/gl.h>
-#include <OpenGLES/ES3/glext.h>
+#if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR /* Covers iOS, tvOS, watchOS, and their simulators */
+  #if defined(HAVE_OPENGLES3)
+    #include <OpenGLES/ES3/gl.h>
+    #include <OpenGLES/ES3/glext.h>
+  #else
+    #include <OpenGLES/ES2/gl.h>
+    #include <OpenGLES/ES2/glext.h>
+  #endif
+#elif TARGET_OS_MAC /* Specifically for macOS */
+  /* For macOS, use the desktop OpenGL framework headers */
+  #include <OpenGL/gl3.h>
+  #include <OpenGL/gl3ext.h> /* Provides GL_PRIMITIVE_RESTART on modern macOS */
 #else
-#include <OpenGLES/ES2/gl.h>
-#include <OpenGLES/ES2/glext.h>
-#endif
-
-#elif defined(__APPLE__)
-#include <compat/apple_compat.h>
-#if MAC_OS_X_VERSION_10_7
-#include <OpenGLES/ES3/gl.h>
-#include <OpenGLES/ES3/glext.h>
-#else
-#include <OpenGLES/ES2/gl.h>
-#include <OpenGLES/ES2/glext.h>
+  #error "Unknown Apple platform"
 #endif
 #elif defined(HAVE_PSGL)
 #include <PSGL/psgl.h>
