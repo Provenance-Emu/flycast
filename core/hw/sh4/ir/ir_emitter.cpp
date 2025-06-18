@@ -150,6 +150,16 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+    // MOV Rm,Rn 0x6nm3 (register to register)
+    if ((raw & 0xF00F) == 0x6003) {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::MOV_REG;
+        ins.dst = {false, n};
+        ins.src1 = {false, m};
+        blk.pcNext = pc + 2;
+        return true;
+    }
     // MOV.L @Rm+,Rn 0x6nm6  (post-increment long load)
     else if ((raw & 0xF00F) == 0x6006) {
         uint8_t n = (raw >> 8) & 0xF;
@@ -205,16 +215,6 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         return true;
     }
 
-    // MOV Rm,Rn 0x6nm3 (register to register)
-    else if ((raw & 0xF00F) == 0x6003) {
-        uint8_t n = (raw >> 8) & 0xF;
-        uint8_t m = (raw >> 4) & 0xF;
-        ins.op = Op::MOV_REG;
-        ins.dst = {false, n};
-        ins.src1 = {false, m};
-        blk.pcNext = pc + 2;
-        return true;
-    }
 
     else if ((raw & 0xF000) == 0xE000) // MOV #imm,Rn
     {
