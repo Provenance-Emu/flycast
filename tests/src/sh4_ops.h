@@ -104,7 +104,13 @@ protected:
 				r(src) = v;
 				PrepareOp(0x6003 | Rm(src) | Rn(dst));	// mov Rm, Rn
 				RunOp();
+				if (r(dst) != v) {
+					fprintf(stderr, "MovRmRnTest FAIL: src=%d, dst=%d, expected r[dst]=0x%08X, got 0x%08X\n", src, dst, v, r(dst));
+				}
 				ASSERT_EQ(r(dst), v);
+				if (r(src) != v) {
+					fprintf(stderr, "MovRmRnTest FAIL: src=%d, dst=%d, expected r[src]=0x%08X, got 0x%08X (value was 0x%08X)\n", src, dst, v, r(src), v);
+				}
 				ASSERT_EQ(r(src), v);
 				AssertState();
 			}
