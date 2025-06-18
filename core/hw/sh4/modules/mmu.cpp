@@ -770,7 +770,7 @@ template u64 mmu_ReadMem(u32 adr);
 
 u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 {
-    INFO_LOG(SH4, "mmu_IReadMem16: Entry. vaddr=0x%08X, mmuOn=%d, CCN_MMUCR.AT=%d", vaddr, mmuOn, CCN_MMUCR.AT);
+    // INFO_LOG(SH4, "mmu_IReadMem16: Entry. vaddr=0x%08X, mmuOn=%d, CCN_MMUCR.AT=%d", vaddr, mmuOn, CCN_MMUCR.AT);
 	// BIOS ROM is only visible in the A0/C0 regions (cached + uncached) and their P1/P2 mirrors.
     // Accesses in P0 (0x00000000–0x7FFFFFFF) should point to SDRAM, NOT to the BIOS. Using the BIOS
     // there caused the bogus wrap-to-zero bug we are chasing.
