@@ -65,8 +65,7 @@ static void map_area3_init()
 static void map_area3(u32 base)
 {
 	// System RAM
-	// System RAM
-	addrspace::mapBlockMirror(&mem_b[0], 0x0C | base,0x0F | base, RAM_SIZE - 1);
+	addrspace::mapBlockMirror(&mem_b[0], 0x0C | base,0x0F | base, RAM_SIZE);
 }
 
 //AREA 4
@@ -291,11 +290,6 @@ u8* GetMemPtr(u32 addr, u32 size)
 	return nullptr;
 }
 
-// Add this forward declaration before the SetMemoryHandlers function
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-void SetOptimizedMemoryHandlers();
-#endif
-
 void SetMemoryHandlers()
 {
 #ifdef STRICT_MODE
@@ -351,115 +345,5 @@ void SetMemoryHandlers()
 		WriteMem16 = &addrspace::write16;
 		WriteMem32 = &addrspace::write32;
 		WriteMem64 = &addrspace::write64;
-
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-		// Use optimized handlers on ARM platforms
-		SetOptimizedMemoryHandlers();
-#endif
 	}
 }
-
-// Add these optimizations for memory access
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-#include <arm_neon.h>
-
-// Optimize memory read with NEON
-u32 DYNACALL optimized_read32(u32 addr)
-{
-	u32 result;
-
-	// Fast path for main RAM
-	if ((addr & 0xFC000000) == 0x0C000000)
-	{
-		addr &= RAM_MASK;
-		// Use addrspace::read32 instead of direct access
-		return addrspace::read32(addr);
-	}
-
-	// Fast path for VRAM
-	if ((addr & 0xFC000000) == 0x04000000)
-	{
-		addr &= VRAM_MASK;
-		// Use addrspace::read32 instead of direct access
-		return addrspace::read32(addr);
-	}
-
-	// Fall back to standard implementation for other cases
-	return addrspace::read32(addr);
-}
-
-// Optimize memory write with NEON
-void DYNACALL optimized_write32(u32 addr, u32 data)
-{
-	// Fast path for main RAM
-	if ((addr & 0xFC000000) == 0x0C000000)
-	{
-		addr &= RAM_MASK;
-		// Use addrspace::write32 instead of direct access
-		addrspace::write32(addr, data);
-		return;
-	}
-
-	// Fast path for VRAM
-	if ((addr & 0xFC000000) == 0x04000000)
-	{
-		addr &= VRAM_MASK;
-		// Use addrspace::write32 instead of direct access
-		addrspace::write32(addr, data);
-		return;
-	}
-
-	// Fall back to standard implementation for other cases
-	addrspace::write32(addr, data);
-}
-
-// Optimize memory copy with NEON
-void optimized_memcpy(void *dst, const void *src, size_t size)
-{
-	uint8_t *d = (uint8_t *)dst;
-	const uint8_t *s = (const uint8_t *)src;
-
-	// Handle small copies directly
-	if (size < 16)
-	{
-		for (size_t i = 0; i < size; i++)
-			d[i] = s[i];
-		return;
-	}
-
-	// Align to 16-byte boundary
-	size_t pre = (16 - (size_t)d) & 15;
-	if (pre > 0)
-	{
-		for (size_t i = 0; i < pre; i++)
-			d[i] = s[i];
-		d += pre;
-		s += pre;
-		size -= pre;
-	}
-
-	// Copy 16 bytes at a time
-	size_t main = size & ~15;
-	for (size_t i = 0; i < main; i += 16)
-	{
-		uint8x16_t v = vld1q_u8(s + i);
-		vst1q_u8(d + i, v);
-	}
-
-	// Copy remaining bytes
-	for (size_t i = main; i < size; i++)
-		d[i] = s[i];
-}
-
-// Override the memory handlers to use our optimized versions
-void SetOptimizedMemoryHandlers()
-{
-	// Only override if not using MMU
-	if (!mmu_enabled())
-	{
-		// Keep the original handlers for other sizes
-		ReadMem32 = &optimized_read32;
-		WriteMem32 = &optimized_write32;
-	}
-}
-#endif

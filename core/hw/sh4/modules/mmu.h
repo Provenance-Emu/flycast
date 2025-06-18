@@ -1,6 +1,5 @@
 #pragma once
 #include "types.h"
-#include "hw/sh4/sh4_if.h" // For Sh4ExceptionCode enum and Sh4Context
 #include "hw/sh4/sh4_mmr.h"
 #include "hw/sh4/dyna/ngen.h"
 
@@ -14,12 +13,10 @@
 
 enum class MmuError
 {
-    //Translation was successful
-    NONE,
-    //UTLB miss (Data TLB)
-    TLB_MISS,
-    //ITLB miss (Instruction TLB)
-    ITLB_MISS,
+	//Translation was successful
+	NONE,
+	//TLB miss
+	TLB_MISS,
 	//TLB Multihit
 	TLB_MHIT,
 	//Mem is read/write protected (depends on translation type)
@@ -79,46 +76,6 @@ MmuError mmu_full_SQ(u32 va, u32& rv);
 #ifdef FAST_MMU
 static inline MmuError mmu_instruction_translation(u32 va, u32& rv)
 {
-	// Low physical memory (0x00000000-0x01FFFFFF) is identity-mapped even when MMU is enabled on DC BIOS.
-	if (va < 0x02000000)
-	{
-		rv = va;
-		return MmuError::NONE;
-	}
-
-	// P4 area (on-chip I/O, ROM) is always direct-mapped, MMU never translates
-	if ((va & 0xE0000000) == 0xE0000000)
-	{
-		rv = va;
-		return MmuError::NONE;
-	}
-
-	// Cached areas P1/P2 behave differently based on MMU state
-    // P1 (0x80000000–0x9FFFFFFF cached) and P2 (0xA0000000–0xBFFFFFFF uncached)
-    // always bypass the MMU and access main SDRAM directly.  They map to the
-    // same 32-MiB window that lives at physical 0x0C000000 on Dreamcast.
-    // P1 (cached) and P2 (uncached) segments bypass the MMU entirely and
-    // are identity-mapped to physical addresses when the MMU is enabled.
-    if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
-    {
-        rv = va; // keep full 32-bit address unchanged (identity map)
-        return MmuError::NONE;
-    }
-
-	// P3 (0xC0000000) remains mirrored to SDRAM window as before.
-	if ((va & 0xE0000000) == 0xC0000000)
-	{
-		rv = 0x0C000000 | (va & 0x00FFFFFF);
-		return MmuError::NONE;
-	}
-
-	// P4 SDRAM mirrors: 0xF8xxxxxx–0xFExxxxxx map to same SDRAM offset
-	if (va >= 0xF8000000u && va < 0xFF000000u)
-	{
-		rv = 0x0C000000 | (va & 0x00FFFFFF);
-		return MmuError::NONE;
-	}
-
 	if (fast_reg_lut[va >> 29] != 0)
 	{
 		rv = va;

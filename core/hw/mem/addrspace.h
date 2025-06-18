@@ -1,6 +1,5 @@
 #pragma once
 #include "types.h"
-#include <cassert>
 
 namespace addrspace
 {
@@ -32,34 +31,15 @@ handler registerHandler(ReadMem8FP *read8, ReadMem16FP *read16, ReadMem32FP *rea
 									(read<u8>, read<u16>, read<u32>,	\
 									write<u8>, write<u16>, write<u32>)
 
-#define HANDLER_MAX 0x1F
-
-extern void* memInfo_ptr[0x100];
-
-static inline u32 FindMask(u32 mask)
-{
-    // Count contiguous low-order 1-bits; this equals log2(block size).
-    u32 width = 0;
-    while (mask & 1) {
-        ++width;
-        mask >>= 1;
-    }
-    return width;
-}
-
 void mapHandler(handler Handler, u32 start, u32 end);
 void mapBlock(void* base, u32 start, u32 end, u32 mask);
 void mirrorMapping(u32 new_region, u32 start, u32 size);
 
-static inline void mapBlockMirror(void *base, u32 start, u32 end, u32 mask)
+static inline void mapBlockMirror(void *base, u32 start, u32 end, u32 blck_size)
 {
-    u32 page_shift = FindMask(mask);
-    assert(page_shift <= HANDLER_MAX);
-
-    for (u32 i = start; i <= end; i++)
-    {
-        memInfo_ptr[i] = (u8*)((uintptr_t)base | page_shift);
-    }
+	u32 block_size = blck_size >> 24;
+	for (u32 _maip = start; _maip <= end; _maip += block_size)
+		mapBlock(base, _maip, _maip + block_size - 1, blck_size - 1);
 }
 
 u8 DYNACALL read8(u32 address);
@@ -67,7 +47,6 @@ u16 DYNACALL read16(u32 address);
 u32 DYNACALL read32(u32 address);
 u64 DYNACALL read64(u32 address);
 template<typename T> T DYNACALL readt(u32 addr);
-
 
 static inline int32_t DYNACALL read8SX32(u32 address) {
 	return (int32_t)(int8_t)readt<u8>(address);

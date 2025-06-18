@@ -22,9 +22,6 @@ float sh4_cpu_timescale = 1.0f;
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
 #include <arm_neon.h>
 
-// Use the optimized memory functions from sh4_mem.cpp
-extern u32 DYNACALL optimized_read32(u32 addr);
-extern void DYNACALL optimized_write32(u32 addr, u32 data);
 
 // Optimize floating point operations with NEON
 static inline float optimized_float_add(float a, float b)
@@ -152,7 +149,7 @@ void Sh4Interpreter::ExecuteOpcode(u16 op)
 			u32 data = ctx->r[m];
 
 			if ((op & 3) == 2) // MOV.L
-				optimized_write32(addr, data);
+				addrspace::write32(addr, data);
 			else
 				OpPtr[op](ctx, op); // Fall back for other sizes
 
@@ -399,7 +396,7 @@ void Sh4Interpreter::ExecuteDelayslot()
 {
 	try {
 		u16 op = ReadNexOp();
- 
+
 		// --- NOP Optimization ---
 		// If the delay slot instruction is not NOP (0x0009), execute it.
 		if (op != 0x0009)
@@ -407,7 +404,7 @@ void Sh4Interpreter::ExecuteDelayslot()
 			ExecuteOpcode(op);
 		}
 		// --- End NOP Optimization ---
- 
+
 	} catch (SH4ThrownException& ex) {
 		AdjustDelaySlotException(ex);
 		throw ex;
