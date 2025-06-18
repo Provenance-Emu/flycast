@@ -63,6 +63,81 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+    // MOV.B Rm,@Rn (0x2nm0)
+    else if ((raw & 0xF00F) == 0x2000)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::STORE8;
+        ins.src1 = {false, m};
+        ins.src2 = {false, n};
+        ins.extra = 0;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // MOV.W Rm,@Rn (0x2nm1)
+    else if ((raw & 0xF00F) == 0x2001)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::STORE16;
+        ins.src1 = {false, m};
+        ins.src2 = {false, n};
+        ins.extra = 0;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // MOV.L Rm,@Rn (0x2nm2)
+    else if ((raw & 0xF00F) == 0x2002)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::STORE32;
+        ins.src1 = {false, m};
+        ins.src2 = {false, n};
+        ins.extra = 0;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // MOV.B Rm,@-Rn (0x2nm4)
+    else if ((raw & 0xF00F) == 0x2004)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::STORE8_PREDEC;
+        ins.dst.isImm = false;
+        ins.dst.reg = n;
+        ins.src1.isImm = false;
+        ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // MOV.W Rm,@-Rn (0x2nm5)
+    else if ((raw & 0xF00F) == 0x2005)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::STORE16_PREDEC;
+        ins.dst.isImm = false;
+        ins.dst.reg = n;
+        ins.src1.isImm = false;
+        ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // MOV.L Rm,@-Rn (0x2nm6)
+    else if ((raw & 0xF00F) == 0x2006)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::STORE32_PREDEC;
+        ins.dst.isImm = false;
+        ins.dst.reg = n;
+        ins.src1.isImm = false;
+        ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
     // MOV.B Rm,@-Rn (0x2nm8)
     else if ((raw & 0xF00F) == 0x2008)
     {
@@ -146,6 +221,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
     }
     // MOV.L Rm,@(disp,Rn) 0x5(Rm)(Rn)disp -- This is a STORE: Store Rm to @(disp,Rn)
     else if ((raw & 0xF000) == 0x5000) {
+        printf("[IR_EMITTER_DEBUG] FastDecode: Entered 0x5000 block for raw=0x%04X, pc=0x%08X\n", raw, pc); fflush(stdout);
         uint8_t rm_val_reg = (raw >> 8) & 0xF;    // Rm (source value for STORE)
         uint8_t rn_base_reg = (raw >> 4) & 0xF;   // Rn (base address for STORE)
         uint8_t disp_val = raw & 0xF;
@@ -782,39 +858,51 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
-        // MOV.B Rm, @(disp, Rn) or MOV.B Rm, @Rn
-        else if ((raw & 0xF000) == 0x0000 && !((raw & 0xF0FF) == 0x0002 || (raw & 0xF0FF) == 0x0012 || (raw & 0xF0FF) == 0x0022 || (raw & 0xF0FF) == 0x000E || (raw & 0xF0FF) == 0x001E || (raw & 0xF0FF) == 0x0003 || (raw & 0xF0FF) == 0x0023 || raw == 0x000B || raw == 0x001B || raw == 0x0028 || raw == 0x0009 || raw == 0x0019 || raw == 0x0008 || raw == 0x0018 || raw == 0x0048 || raw == 0x0058)) // Exclude specific 0x0xxx opcodes handled elsewhere or by FastDecode. Added 0048 (CLRS) and 0058 (SETS)
+        // MOV.B/W/L Rm, @(R0, Rn)
+        else if ((raw & 0xF00F) == 0x0004 || (raw & 0xF00F) == 0x0005 || (raw & 0xF00F) == 0x0006)
         {
-            ins.op = Op::STORE8;
+            uint8_t type = raw & 0xF;
             ins.src1.isImm = false;
-            ins.src1.reg = m; // Rm (value to store)
+            ins.src1.reg = m; // Rm
             ins.src2.isImm = false;
-            ins.src2.reg = n; // Rn (base address register)
-            if ((raw & 0xF) == 0x4) { // MOV.B Rm, @Rn (.... .... .... 0100)
-                ins.extra = 0;
-                INFO_LOG(SH4, "Emitter: Decoded STORE8_REG R%d, @R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
-            } else { // MOV.B Rm, @(disp, Rn) (.... .... .... dddd)
-                ins.extra = (raw & 0xF); // displacement, scaled by 1
-                INFO_LOG(SH4, "Emitter: Decoded STORE8_DISP R%d, @(%d,R%d) (0x%04X) at PC=0x%08X", m, ins.extra, n, raw, pc);
+            ins.src2.reg = n; // Rn
+            // R0 is an implicit source for the executor
+            if (type == 0x4) {
+                ins.op = Op::STORE8_R0;
+                INFO_LOG(SH4, "Emitter: Decoded STORE8_R0_REG R%d, @(R0,R%d) (0x%04X) at PC=0x%08X", m, n, raw, pc);
+            } else if (type == 0x5) {
+                ins.op = Op::STORE16_R0;
+                INFO_LOG(SH4, "Emitter: Decoded STORE16_R0_REG R%d, @(R0,R%d) (0x%04X) at PC=0x%08X", m, n, raw, pc);
+            } else { // type == 0x6
+                ins.op = Op::STORE32_R0;
+                INFO_LOG(SH4, "Emitter: Decoded STORE32_R0_REG R%d, @(R0,R%d) (0x%04X) at PC=0x%08X", m, n, raw, pc);
             }
             decoded = true;
             blk.pcNext = pc + 2;
         }
-        // MOV.W Rm, @(disp, Rn) or MOV.W Rm, @Rn
+        // MOV.L Rm,@(disp,Rn) (0x1nmD)
         else if ((raw & 0xF000) == 0x1000)
+        {
+            ins.op = Op::STORE32;
+            ins.src1.isImm = false;
+            ins.src1.reg = m; // Rm
+            ins.src2.isImm = false;
+            ins.src2.reg = n; // Rn
+            ins.extra = (raw & 0xF) * 4; // displacement, scaled by 4
+            INFO_LOG(SH4, "Emitter: Decoded STORE32_DISP R%d, @(%d,R%d) (0x%04X) at PC=0x%08X", m, ins.extra, n, raw, pc);
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.W Rm,@(disp,Rn) (0x9nmD)
+        else if ((raw & 0xF000) == 0x9000)
         {
             ins.op = Op::STORE16;
             ins.src1.isImm = false;
             ins.src1.reg = m; // Rm
             ins.src2.isImm = false;
             ins.src2.reg = n; // Rn
-            if ((raw & 0xF) == 0x1) { // MOV.W Rm, @Rn (.... .... .... 0001)
-                ins.extra = 0;
-                INFO_LOG(SH4, "Emitter: Decoded STORE16_REG R%d, @R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
-            } else { // MOV.W Rm, @(disp, Rn) (.... .... .... dddd)
-                ins.extra = (raw & 0xF) * 2; // displacement, scaled by 2
-                INFO_LOG(SH4, "Emitter: Decoded STORE16_DISP R%d, @(%d,R%d) (0x%04X) at PC=0x%08X", m, ins.extra, n, raw, pc);
-            }
+            ins.extra = (raw & 0xF) * 2; // displacement, scaled by 2
+            INFO_LOG(SH4, "Emitter: Decoded STORE16_DISP R%d, @(%d,R%d) (0x%04X) at PC=0x%08X", m, ins.extra, n, raw, pc);
             decoded = true;
             blk.pcNext = pc + 2;
         }

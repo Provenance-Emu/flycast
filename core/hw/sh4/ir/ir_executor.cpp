@@ -398,6 +398,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::AND_REG:
                     ctx->r[ins.dst.reg] &= ctx->r[ins.src1.reg];
                     break;
+
                 case Op::STORE8:
                 {
                     uint32_t addr = ctx->r[ins.src2.reg] + ins.extra;
@@ -481,7 +482,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     INFO_LOG(SH4, "STORE16_PREDEC: R%u(0x%04X) to @-R%u (new R%u=0x%08X, addr=0x%08X)",
                              ins.src1.reg, val_to_store,
                              ins.src2.reg, ins.src2.reg, ctx->r[ins.src2.reg], addr);
-                             
+
                     if (unlikely(IsBiosAddr(addr))) {
                         LogIllegalBiosWrite(ins, addr, curr_pc);
                     } else {
@@ -504,6 +505,24 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     } else {
                         mmu_WriteMem<uint32_t>(addr, val_to_store);
                     }
+                    break;
+                }
+                case Op::STORE8_R0:
+                {
+                    uint32_t addr = ctx->r[ins.src2.reg] + ctx->r[0]; // addr = Rn + R0
+                    mmu_WriteMem<u8>(addr, ctx->r[ins.src1.reg]);
+                    break;
+                }
+                case Op::STORE16_R0:
+                {
+                    uint32_t addr = ctx->r[ins.src2.reg] + ctx->r[0]; // addr = Rn + R0
+                    mmu_WriteMem<u16>(addr, ctx->r[ins.src1.reg]);
+                    break;
+                }
+                case Op::STORE32_R0:
+                {
+                    uint32_t addr = ctx->r[ins.src2.reg] + ctx->r[0]; // addr = Rn + R0
+                    mmu_WriteMem<u32>(addr, ctx->r[ins.src1.reg]);
                     break;
                 }
                 case Op::OR_REG:
@@ -729,35 +748,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     if (!IsBiosAddr(ctx->gbr + static_cast<uint32_t>(ins.extra)))
                         mmu_WriteMem<u32>(ctx->gbr + static_cast<uint32_t>(ins.extra), ctx->r[ins.src1.reg]);
                     break;
-                case Op::STORE8_R0:
-                {
-                    uint32_t addr = ctx->r[ins.dst.reg] + ctx->r[0];
-                    if (u8* p = FastRamPtrWrite(addr))
-                        *p = static_cast<u8>(ctx->r[ins.src1.reg]);
-                    else if (IsBiosAddr(addr)) {
-                         LogIllegalBiosWrite(ins, addr, curr_pc);
-                     } else
-                         mmu_WriteMem<u8>(addr, ctx->r[ins.src1.reg]);
-                    break;
-                }
-                case Op::STORE16_R0:
-                {
-                    uint32_t addr = ctx->r[ins.dst.reg] + ctx->r[0];
-                    if (u8* p = FastRamPtrWrite(addr))
-                        *reinterpret_cast<u16*>(p) = static_cast<u16>(ctx->r[ins.src1.reg]);
-                    else
-                        mmu_WriteMem<u16>(addr, static_cast<uint16_t>(ctx->r[ins.src1.reg]));
-                    break;
-                }
-                case Op::STORE32_R0:
-                {
-                    uint32_t addr = ctx->r[ins.dst.reg] + ctx->r[0];
-                    if (u8* p = FastRamPtrWrite(addr))
-                        *reinterpret_cast<u32*>(p) = ctx->r[ins.src1.reg];
-                    else
-                        mmu_WriteMem<u32>(addr, ctx->r[ins.src1.reg]);
-                    break;
-                }
+
                 case Op::LOAD8_R0:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + ctx->r[0];
@@ -790,8 +781,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 }
 
-                    mmu_WriteMem<u32>(ctx->gbr + static_cast<uint32_t>(ins.extra), ctx->r[ins.src1.reg]);
-                    break;
+
                 case Op::LOAD16_IMM:
                 {
                     u16 val = mmu_ReadMem<u16>(static_cast<uint32_t>(ins.src1.imm));
