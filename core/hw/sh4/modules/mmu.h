@@ -96,8 +96,15 @@ static inline MmuError mmu_instruction_translation(u32 va, u32& rv)
 	// Unconditionally mirror unmapped cached areas (P1/P2/P3) and P4 SDRAM aliases (F8–FE) to main RAM window.
 	if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
 	{
-		// P1/P2 are identity-mapped when AT==1 even in FAST_MMU path.
-		rv = va;
+		if (CCN_MMUCR.AT == 1)
+		{
+			rv = va; // Identity when MMU enabled
+		}
+		else
+		{
+			// MMU disabled -> identity map as physical address
+			rv = va;
+		}
 		return MmuError::NONE;
 	}
 	// P3 (0xC0000000) remains mirrored to SDRAM window as before.

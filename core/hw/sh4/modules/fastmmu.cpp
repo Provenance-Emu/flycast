@@ -302,12 +302,15 @@ MmuError mmu_data_translation(u32 va, u32& rv)
             // This covers the problematic 0x00000064 address
             rv = va; // U0/P0 are physical when AT=0
         }
-        else if ((va & 0xE0000000) == 0x80000000 || // P1 (0x80000000 - 0x9FFFFFFF)
-                 (va & 0xE0000000) == 0xA0000000 || // P2 (0xA0000000 - 0xBFFFFFFF)
-                 (va & 0xE0000000) == 0xC0000000)   // P3 (0xC0000000 - 0xDFFFFFFF)
+        else if ((va & 0xE0000000) == 0x80000000 || // P1
+                 (va & 0xE0000000) == 0xA0000000)   // P2
         {
-            // SH4 manual: P1, P2, P3 are physical when AT=0.
-            // Common implementation practice is to mirror them to the main RAM window (0x0Cxxxxxx).
+            // Map P1/P2 to SDRAM window (0x0C000000) when MMU disabled
+            rv = 0x0C000000 | (va & 0x00FFFFFF);
+        }
+        else if ((va & 0xE0000000) == 0xC0000000)   // P3
+        {
+            // Keep legacy 24-MiB mirror for P3 -> SDRAM window
             rv = 0x0C000000 | (va & 0x00FFFFFF);
         }
         else
