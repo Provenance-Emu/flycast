@@ -151,7 +151,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         return true;
     }
     // MOV Rm,Rn 0x6nm3 (register to register)
-    if ((raw & 0xF00F) == 0x6003) {
+    else if ((raw & 0xF00F) == 0x6003) {
         uint8_t n = (raw >> 8) & 0xF;
         uint8_t m = (raw >> 4) & 0xF;
         ins.op = Op::MOV_REG;
@@ -390,7 +390,7 @@ Block& Emitter::CreateNew(uint32_t pc) {
             // blk.code[1].raw = 0; // END raw value, if needed for Op::END
 
             // 'blk' is cache_[pc]. It's now populated. If signature caching is used for these NOP blocks,
-            // g_block_sig_cache[sig] = &blk; would happen after this 'if' structure, before returning blk.
+            // g_block_sig_cache[sig] = &blk; would happen after this 'if' structure, before returning blk. 
             // For now, this path correctly populates blk (cache_[pc]) and returns it.
             return blk;
         }
@@ -418,7 +418,6 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.pc = pc;
             ins.raw = raw;
             blk.code.push_back(ins);
-            decoded = true; // fast-path main instruction successfully decoded
 
             // If this instruction has a delay slot (pcNext == pc + 4), decode the slot too
             if (blk.pcNext == pc + 4)
@@ -614,6 +613,10 @@ Block& Emitter::CreateNew(uint32_t pc) {
             // Append single END terminator
             Instr end{}; end.op = Op::END; end.pc = blk.pcNext; end.raw = 0xFFFF;
             blk.code.push_back(end);
+
+            // The block is complete, cache its signature and return it.
+            g_block_sig_cache.emplace(sig, &blk);
+            return blk;
         }
         else if (raw == 0x000B)
         {
@@ -677,9 +680,6 @@ Block& Emitter::CreateNew(uint32_t pc) {
             blk.pcNext = pc + 4; // BSR is a delayed branch
             INFO_LOG(SH4, "Emitter::CreateNew: Manual BSR handler (0xB000) hit for PC=0x%08X, raw=0x%04X. Displacement (ins.extra)=0x%08X, Target (calculated by executor)=0x%08X", pc, raw, ins.extra, pc + 4 + ins.extra);
             INFO_LOG(SH4, "Emitter::CreateNew: Manual BSR handler set blk.pcNext=0x%08X", blk.pcNext);
-            ins.pc = pc;
-            ins.raw = raw;
-            blk.code.push_back(ins);
             decoded = true;
         }
         // BSRF Rn  (0x0n03)

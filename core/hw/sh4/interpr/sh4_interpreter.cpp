@@ -166,12 +166,14 @@ void Sh4Interpreter::ExecuteOpcode(u16 op)
 			{
 				ctx->fr[n] += ctx->fr[m];
 				CHECK_FPU_32(ctx->fr[n]);
+				Sh4Context::UpdateFPSCR(ctx);
 			}
 			else // Double precision
 			{
-				u64* d = (u64*)&ctx->fr[0];
+				double* d = (double*)&ctx->fr[0];
 				d[n >> 1] += d[m >> 1];
 				CHECK_FPU_64(d[n >> 1]);
+				Sh4Context::UpdateFPSCR(ctx);
 			}
 			sh4cycles.executeCycles(op);
 			return;
@@ -185,12 +187,14 @@ void Sh4Interpreter::ExecuteOpcode(u16 op)
 			{
 				ctx->fr[n] -= ctx->fr[m];
 				CHECK_FPU_32(ctx->fr[n]);
+				Sh4Context::UpdateFPSCR(ctx);
 			}
 			else // Double precision
 			{
-				u64* d = (u64*)&ctx->fr[0];
+				double* d = (double*)&ctx->fr[0];
 				d[n >> 1] -= d[m >> 1];
 				CHECK_FPU_64(d[n >> 1]);
+				Sh4Context::UpdateFPSCR(ctx);
 			}
 			sh4cycles.executeCycles(op);
 			return;
@@ -204,12 +208,14 @@ void Sh4Interpreter::ExecuteOpcode(u16 op)
 			{
 				ctx->fr[n] *= ctx->fr[m];
 				CHECK_FPU_32(ctx->fr[n]);
+				Sh4Context::UpdateFPSCR(ctx);
 			}
 			else // Double precision
 			{
-				u64* d = (u64*)&ctx->fr[0];
+				double* d = (double*)&ctx->fr[0];
 				d[n >> 1] *= d[m >> 1];
 				CHECK_FPU_64(d[n >> 1]);
+				Sh4Context::UpdateFPSCR(ctx);
 			}
 			sh4cycles.executeCycles(op);
 			return;
@@ -223,12 +229,14 @@ void Sh4Interpreter::ExecuteOpcode(u16 op)
 			{
 				ctx->fr[n] /= ctx->fr[m];
 				CHECK_FPU_32(ctx->fr[n]);
+				Sh4Context::UpdateFPSCR(ctx);
 			}
 			else // Double precision
 			{
-				u64* d = (u64*)&ctx->fr[0];
+				double* d = (double*)&ctx->fr[0];
 				d[n >> 1] /= d[m >> 1];
 				CHECK_FPU_64(d[n >> 1]);
+				Sh4Context::UpdateFPSCR(ctx);
 			}
 			sh4cycles.executeCycles(op);
 			return;
@@ -246,14 +254,18 @@ void Sh4Interpreter::ExecuteOpcode(u16 op)
 			{
 				u32 n_idx = GetN(op) >> 1;
 				u32 m_idx = GetM(op) >> 1;
-				u64* d = (u64*)&ctx->fr[0];
-				switch ((op >> 4) & 0x11)
+				double* d = (double*)&ctx->fr[0]; // Cast to double* for DR registers
+				double* xd = (double*)&ctx->xf[0]; // Cast to double* for XD registers (assuming xf is the array for XF registers)
+				switch ((op >> 4) & 0x11) // Check the bits that differentiate DR/XD
 				{
 					case 0x00: d[n_idx] = d[m_idx]; break;         // DRm -> DRn
-					case 0x01: d[n_idx] = d[m_idx + 16]; break; // XDm -> DRn
-					case 0x10: d[n_idx + 16] = d[m_idx]; break; // DRm -> XDn
-					case 0x11: d[n_idx + 16] = d[m_idx + 16]; break;// XDm -> XDn
+					case 0x01: d[n_idx] = xd[m_idx]; break;       // XDm -> DRn (m_idx for xd array)
+					case 0x10: xd[n_idx] = d[m_idx]; break;       // DRm -> XDn (n_idx for xd array)
+					case 0x11: xd[n_idx] = xd[m_idx]; break;     // XDm -> XDn
 				}
+				// FMOV might not set cause bits, but FPSCR.FR or other fields might change implicitly.
+				// Calling UpdateFPSCR to be safe, or if it handles FR bit updates for FMOV.
+				Sh4Context::UpdateFPSCR(ctx);
 			}
 			sh4cycles.executeCycles(op);
 			return;
