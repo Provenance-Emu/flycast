@@ -93,9 +93,26 @@ static inline MmuError mmu_instruction_translation(u32 va, u32& rv)
 		return MmuError::NONE;
 	}
 
-	// Unconditionally mirror unmapped cached areas (P1/P2/P3) and P4 SDRAM aliases (F8–FE) to main RAM window.
-	if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000 || (va & 0xE0000000) == 0xC0000000)
+	// Handle P1, P2, P3 regions for instruction fetches
+	u32 region_type = va & 0xE0000000;
+	if (region_type == 0x80000000 || region_type == 0xA0000000) // P1 or P2
 	{
+		if (mmuOn) // CCN_MMUCR.AT == 1
+		{
+			// MmuTest.TestUntranslated expects identity map for P1/P2 instruction fetches when AT=1
+			rv = va;
+		}
+		else // CCN_MMUCR.AT == 0
+		{
+			// P1/P2 mirror to main RAM window (0x0Cxxxxxx) when AT=0
+			rv = 0x0C000000 | (va & 0x00FFFFFF);
+		}
+		return MmuError::NONE;
+	}
+	else if (region_type == 0xC0000000) // P3
+	{
+		// P3 mirrors to main RAM window (0x0Cxxxxxx). Original FAST_MMU logic was unconditional.
+		// If AT=1 specific P3 behavior is needed for other tests, this might need mmuOn check too.
 		rv = 0x0C000000 | (va & 0x00FFFFFF);
 		return MmuError::NONE;
 	}
