@@ -275,11 +275,19 @@ void mapBlock(void *base, u32 start, u32 end, u32 mask)
 	assert(start <= end);
 	assert((0xFF & (uintptr_t)base) == 0);
 	assert(base != nullptr);
-	u32 j = 0;
-	for (u32 i = start; i <= end; i++)
-	{
-		memInfo_ptr[i] = &((u8 *)base)[j & mask] + FindMask(mask) - (j & mask);
-		j += 0x1000000;
+	    u32 j = 0;
+    for (u32 i = start; i <= end; i++)
+    {
+        memInfo_ptr[i] = (u8*)(((uintptr_t)base + j) | FindMask(mask));
+#ifdef DEBUG
+        if (i >= 0xAC && i <= 0xAF) {
+            uintptr_t entry = (uintptr_t)memInfo_ptr[i];
+            u32 shift = entry & HANDLER_MAX;
+            void* host = (void*)(entry & ~HANDLER_MAX);
+            INFO_LOG(MEMORY, "[addrspace] mapBlock region %02X host=%p shift=%u", i, host, shift);
+        }
+#endif
+        j += 0x1000000;
 	}
 }
 
