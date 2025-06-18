@@ -319,10 +319,12 @@ template MmuError mmu_full_SQ<MMU_TT_DWRITE>(u32 va, u32& rv);
 template<u32 translation_type>
 MmuError mmu_data_translation(u32 va, u32& rv)
 {
-	// Cascade: Added general entry log
-	INFO_LOG(MMU, "mmu_data_translation: Entry. va=0x%08X, type=%s, mmuOn=%d, CCN_MMUCR.AT=%d, SR.MD=%d",
-	         va, (translation_type == MMU_TT_DWRITE ? "DWRITE" : "DREAD"),
-	         mmuOn, CCN_MMUCR.AT, Sh4cntx.sr.MD);
+    // Direct-map P1/P2 like instruction translation.
+    if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
+    {
+        rv = 0x0C000000 | (va & 0x00FFFFFF);
+        return MmuError::OK;
+    }
 
 	/* // Original va==0 logging, can be re-enabled if needed
 	if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) {
@@ -469,6 +471,18 @@ template MmuError mmu_data_translation<MMU_TT_DREAD>(u32 va, u32& rv);
 template MmuError mmu_data_translation<MMU_TT_DWRITE>(u32 va, u32& rv);
 
 MmuError mmu_instruction_translation(u32 va, u32& rv)
+{
+    // SH4 manuals: Segments P1 (0x80000000-0x9FFFFFFF) and P2 (0xA0000000-0xBFFFFFFF)
+    // bypass the MMU and are always direct mapped to physical memory. Only the
+    // lower 29 bits are used (identity mapping). Handle this first for speed and
+    // correctness.
+    if ((va & 0xE0000000) == 0x80000000 || // P1
+        (va & 0xE0000000) == 0xA0000000)   // P2
+    {
+        rv = va & 0x1FFFFFFF; // identity map into 512 MB physical space
+        return MmuError::OK;
+    }
+
 {
 	// Always map Areas 0–3 (0x0000_0000–0x5FFF_FFFF) directly to SDRAM regardless
 	// of MMU state. This avoids UTLB misses during the very early boot stages when

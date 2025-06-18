@@ -115,7 +115,11 @@ T DYNACALL readt(u32 addr)
 		addr <<= iirf;
 		addr >>= iirf;
 
-		return *(T *)&((u8 *)ptr)[addr];
+		if (page == 0xAC)
+        {
+            INFO_LOG(SH4, "READ%u page AC host=%p offs=%06X val=%08llX", sz*8, &((u8*)ptr)[addr], addr, (unsigned long long)*(T*)&((u8*)ptr)[addr]);
+        }
+        return *(T *)&((u8 *)ptr)[addr];
 	}
 	else
 	{
@@ -159,7 +163,11 @@ void DYNACALL writet(u32 addr, T data)
 		addr <<= iirf;
 		addr >>= iirf;
 
-		*(T *)&((u8 *)ptr)[addr] = data;
+		if (page == 0xAC)
+        {
+            INFO_LOG(SH4, "WRITE%u page AC host=%p offs=%06X val=%08llX", sz*8, &((u8*)ptr)[addr], addr, (unsigned long long)data);
+        }
+        *(T *)&((u8 *)ptr)[addr] = data;
 	}
 	else
 	{
@@ -246,15 +254,15 @@ handler registerHandler(
 	return rv;
 }
 
-static u32 FindMask(u32 msk)
+static u32 FindMask(u32 mask)
 {
-	u32 s=-1;
-	u32 rv=0;
-
-	while(msk!=s>>rv)
-		rv++;
-
-	return rv;
+    // Count contiguous low-order 1-bits; this equals log2(block size).
+    u32 width = 0;
+    while (mask & 1) {
+        ++width;
+        mask >>= 1;
+    }
+    return width;
 }
 
 //map a registered handler to a mem region
@@ -264,7 +272,12 @@ void mapHandler(handler Handler, u32 start, u32 end)
 	assert(end < 0x100);
 	assert(start <= end);
 	for (u32 i = start; i <= end; i++)
+	{
 		memInfo_ptr[i] = (u8 *)nullptr + Handler;
+        if (i >= 0xA0 && i <= 0xAF) {
+            INFO_LOG(SH4, "[handler] idx=%02X set handler=%u", i, (unsigned)Handler);
+        }
+	}
 }
 
 //map a memory block to a mem region
@@ -278,15 +291,14 @@ void mapBlock(void *base, u32 start, u32 end, u32 mask)
 	    u32 j = 0;
     for (u32 i = start; i <= end; i++)
     {
-        memInfo_ptr[i] = (u8*)(((uintptr_t)base + j) | FindMask(mask));
-#ifdef DEBUG
-        if (i >= 0xAC && i <= 0xAF) {
+        uintptr_t hostPtr = (uintptr_t)base + (j & mask); // wrap every 16 MiB to alias base
+        memInfo_ptr[i] = (u8*)(hostPtr | FindMask(mask));
+        if (i >= 0xA0 && i <= 0xAF) {
             uintptr_t entry = (uintptr_t)memInfo_ptr[i];
             u32 shift = entry & HANDLER_MAX;
             void* host = (void*)(entry & ~HANDLER_MAX);
-            INFO_LOG(MEMORY, "[addrspace] mapBlock region %02X host=%p shift=%u", i, host, shift);
+            INFO_LOG(SH4, "[map] idx=%02X host=%p shift=%u", i, host, shift);
         }
-#endif
         j += 0x1000000;
 	}
 }
