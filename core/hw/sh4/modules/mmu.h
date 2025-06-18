@@ -94,18 +94,14 @@ static inline MmuError mmu_instruction_translation(u32 va, u32& rv)
 	}
 
 	// Cached areas P1/P2 behave differently based on MMU state
+    // P1 (0x80000000–0x9FFFFFFF cached) and P2 (0xA0000000–0xBFFFFFFF uncached)
+    // always bypass the MMU and access main SDRAM directly.  They map to the
+    // same 32-MiB window that lives at physical 0x0C000000 on Dreamcast.
+    // P1 (cached) and P2 (uncached) segments bypass the MMU entirely and
+    // are identity-mapped to physical addresses when the MMU is enabled.
     if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
     {
-        if (CCN_MMUCR.AT == 0)
-        {
-            // MMU disabled: identity mapping (virtual == physical)
-            rv = va;
-        }
-        else
-        {
-            // MMU enabled: identity-mapped (physical == virtual)
-            rv = va;
-        }
+        rv = va; // keep full 32-bit address unchanged (identity map)
         return MmuError::NONE;
     }
 

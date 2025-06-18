@@ -35,11 +35,19 @@ void mapHandler(handler Handler, u32 start, u32 end);
 void mapBlock(void* base, u32 start, u32 end, u32 mask);
 void mirrorMapping(u32 new_region, u32 start, u32 size);
 
-static inline void mapBlockMirror(void *base, u32 start, u32 end, u32 blck_size)
+static inline void mapBlockMirror(void* base, u32 start, u32 end, u32 blck_size)
 {
-	u32 block_size = blck_size >> 24;
-	for (u32 _maip = start; _maip <= end; _maip += block_size)
-		mapBlock(base, _maip, _maip + block_size - 1, blck_size - 1);
+    // Map every 16-MiB virtual page in [start,end] onto the backing buffer,
+    // wrapping the pointer every 16 MiB so larger buffers mirror correctly.
+    constexpr u32 PAGE16M_MASK = (1u << 24) - 1; // 0x00FFFFFF
+
+    for (u32 vp = start; vp <= end; ++vp)
+    {
+        // Offset into buffer repeats every 16 MiB.
+        u32 offset = ((vp - start) << 24) & (blck_size - 1);
+        void* hostPtr = static_cast<u8*>(base) + offset;
+        mapBlock(hostPtr, vp, vp, PAGE16M_MASK);
+    }
 }
 
 u8 DYNACALL read8(u32 address);

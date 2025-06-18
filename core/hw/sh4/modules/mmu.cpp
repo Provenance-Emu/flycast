@@ -319,12 +319,7 @@ template MmuError mmu_full_SQ<MMU_TT_DWRITE>(u32 va, u32& rv);
 template<u32 translation_type>
 MmuError mmu_data_translation(u32 va, u32& rv)
 {
-    // Direct-map P1/P2 like instruction translation.
-    if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
-    {
-        rv = 0x0C000000 | (va & 0x00FFFFFF);
-        return MmuError::OK;
-    }
+
 
 	/* // Original va==0 logging, can be re-enabled if needed
 	if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) {
@@ -479,8 +474,8 @@ MmuError mmu_instruction_translation(u32 va, u32& rv)
     if ((va & 0xE0000000) == 0x80000000 || // P1
         (va & 0xE0000000) == 0xA0000000)   // P2
     {
-        rv = va & 0x1FFFFFFF; // identity map into 512 MB physical space
-        return MmuError::OK;
+        rv = va; // identity map for bypass segments
+        return MmuError::NONE;
     }
 
 {
@@ -783,8 +778,12 @@ u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 	// BIOS ROM is only visible in the A0/C0 regions (cached + uncached) and their P1/P2 mirrors.
     // Accesses in P0 (0x00000000–0x7FFFFFFF) should point to SDRAM, NOT to the BIOS. Using the BIOS
     // there caused the bogus wrap-to-zero bug we are chasing.
-    u32 area = vaddr & 0xE0000000;
-    if ((area == 0x00000000 && mmuOn == 0) || area == 0xA0000000 || area == 0xC0000000 || area == 0x80000000)
+    u32 upper = vaddr & 0xFFE00000; // 2 MiB granularity
+    if ((upper == 0x00000000 && mmuOn == 0) || // Boot ROM when MMU off
+        upper == 0xA0000000 ||                 // BIOS cached (first 2 MiB only)
+        upper == 0xC0000000 ||                 // BIOS uncached (first 2 MiB only)
+        upper == 0x80000000)                   // Alternate mirror
+
     {
         // Mirror mask to 2 MiB window for all ROM aliases.
         u32 bios_offset = vaddr & 0x001FFFFF;

@@ -61,8 +61,9 @@ void *readConst(u32 addr, bool& ismem, u32 sz)
 	else
 	{
 		ismem = true;
-		addr <<= iirf;
-		addr >>= iirf;
+		u32 shift = iirf & HANDLER_MAX;
+        addr <<= shift;
+		        addr >>= shift;
 
 		return &(((u8 *)ptr)[addr]);
 	}
@@ -94,8 +95,9 @@ void *writeConst(u32 addr, bool& ismem, u32 sz)
 	else
 	{
 		ismem = true;
-		addr <<= iirf;
-		addr >>= iirf;
+		u32 shift = iirf & HANDLER_MAX;
+        addr <<= shift;
+		        addr >>= shift;
 
 		return &(((u8 *)ptr)[addr]);
 	}
@@ -112,12 +114,13 @@ T DYNACALL readt(u32 addr)
 
 	if (likely(ptr != nullptr))
 	{
-		addr <<= iirf;
-		addr >>= iirf;
+		u32 shift = iirf & HANDLER_MAX;
+        addr <<= shift;
+		        addr >>= shift;
 
 		if (page == 0xAC)
         {
-            INFO_LOG(SH4, "READ%u page AC host=%p offs=%06X val=%08llX", sz*8, &((u8*)ptr)[addr], addr, (unsigned long long)*(T*)&((u8*)ptr)[addr]);
+            INFO_LOG(SH4, "READ%u page %02X host=%p offs=%06X val=%08llX", sz*8, &((u8*)ptr)[addr], addr, (unsigned long long)*(T*)&((u8*)ptr)[addr]);
         }
         return *(T *)&((u8 *)ptr)[addr];
 	}
@@ -160,8 +163,9 @@ void DYNACALL writet(u32 addr, T data)
 
 	if (likely(ptr != nullptr))
 	{
-		addr <<= iirf;
-		addr >>= iirf;
+		u32 shift = iirf & HANDLER_MAX;
+        addr <<= shift;
+		        addr >>= shift;
 
 		if (page == 0xAC)
         {
