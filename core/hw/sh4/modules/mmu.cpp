@@ -371,14 +371,14 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 			// Map 0x1C000000-0x1FFFFFFF (store queues) into P4 MMIO window
 			rv = va | 0xF0000000;
 		}
-		else if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000) // P1 or P2
+		else if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
 		{
-			// Map P1/P2 to main RAM window (mirror) when AT=0
+			// Map P1/P2 to main RAM window (mirror)
 			rv = 0x0C000000 | (va & 0x00FFFFFF);
 		}
-		else // Default for U0/P0 regions not otherwise handled when AT=0
+		else
 		{
-			rv = va; // Identity map
+			rv = 0x0C000000 | (va & 0x00FFFFFF);
 		}
 		return MmuError::NONE;
 	}
@@ -392,15 +392,15 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 	// This logic is for AT=1. If AT=0, P1/P2 are handled in the AT=0 block.
 	if ((va & 0xE0000000) == 0x80000000) // P1
 	{
-		// MmuTest.TestUntranslated expects identity map for P1 when AT=1
-		rv = va;
+		// if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): P1 direct map check.");
+		rv = 0x0C000000 | (va & 0x00FFFFFF); // mirror to main RAM window
 		return MmuError::NONE;
 	}
 
 	if ((va & 0xE0000000) == 0xA0000000) // P2
 	{
-		// MmuTest.TestUntranslated expects identity map for P2 when AT=1
-		rv = va;
+		// if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): P2 direct map check.");
+		rv = 0x0C000000 | (va & 0x00FFFFFF);
 		return MmuError::NONE;
 	}
 
@@ -496,28 +496,14 @@ MmuError mmu_instruction_translation(u32 va, u32& rv)
 		}
 		else if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
 		{
-			// P1/P2 mirror to main RAM window when AT=0
+			// P1/P2 mirror to main RAM window
 			rv = 0x0C000000 | (va & 0x00FFFFFF);
 		}
 		else
 		{
-			// P0/U0 mirror into first 16MB when AT=0
+			// P0/U0 mirror into first 16MB
 			rv = va & 0x0FFFFFFF;
 		}
-		return MmuError::NONE;
-	}
-
-	// AT == 1 from here
-
-	// MmuTest.TestUntranslated expects identity map for P1/P2 instruction fetches when AT=1
-	if ((va >> 29) == 4) // P1 region (0x80000000 - 0x9FFFFFFF)
-	{
-		rv = va;
-		return MmuError::NONE;
-	}
-	if ((va >> 29) == 5) // P2 region (0xA0000000 - 0xBFFFFFFF)
-	{
-		rv = va;
 		return MmuError::NONE;
 	}
 
@@ -644,23 +630,18 @@ void mmu_set_state()
 {
 	if (CCN_MMUCR.AT == 1)
 	{
-		mmuOn = true;
-		// Log if we're running Windows CE, as it might imply specific MMU configurations
+		// Detect if we're running Windows CE
 		static const char magic[] = { 'S', 0, 'H', 0, '-', 0, '4', 0, ' ', 0, 'K', 0, 'e', 0, 'r', 0, 'n', 0, 'e', 0, 'l', 0 };
 		if (memcmp(GetMemPtr(0x8c0110a8, 4), magic, sizeof(magic)) == 0
 				|| memcmp(GetMemPtr(0x8c011118, 4), magic, sizeof(magic)) == 0)
 		{
-			NOTICE_LOG(SH4, "MMU enabled (AT=1) and Windows CE detected.");
-		}
-		else
-		{
-			DEBUG_LOG(SH4, "MMU enabled (AT=1).");
+			mmuOn = true;
+			NOTICE_LOG(SH4, "Enabling Full MMU support");
 		}
 	}
 	else
 	{
 		mmuOn = false;
-		DEBUG_LOG(SH4, "MMU disabled (AT=0).");
 	}
 
 	SetMemoryHandlers();
@@ -789,46 +770,26 @@ template u64 mmu_ReadMem(u32 adr);
 
 u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 {
-    //INFO_LOG(SH4, "mmu_IReadMem16: Entry. vaddr=0x%08X, mmuOn=%d, CCN_MMUCR.AT=%d", vaddr, mmuOn, CCN_MMUCR.AT);
-
-    // Instruction fetches must be 2-byte aligned.
-    if (vaddr & 1)
-    {
-        mmu_raise_exception(MmuError::BADADDR, vaddr, MMU_TT_IREAD);
-        return 0; // Value doesn't matter as exception is thrown
-    }
+    INFO_LOG(SH4, "mmu_IReadMem16: Entry. vaddr=0x%08X, mmuOn=%d, CCN_MMUCR.AT=%d", vaddr, mmuOn, CCN_MMUCR.AT);
 	// BIOS ROM is only visible in the A0/C0 regions (cached + uncached) and their P1/P2 mirrors.
     // Accesses in P0 (0x00000000–0x7FFFFFFF) should point to SDRAM, NOT to the BIOS. Using the BIOS
     // there caused the bogus wrap-to-zero bug we are chasing.
     u32 area = vaddr & 0xE0000000;
-
-    // Handle direct BIOS accesses first.
-    // BIOS is at physical 0x00000000 to settings.platform.bios_size - 1.
-    // P0 (MMU off), P1, P2, P3 can all map to this physical region.
-
-    if (!mmuOn && area == 0x00000000) { // P0, MMU Off. vaddr is physical address.
-        if (vaddr < settings.platform.bios_size) {
-            return *reinterpret_cast<const u16*>(nvmem::getBiosData() + vaddr);
+    if ((area == 0x00000000 && mmuOn == 0) || area == 0xA0000000 || area == 0xC0000000 || area == 0x80000000)
+    {
+        // Mirror mask to 2 MiB window for all ROM aliases.
+        u32 bios_offset = vaddr & 0x001FFFFF;
+        if (bios_offset < settings.platform.bios_size)
+        {
+            return *reinterpret_cast<const u16*>(nvmem::getBiosData() + bios_offset);
         }
-        // Else: P0 MMU Off, address is beyond BIOS (e.g. RAM mapped after BIOS). Fall through.
-    } else if (area == 0x80000000 || area == 0xA0000000 || area == 0xC0000000) { // P1, P2, or P3
-        u32 physical_addr_in_window = vaddr & 0x1FFFFFFF; // Target physical address in 0x00000000-0x1FFFFFFF window
-        if (physical_addr_in_window < settings.platform.bios_size) {
-            // This P1/P2/P3 address maps to the physical BIOS region.
-            return *reinterpret_cast<const u16*>(nvmem::getBiosData() + physical_addr_in_window);
-        }
-        // Else: This P1/P2/P3 address maps to a physical address beyond the BIOS range
-        // (e.g., RAM at physical 0x0C000000). Fall through.
+        // Out of range – log once and raise BADADDR so the core doesn’t silently consume NOPs.
+        INFO_LOG(SH4, "BIOS fetch OOB @ %08X (offset %X / size %u)", vaddr, bios_offset, settings.platform.bios_size);
+        mmu_raise_exception(MmuError::BADADDR, vaddr, MMU_TT_IREAD);
+        return 0;
     }
-    // If none of the above conditions returned, it means the access was not a direct BIOS read handled by those paths.
-    // This includes:
-    // - P0 with MMU On (requires TLB lookup via mmu_instruction_translation)
-    // - P4 (SoC I/O region, handled by mmu_instruction_translation)
-    // - P0 MMU Off, but vaddr >= bios_size (e.g., RAM access, will be identity mapped by mmu_instruction_translation)
-    // - P1/P2/P3, but its corresponding physical_addr_in_window >= bios_size (e.g., RAM access, mmu_instruction_translation will handle)
-    // All these cases should proceed to standard MMU translation.
 
-	// If not a direct BIOS read handled above, proceed with standard MMU translation.
+	// If not a BIOS read, proceed with standard MMU translation.
 	u32 paddr;
     MmuError err = mmu_instruction_translation(vaddr, paddr);
     if (err != MmuError::NONE)

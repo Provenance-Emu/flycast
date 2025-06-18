@@ -323,7 +323,10 @@ MmuError mmu_data_translation(u32 va, u32& rv)
     // Original fastmmu.cpp logic follows if CCN_MMUCR.AT == 1
 	if (fast_reg_lut[va >> 29] != 0)
 	{
-		rv = va;
+		if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000 || (va & 0xE0000000) == 0xC0000000)
+			rv = 0x0C000000 | (va & 0x00FFFFFF);
+		else
+			rv = va;
 		return MmuError::NONE;
 	}
 
