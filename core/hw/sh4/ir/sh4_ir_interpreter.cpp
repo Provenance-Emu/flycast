@@ -118,6 +118,8 @@ void Sh4IrInterpreter::Run()
 
 void Sh4IrInterpreter::Step()
 {
+    printf("[PRINTF_DEBUG_IR_STEP_ENTRY] Sh4IrInterpreter::Step() entered.\n");
+    //fflush(stdout); // Temporarily removed for testing crash output behavior
     uint32_t pc = ctx_->pc;
     uint32_t old_pc = pc;
     try {

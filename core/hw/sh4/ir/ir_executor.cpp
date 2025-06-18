@@ -401,28 +401,109 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::STORE8:
                 {
                     uint32_t addr = ctx->r[ins.src2.reg] + ins.extra;
-                    uint8_t val = static_cast<uint8_t>(ctx->r[ins.src1.reg]);
-                    INFO_LOG(SH4, "STORE8: R%u(0x%02X) -> @(R%u=0x%08X + disp=%d) -> addr=0x%08X", ins.src1.reg, val, ins.src2.reg, ctx->r[ins.src2.reg], ins.extra, addr);
-                    if (unlikely(IsBiosAddr(addr))) LogIllegalBiosWrite(ins, addr, curr_pc);
-                    else mmu_WriteMem<uint8_t>(addr, val);
+                    uint8_t val_to_store = static_cast<uint8_t>(ctx->r[ins.src1.reg]);
+                    // Initial log for context
+                    INFO_LOG(SH4, "STORE8 PRE-WRITE: R%u(0x%02X) intended for addr 0x%08X. (Rn=R%u@0x%08X, disp=%d)",
+                             ins.src1.reg, val_to_store, addr,
+                             ins.src2.reg, ctx->r[ins.src2.reg], ins.extra);
+                    if (unlikely(IsBiosAddr(addr))) {
+                        LogIllegalBiosWrite(ins, addr, curr_pc);
+                    } else {
+                        INFO_LOG(SH4, "STORE8 ACTUAL WRITE: Writing 0x%02X to 0x%08X", val_to_store, addr);
+                        mmu_WriteMem<uint8_t>(addr, val_to_store);
+                    }
                     break;
                 }
                 case Op::STORE16:
                 {
                     uint32_t addr = ctx->r[ins.src2.reg] + ins.extra;
-                    uint16_t val = static_cast<uint16_t>(ctx->r[ins.src1.reg]);
-                    INFO_LOG(SH4, "STORE16: R%u(0x%04X) -> @(R%u=0x%08X + disp=%d) -> addr=0x%08X", ins.src1.reg, val, ins.src2.reg, ctx->r[ins.src2.reg], ins.extra, addr);
-                    if (unlikely(IsBiosAddr(addr))) LogIllegalBiosWrite(ins, addr, curr_pc);
-                    else mmu_WriteMem<uint16_t>(addr, val);
+                    uint16_t val_to_store = static_cast<uint16_t>(ctx->r[ins.src1.reg]);
+                    // Initial log for context
+                    INFO_LOG(SH4, "STORE16 PRE-WRITE: R%u(0x%04X) intended for addr 0x%08X. (Rn=R%u@0x%08X, disp=%d)",
+                             ins.src1.reg, val_to_store, addr,
+                             ins.src2.reg, ctx->r[ins.src2.reg], ins.extra);
+                    if (unlikely(IsBiosAddr(addr))) {
+                        LogIllegalBiosWrite(ins, addr, curr_pc);
+                    } else {
+                        INFO_LOG(SH4, "STORE16 ACTUAL WRITE: Writing 0x%04X to 0x%08X", val_to_store, addr);
+                        mmu_WriteMem<uint16_t>(addr, val_to_store);
+                    }
                     break;
                 }
                 case Op::STORE32:
                 {
+                    // Added for PRINTF_DEBUG_IR_STORE32
+                    u32 rm_idx = ins.src1.reg; // Rm
+                    u32 rn_idx = ins.src2.reg; // Rn
+                    s32 disp = ins.extra;     // displacement
+                    printf("[PRINTF_DEBUG_IR_STORE32_ENTRY] STORE32: ins.src1.reg (Rm_idx)=%u (expected 14 for R14), ins.src2.reg (Rn_idx)=%u (expected 11 for R11), ins.extra (disp)=%d\n", rm_idx, rn_idx, disp);
+                    // Assuming Sh4cntx is available as ctx, or directly Sh4cntx if global/member
+                    printf("[PRINTF_DEBUG_IR_STORE32_VALS] STORE32: ctx->r[14]=0x%08X, ctx->r[rm_idx (%u)]=0x%08X /* rm_idx is ins.src1.reg */\n", ctx->r[14], rm_idx, ctx->r[rm_idx]);
+                    fflush(stdout);
+
                     uint32_t addr = ctx->r[ins.src2.reg] + ins.extra;
-                    uint32_t val = ctx->r[ins.src1.reg];
-                    INFO_LOG(SH4, "STORE32: R%u(0x%08X) -> @(R%u=0x%08X + disp=%d) -> addr=0x%08X", ins.src1.reg, val, ins.src2.reg, ctx->r[ins.src2.reg], ins.extra, addr);
-                    if (unlikely(IsBiosAddr(addr))) LogIllegalBiosWrite(ins, addr, curr_pc);
-                    else mmu_WriteMem<uint32_t>(addr, val);
+                    uint32_t val_to_store = ctx->r[ins.src1.reg];
+                    // Initial log for context
+                    // INFO_LOG(SH4, "STORE32 PRE-WRITE: R%u(0x%08X) intended for addr 0x%08X. (Rn=R%u@0x%08X, disp=%d)",
+                    //          ins.src1.reg, val_to_store, addr,
+                    //          ins.src2.reg, ctx->r[ins.src2.reg], ins.extra); // Test if this LOG_INFO causes corruption
+                    if (unlikely(IsBiosAddr(addr))) {
+                        LogIllegalBiosWrite(ins, addr, curr_pc);
+                    } else {
+                        INFO_LOG(SH4, "STORE32 ACTUAL WRITE: Writing 0x%08X to 0x%08X", val_to_store, addr);
+                        mmu_WriteMem<uint32_t>(addr, val_to_store);
+                    }
+                    break;
+                }
+                case Op::STORE8_PREDEC:
+                {
+                    uint8_t val_to_store = static_cast<uint8_t>(ctx->r[ins.src1.reg]); // Get value from Rm FIRST
+                    ctx->r[ins.src2.reg] -= 1;                    // THEN decrement Rn
+                    uint32_t addr = ctx->r[ins.src2.reg];         // Use new Rn as address
+
+                    INFO_LOG(SH4, "STORE8_PREDEC: R%u(0x%02X) to @-R%u (new R%u=0x%08X, addr=0x%08X)",
+                             ins.src1.reg, val_to_store,
+                             ins.src2.reg, ins.src2.reg, ctx->r[ins.src2.reg], addr);
+
+                    if (unlikely(IsBiosAddr(addr))) {
+                        LogIllegalBiosWrite(ins, addr, curr_pc);
+                    } else {
+                        mmu_WriteMem<uint8_t>(addr, val_to_store);
+                    }
+                    break;
+                }
+                case Op::STORE16_PREDEC:
+                {
+                    uint16_t val_to_store = static_cast<uint16_t>(ctx->r[ins.src1.reg]); // Get value from Rm FIRST
+                    ctx->r[ins.src2.reg] -= 2;                    // THEN decrement Rn
+                    uint32_t addr = ctx->r[ins.src2.reg];         // Use new Rn as address
+
+                    INFO_LOG(SH4, "STORE16_PREDEC: R%u(0x%04X) to @-R%u (new R%u=0x%08X, addr=0x%08X)",
+                             ins.src1.reg, val_to_store,
+                             ins.src2.reg, ins.src2.reg, ctx->r[ins.src2.reg], addr);
+                             
+                    if (unlikely(IsBiosAddr(addr))) {
+                        LogIllegalBiosWrite(ins, addr, curr_pc);
+                    } else {
+                        mmu_WriteMem<uint16_t>(addr, val_to_store);
+                    }
+                    break;
+                }
+                case Op::STORE32_PREDEC:
+                {
+                    uint32_t val_to_store = ctx->r[ins.src1.reg]; // Get value from Rm FIRST
+                    ctx->r[ins.src2.reg] -= 4;                    // THEN decrement Rn
+                    uint32_t addr = ctx->r[ins.src2.reg];         // Use new Rn as address
+
+                    INFO_LOG(SH4, "STORE32_PREDEC: R%u(0x%08X) to @-R%u (new R%u=0x%08X, addr=0x%08X)",
+                             ins.src1.reg, val_to_store,
+                             ins.src2.reg, ins.src2.reg, ctx->r[ins.src2.reg], addr);
+
+                    if (unlikely(IsBiosAddr(addr))) {
+                        LogIllegalBiosWrite(ins, addr, curr_pc);
+                    } else {
+                        mmu_WriteMem<uint32_t>(addr, val_to_store);
+                    }
                     break;
                 }
                 case Op::OR_REG:

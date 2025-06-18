@@ -778,7 +778,80 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.extra = 1;      // 1 for GBR
             decoded = true;
             blk.pcNext = pc + 2;
-            INFO_LOG(SH4, "Emitter: Decoded STC GBR, R%d (0x%04X) at PC=0x%08X", n, raw, pc);
+        }
+        // MOV.B Rm, @(disp, Rn) or MOV.B Rm, @Rn
+        else if ((raw & 0xF000) == 0x0000 && !((raw & 0xF0FF) == 0x0002 || (raw & 0xF0FF) == 0x0012 || (raw & 0xF0FF) == 0x0022 || (raw & 0xF0FF) == 0x000E || (raw & 0xF0FF) == 0x001E || (raw & 0xF0FF) == 0x0003 || (raw & 0xF0FF) == 0x0023 || raw == 0x000B || raw == 0x001B || raw == 0x0028 || raw == 0x0009 || raw == 0x0019 || raw == 0x0008 || raw == 0x0018 || raw == 0x0048 || raw == 0x0058)) // Exclude specific 0x0xxx opcodes handled elsewhere or by FastDecode. Added 0048 (CLRS) and 0058 (SETS)
+        {
+            ins.op = Op::STORE8;
+            ins.src1.isImm = false;
+            ins.src1.reg = m; // Rm (value to store)
+            ins.src2.isImm = false;
+            ins.src2.reg = n; // Rn (base address register)
+            if ((raw & 0xF) == 0x4) { // MOV.B Rm, @Rn (.... .... .... 0100)
+                ins.extra = 0;
+                INFO_LOG(SH4, "Emitter: Decoded STORE8_REG R%d, @R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
+            } else { // MOV.B Rm, @(disp, Rn) (.... .... .... dddd)
+                ins.extra = (raw & 0xF); // displacement, scaled by 1
+                INFO_LOG(SH4, "Emitter: Decoded STORE8_DISP R%d, @(%d,R%d) (0x%04X) at PC=0x%08X", m, ins.extra, n, raw, pc);
+            }
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.W Rm, @(disp, Rn) or MOV.W Rm, @Rn
+        else if ((raw & 0xF000) == 0x1000)
+        {
+            ins.op = Op::STORE16;
+            ins.src1.isImm = false;
+            ins.src1.reg = m; // Rm
+            ins.src2.isImm = false;
+            ins.src2.reg = n; // Rn
+            if ((raw & 0xF) == 0x1) { // MOV.W Rm, @Rn (.... .... .... 0001)
+                ins.extra = 0;
+                INFO_LOG(SH4, "Emitter: Decoded STORE16_REG R%d, @R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
+            } else { // MOV.W Rm, @(disp, Rn) (.... .... .... dddd)
+                ins.extra = (raw & 0xF) * 2; // displacement, scaled by 2
+                INFO_LOG(SH4, "Emitter: Decoded STORE16_DISP R%d, @(%d,R%d) (0x%04X) at PC=0x%08X", m, ins.extra, n, raw, pc);
+            }
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.L Rm, @(disp, Rn) or MOV.L Rm, @Rn
+        else if ((raw & 0xF000) == 0x2000)
+        {
+            INFO_LOG(SH4, "Emitter: Manual STORE32 path entered for raw=0x%04X, pc=0x%08X. m=R%d, n=R%d", raw, pc, m, n);
+            uint8_t type_nibble = raw & 0xF;
+
+            ins.src1.isImm = false;
+            ins.src1.reg = m; // Rm is already extracted before this block
+            ins.src2.isImm = false;
+            ins.src2.reg = n; // Rn is already extracted before this block
+            ins.extra = 0;    // For @Rn and @-Rn forms, displacement is 0 from opcode perspective.
+
+            if (type_nibble == 0x0) { // MOV.B Rm, @Rn
+                ins.op = Op::STORE8;
+                INFO_LOG(SH4, "Emitter: Decoded STORE8 R%d, @R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
+            } else if (type_nibble == 0x1) { // MOV.W Rm, @Rn
+                ins.op = Op::STORE16;
+                INFO_LOG(SH4, "Emitter: Decoded STORE16 R%d, @R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
+            } else if (type_nibble == 0x2) { // MOV.L Rm, @Rn
+                ins.op = Op::STORE32;
+                INFO_LOG(SH4, "Emitter: Decoded STORE32 R%d, @R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
+            } else if (type_nibble == 0x4) { // MOV.B Rm, @-Rn
+                ins.op = Op::STORE8_PREDEC;
+                INFO_LOG(SH4, "Emitter: Decoded STORE8_PREDEC R%d, @-R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
+            } else if (type_nibble == 0x5) { // MOV.W Rm, @-Rn
+                ins.op = Op::STORE16_PREDEC;
+                INFO_LOG(SH4, "Emitter: Decoded STORE16_PREDEC R%d, @-R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
+            } else if (type_nibble == 0x6) { // MOV.L Rm, @-Rn
+                ins.op = Op::STORE32_PREDEC;
+                INFO_LOG(SH4, "Emitter: Decoded STORE32_PREDEC R%d, @-R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
+            }
+            else {
+                ins.op = Op::ILLEGAL;
+                INFO_LOG(SH4, "Emitter: ILLEGAL/UNHANDLED 0x2xxx form (0x%04X), last nibble %X, at PC=0x%08X", raw, type_nibble, pc);
+            }
+            decoded = true;
+            blk.pcNext = pc + 2;
         }
         // STC VBR, Rn (0000 nnnn 0010 0010 -> 0x0n22)
         else if ((raw & 0xF0FF) == 0x0022)
