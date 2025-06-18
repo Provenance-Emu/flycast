@@ -37,6 +37,7 @@ protected:
 
 	void ClearRegs()
 	{
+		sh4->Init();
 		std::fill(std::begin(ctx->r), std::end(ctx->r), REG_MAGIC);
 		std::fill(std::begin(reinterpret_cast<u32 (&)[16]>(ctx->xf)), std::end(reinterpret_cast<u32 (&)[16]>(ctx->xf)), REG_MAGIC);
 		std::fill(std::begin(reinterpret_cast<u32 (&)[16]>(ctx->fr)), std::end(reinterpret_cast<u32 (&)[16]>(ctx->fr)), REG_MAGIC);

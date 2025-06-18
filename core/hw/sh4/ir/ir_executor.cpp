@@ -253,6 +253,22 @@ static void Exec_ADDC(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
     ctx->sr.T = (sum >> 32) & 1; // carry-out sets T
 }
 
+static void Exec_CLRT(const sh4::ir::Instr& /*ins*/, Sh4Context* ctx, uint32_t /*pc*/) {
+    ctx->sr.T = 0;
+}
+
+static void Exec_SETT(const sh4::ir::Instr& /*ins*/, Sh4Context* ctx, uint32_t /*pc*/) {
+    ctx->sr.T = 1;
+}
+
+static void Exec_CLRS(const sh4::ir::Instr& /*ins*/, Sh4Context* ctx, uint32_t /*pc*/) {
+    ctx->sr.S = 0;
+}
+
+static void Exec_SETS(const sh4::ir::Instr& /*ins*/, Sh4Context* ctx, uint32_t /*pc*/) {
+    ctx->sr.S = 1;
+}
+
 static ExecFn g_exec_table[static_cast<int>(sh4::ir::Op::NUM_OPS)]{};
 
 static void InitExecTable()
@@ -264,6 +280,10 @@ static void InitExecTable()
     g_exec_table[static_cast<int>(sh4::ir::Op::ADD_REG)]  = &Exec_ADD_REG;
     g_exec_table[static_cast<int>(sh4::ir::Op::ADD_IMM)]  = &Exec_ADD_IMM;
     g_exec_table[static_cast<int>(sh4::ir::Op::ADDC)]       = &Exec_ADDC;
+    g_exec_table[static_cast<int>(sh4::ir::Op::CLRT)]       = &Exec_CLRT;
+    g_exec_table[static_cast<int>(sh4::ir::Op::SETT)]       = &Exec_SETT;
+    g_exec_table[static_cast<int>(sh4::ir::Op::CLRS)]       = &Exec_CLRS;
+    g_exec_table[static_cast<int>(sh4::ir::Op::SETS)]       = &Exec_SETS;
     init = true;
 }
 
@@ -378,6 +398,33 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::AND_REG:
                     ctx->r[ins.dst.reg] &= ctx->r[ins.src1.reg];
                     break;
+                case Op::STORE8:
+                {
+                    uint32_t addr = ctx->r[ins.src2.reg] + ins.extra;
+                    uint8_t val = static_cast<uint8_t>(ctx->r[ins.src1.reg]);
+                    INFO_LOG(SH4, "STORE8: R%u(0x%02X) -> @(R%u=0x%08X + disp=%d) -> addr=0x%08X", ins.src1.reg, val, ins.src2.reg, ctx->r[ins.src2.reg], ins.extra, addr);
+                    if (unlikely(IsBiosAddr(addr))) LogIllegalBiosWrite(ins, addr, curr_pc);
+                    else mmu_WriteMem<uint8_t>(addr, val);
+                    break;
+                }
+                case Op::STORE16:
+                {
+                    uint32_t addr = ctx->r[ins.src2.reg] + ins.extra;
+                    uint16_t val = static_cast<uint16_t>(ctx->r[ins.src1.reg]);
+                    INFO_LOG(SH4, "STORE16: R%u(0x%04X) -> @(R%u=0x%08X + disp=%d) -> addr=0x%08X", ins.src1.reg, val, ins.src2.reg, ctx->r[ins.src2.reg], ins.extra, addr);
+                    if (unlikely(IsBiosAddr(addr))) LogIllegalBiosWrite(ins, addr, curr_pc);
+                    else mmu_WriteMem<uint16_t>(addr, val);
+                    break;
+                }
+                case Op::STORE32:
+                {
+                    uint32_t addr = ctx->r[ins.src2.reg] + ins.extra;
+                    uint32_t val = ctx->r[ins.src1.reg];
+                    INFO_LOG(SH4, "STORE32: R%u(0x%08X) -> @(R%u=0x%08X + disp=%d) -> addr=0x%08X", ins.src1.reg, val, ins.src2.reg, ctx->r[ins.src2.reg], ins.extra, addr);
+                    if (unlikely(IsBiosAddr(addr))) LogIllegalBiosWrite(ins, addr, curr_pc);
+                    else mmu_WriteMem<uint32_t>(addr, val);
+                    break;
+                }
                 case Op::OR_REG:
                     ctx->r[ins.dst.reg] |= ctx->r[ins.src1.reg];
                     break;
@@ -553,39 +600,6 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     ctx->r[ins.src1.reg] += 4;
                     break;
                 }
-                case Op::STORE8:
-                {
-                    uint32_t addr = ctx->r[ins.dst.reg] + static_cast<uint32_t>(ins.extra);
-                    if (u8* p = FastRamPtrWrite(addr))
-                        *p = static_cast<u8>(ctx->r[ins.src1.reg]);
-                    else if (IsBiosAddr(addr)) {
-                         LogIllegalBiosWrite(ins, addr, curr_pc);
-                     } else
-                         mmu_WriteMem<u8>(addr, ctx->r[ins.src1.reg]);
-                    break;
-                }
-                case Op::STORE16:
-                {
-                    uint32_t addr = ctx->r[ins.dst.reg] + static_cast<uint32_t>(ins.extra);
-                    if (u8* p = FastRamPtrWrite(addr))
-                        *reinterpret_cast<u16*>(p) = static_cast<u16>(ctx->r[ins.src1.reg]);
-                    else if (IsBiosAddr(addr)) {
-                         LogIllegalBiosWrite(ins, addr, curr_pc);
-                     } else
-                         mmu_WriteMem<u16>(addr, static_cast<uint16_t>(ctx->r[ins.src1.reg]));
-                    break;
-                }
-                case Op::STORE32:
-                {
-                    uint32_t addr = ctx->r[ins.dst.reg] + static_cast<uint32_t>(ins.extra);
-                    if (u8* p = FastRamPtrWrite(addr))
-                        *reinterpret_cast<u32*>(p) = ctx->r[ins.src1.reg];
-                    else if (IsBiosAddr(addr)) {
-                         LogIllegalBiosWrite(ins, addr, curr_pc);
-                     } else
-                         mmu_WriteMem<u32>(addr, ctx->r[ins.src1.reg]);
-                    break;
-                }
                 case Op::STORE8_POST:
                 {
                     uint32_t addr = ctx->r[ins.dst.reg];
@@ -705,6 +719,14 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 }
                 case Op::LOAD32_IMM:
                     ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(static_cast<uint32_t>(ins.src1.imm));
+                    break;
+                case Op::LDC_SR: // LDC Rm, SR
+                    ctx->sr.setFull(ctx->r[ins.src1.reg]);
+                    // INFO_LOG(SH4, "LDC_SR: R%d (0x%08X) -> SR (0x%08X) at PC=%08X", ins.src1.reg, ctx->r[ins.src1.reg], ctx->sr.GetFull(), curr_pc);
+                    break;
+                case Op::STC_SR: // STC SR, Rn
+                    ctx->r[ins.dst.reg] = ctx->sr.getFull();
+                    // INFO_LOG(SH4, "STC_SR: SR (0x%08X) -> R%d (0x%08X) at PC=%08X", ctx->sr.GetFull(), ins.dst.reg, ctx->r[ins.dst.reg], curr_pc);
                     break;
                 case Op::JSR:
                     INFO_LOG(SH4, "BR JSR from %08X -> %08X (r%u)", curr_pc, ctx->r[ins.src1.reg], ins.src1.reg);

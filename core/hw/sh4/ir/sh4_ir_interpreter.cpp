@@ -18,6 +18,7 @@ Sh4IrInterpreter::Sh4IrInterpreter()
 
 void Sh4IrInterpreter::Init()
 {
+    emitter_.ClearCaches();
     // Zero context similar to legacy init
     memset(ctx_, 0, sizeof(*ctx_));
     ctx_->vbr = 0x8C000000; // exception vectors

@@ -166,6 +166,8 @@ enum class Op : uint8_t {
     SHLR2,
     SHLR8,
     SLEEP,
+    LDC_SR,     // Load GPR to System Register (e.g., LDC Rm, SR)
+    STC_SR,     // Store System Register to GPR (e.g., STC SR, Rn)
     STC,
     STC_L,
     STS,
