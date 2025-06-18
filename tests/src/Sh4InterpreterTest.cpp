@@ -102,3 +102,54 @@ TEST_F(Sh4InterpreterTest, DoubleFloatingPointTest)
 {
 	Sh4OpTest::DoubleFloatingPointTest();
 }
+
+TEST_F(Sh4InterpreterTest, DirectAddrSpaceP1WriteReadTest)
+{
+	// Target P1 address (cached RAM)
+	const u32 test_addr = 0x8C010000;
+	const u32 test_value = 0xDEADBEEF;
+	const u32 initial_ram_value = addrspace::read32(test_addr);
+
+	INFO_LOG(SH4, "DirectAddrSpaceP1WriteReadTest: Initial value at 0x%08X is 0x%08X", test_addr, initial_ram_value);
+
+	addrspace::write32(test_addr, test_value);
+	INFO_LOG(SH4, "DirectAddrSpaceP1WriteReadTest: Wrote 0x%08X to 0x%08X", test_value, test_addr);
+
+	const u32 value_after_write = addrspace::read32(test_addr);
+	INFO_LOG(SH4, "DirectAddrSpaceP1WriteReadTest: Read 0x%08X from 0x%08X after write", value_after_write, test_addr);
+
+	EXPECT_EQ(value_after_write, test_value)
+		<< "Value read from 0x" << std::hex << test_addr
+		<< " after writing 0x" << test_value
+		<< " did not match. Read: 0x" << value_after_write;
+
+	// As a control, write something else and read again
+	const u32 control_value = 0x12345678;
+	addrspace::write32(test_addr, control_value);
+	const u32 value_after_control_write = addrspace::read32(test_addr);
+	EXPECT_EQ(value_after_control_write, control_value)
+		<< "Control write failed. Value read from 0x" << std::hex << test_addr
+		<< " after writing 0x" << control_value
+		<< " did not match. Read: 0x" << value_after_control_write;
+}
+
+TEST_F(Sh4InterpreterTest, DirectAddrSpaceP0WriteReadTest)
+{
+	// Target P0 address (cached RAM)
+	const u32 test_addr = 0x0C010000; // Same offset as P1 test, but in P0
+	const u32 test_value = 0xCAFEBABE;
+	const u32 initial_ram_value = addrspace::read32(test_addr);
+
+	INFO_LOG(SH4, "DirectAddrSpaceP0WriteReadTest: Initial value at 0x%08X is 0x%08X", test_addr, initial_ram_value);
+
+	addrspace::write32(test_addr, test_value);
+	INFO_LOG(SH4, "DirectAddrSpaceP0WriteReadTest: Wrote 0x%08X to 0x%08X", test_value, test_addr);
+
+	const u32 value_after_write = addrspace::read32(test_addr);
+	INFO_LOG(SH4, "DirectAddrSpaceP0WriteReadTest: Read 0x%08X from 0x%08X after write", value_after_write, test_addr);
+
+	EXPECT_EQ(value_after_write, test_value)
+		<< "Value read from 0x" << std::hex << test_addr
+		<< " after writing 0x" << test_value
+		<< " did not match. Read: 0x" << value_after_write;
+}
