@@ -9,6 +9,8 @@ PIC="ON"
 ARCH="arm64"
 SYSTEM_NAME="macOS"
 RUN_BUILD="ON"
+# PASS CLEAN=TRUE to force cleaning
+CLEAN=${CLEAN:-"FALSE"}
 
 # Simple helper to configure, build and run the C++ unit-tests (GoogleTest)
 # against the SH4 cached-IR executor.
@@ -28,8 +30,10 @@ if [[ $# -gt 0 ]]; then
   shift # remove build dir param so remaining args go to cmake
 fi
 
-# Clean the build directory
-#rm -rf "${BUILD_DIR}"
+# Clean the build directory if CLEAN is TRUE
+if [[ "${CLEAN}" == "TRUE" ]]; then
+    rm -rf "${BUILD_DIR}"
+fi
 
 # Configure with CMake
 cmake -S "${PROJECT_ROOT_DIR}" -B "${BUILD_DIR}" \
