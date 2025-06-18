@@ -388,23 +388,20 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 		//if on kernel, and not SQ addr -> error // This comment seems to refer to SR.MD=1 (kernel) but condition is SR.MD=0 (user)
 		return MmuError::BADADDR; // Protection Violation (User mode, Pn access)
 
-	// P1 (0x80000000-0x9FFFFFFF) and P2 (0xA0000000-BFFFFFFF) are always direct-mapped when AT=1
-	// This logic is for AT=1. If AT=0, P1/P2 are handled in the AT=0 block.
 	if ((va & 0xE0000000) == 0x80000000) // P1
 	{
-		// if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): P1 direct map check.");
-		rv = 0x0C000000 | (va & 0x00FFFFFF); // mirror to main RAM window
+		        // When MMU is enabled (AT==1) P1 is untranslated (identity-mapped)
+        rv = va;
 		return MmuError::NONE;
 	}
 
 	if ((va & 0xE0000000) == 0xA0000000) // P2
 	{
-		// if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): P2 direct map check.");
-		rv = 0x0C000000 | (va & 0x00FFFFFF);
+		        // When MMU is enabled (AT==1) P2 is untranslated (identity-mapped)
+        rv = va;
 		return MmuError::NONE;
 	}
 
-	// P0/U0 0x7C000000 - 0x7FFFFFFF not translated (when AT=1)
 	if ((va & 0xFC000000) == 0x7C000000)
 	{
 		// if (va == 0 && translation_type == MMU_TT_DWRITE && CCN_MMUCR.AT == 1) INFO_LOG(MMU, "mmu_data_translation(va=0, DWRITE, AT=1): P0/U0 non-translated (0x7Cxxxxxx) check.");
@@ -418,11 +415,11 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 	// However, P1, P2, P4 are already handled above for AT=1 or by the P4 check at the function start.
 	// This might be redundant or for a specific configuration.
 	// For safety, let's assume it's intended for some edge case if AT=1.
-	if (fast_reg_lut[va >> 29] != 0) // Checks top 3 bits for P1,P2,P4 (0x8,0xA,0xE,0xF)
-	{
-		rv = va;
-		return MmuError::NONE;
-	}
+	// if (fast_reg_lut[va >> 29] != 0) // Checks top 3 bits for P1,P2,P4 (0x8,0xA,0xE,0xF)
+	// {
+	// 	rv = va;
+	// 	return MmuError::NONE;
+	// }
 
 	// Cascade: Added log before mmu_full_lookup
 	INFO_LOG(MEMORY, "mmu_data_translation: PRE_LOOKUP. va=0x%08X, type=%s, mmuOn=%d, CCN_MMUCR.AT=%d, SR.MD=%d", // Changed to MEMORY channel
@@ -495,10 +492,10 @@ MmuError mmu_instruction_translation(u32 va, u32& rv)
 			rv = va | 0xF0000000;
 		}
 		else if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
-		{
-			// P1/P2 mirror to main RAM window
-			rv = 0x0C000000 | (va & 0x00FFFFFF);
-		}
+        {
+            // When the MMU is disabled (AT==0) P1/P2 are identity–mapped. No mirroring.
+            rv = va;
+        }
 		else
 		{
 			// P0/U0 mirror into first 16MB
@@ -515,19 +512,11 @@ MmuError mmu_instruction_translation(u32 va, u32& rv)
 		// P4 not executable
 		return MmuError::BADADDR;
 
-	if (fast_reg_lut[va >> 29] != 0)
-	{
-		// P1 and P2 mirror to main RAM window
-		if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
-		{
-			rv = 0x0C000000 | (va & 0x00FFFFFF);
-		}
-		else
-		{
-			rv = va;
-		}
-		return MmuError::NONE;
-	}
+	if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
+    {
+        rv = va;
+        return MmuError::NONE;
+    }
 
 	const TLB_Entry *entry;
 	MmuError lookup = mmu_instruction_lookup(va, &entry, rv);
@@ -771,6 +760,12 @@ template u64 mmu_ReadMem(u32 adr);
 u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 {
     // INFO_LOG(SH4, "mmu_IReadMem16: Entry. vaddr=0x%08X, mmuOn=%d, CCN_MMUCR.AT=%d", vaddr, mmuOn, CCN_MMUCR.AT);
+    // Instruction fetches must be half-word aligned. Generate BADADDR on misaligned access so the test detects it.
+    if (vaddr & 1)
+    {
+        mmu_raise_exception(MmuError::BADADDR, vaddr, MMU_TT_IREAD);
+        return 0;
+    }
 	// BIOS ROM is only visible in the A0/C0 regions (cached + uncached) and their P1/P2 mirrors.
     // Accesses in P0 (0x00000000–0x7FFFFFFF) should point to SDRAM, NOT to the BIOS. Using the BIOS
     // there caused the bogus wrap-to-zero bug we are chasing.
