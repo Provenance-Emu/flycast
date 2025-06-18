@@ -65,13 +65,8 @@ static void map_area3_init()
 static void map_area3(u32 base)
 {
 	// System RAM
-	// Map P0, P1 and P2 windows as independent mirrors onto main RAM so segment offsets remain correct
-    // Map primary P0/U0 window directly
-    addrspace::mapBlockMirror(&mem_b[0], 0x0C | base, 0x0F | base, RAM_SIZE);
-    // Map P1 (0x8C–0x8F) and P2 (0xAC–0xAF) as real mirrors using mapBlockMirror so
-    // each 16-MiB slice points to the correct offset within SDRAM.
-    addrspace::mapBlockMirror(&mem_b[0], 0x8C | base, 0x8F | base, RAM_SIZE); // P1 mirror
-    addrspace::mapBlockMirror(&mem_b[0], 0xAC | base, 0xAF | base, RAM_SIZE); // P2 mirror
+	// System RAM
+	addrspace::mapBlockMirror(&mem_b[0], 0x0C | base,0x0F | base, RAM_SIZE - 1);
 }
 
 //AREA 4

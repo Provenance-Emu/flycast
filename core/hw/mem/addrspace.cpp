@@ -11,7 +11,6 @@
 namespace addrspace
 {
 
-#define HANDLER_MAX 0x1F
 #define HANDLER_COUNT (HANDLER_MAX+1)
 
 //top registered handler
@@ -28,7 +27,7 @@ static ReadMem32FP*  RF32[HANDLER_COUNT];
 static WriteMem32FP* WF32[HANDLER_COUNT];
 
 //upper 8b of the address
-static void* memInfo_ptr[0x100];
+void* memInfo_ptr[0x100];
 
 #define MAP_RAM_START_OFFSET  0
 #define MAP_VRAM_START_OFFSET (MAP_RAM_START_OFFSET+RAM_SIZE)
@@ -112,37 +111,45 @@ T DYNACALL readt(u32 addr)
 	uintptr_t iirf = (uintptr_t)memInfo_ptr[page]; //2 ops, insert + read [vmem table will be on reg ]
 	void *ptr = (void *)(iirf & ~HANDLER_MAX);     //2 ops, and // 1 op insert
 
-	if (likely(ptr != nullptr))
+	if (likely(ptr != nullptr)) // This means memInfo_ptr[page] was a direct pointer, not a handler ID.
 	{
-		u32 shift = iirf & HANDLER_MAX;
-        addr <<= shift;
-		        addr >>= shift;
+		u32 shift_val = iirf & HANDLER_MAX; // This is N from FindMask(page_actual_mask)
+		u32 page_offset_mask = (1U << shift_val) - 1; // Reconstruct the page_actual_mask
+		u32 actual_offset = addr & page_offset_mask;
 
-		if (page == 0xAC)
+        T value_read = *(T *)&((u8 *)ptr)[actual_offset];
+
+        INFO_LOG(MEMORY, "readt fast path: size=%u guest_addr=%08X page=%02X -> host_base=%p, derived_mask=%08X, offset_in_page=%08X -> val=%0*llX",
+                 sz*8, addr, page, ptr, page_offset_mask, actual_offset, (sz == 8 ? 16 : sz*2), (unsigned long long)value_read);
+
+		if (page == 0xAC) // Existing specific log for 0xAC
         {
-            INFO_LOG(SH4, "READ%u page %02X host=%p offs=%06X val=%08llX", sz*8, &((u8*)ptr)[addr], addr, (unsigned long long)*(T*)&((u8*)ptr)[addr]);
+            INFO_LOG(SH4, "READ%u (0xAC specific) page %02X host_ptr_at_offset=%p offs_in_page=%06X val=%0*llX",
+                     sz*8, page, &((u8*)ptr)[actual_offset], actual_offset, (sz == 8 ? 16 : sz*2), (unsigned long long)value_read);
         }
-        return *(T *)&((u8 *)ptr)[addr];
+        return value_read;
 	}
-	else
+	else // Slow path: using registered I/O handlers
 	{
-		const u32 id = iirf;
+		const u32 handler_id = iirf; // iirf from memInfo_ptr[page] is the handler_id
+        INFO_LOG(MEMORY, "readt slow path: size=%u guest_addr=%08X page=%02X -> handler_id=%u",
+                 sz*8, addr, page, handler_id);
 		switch (sz)
 		{
 		case 1:
-			return (T)RF8[id](addr);
+			return (T)RF8[handler_id](addr);
 		case 2:
-			return (T)RF16[id](addr);
+			return (T)RF16[handler_id](addr);
 		case 4:
-			return (T)RF32[id](addr);
+			return (T)RF32[handler_id](addr);
 		case 8:
 			{
-				T rv = RF32[id](addr);
-				rv |= (T)((u64)RF32[id](addr + 4) << 32);
+				T rv = RF32[handler_id](addr);
+				rv |= (T)((u64)RF32[handler_id](addr + 4) << 32);
 				return rv;
 			}
 		default:
-			die("Invalid size");
+			die("Invalid size for readt slow path");
 			return 0;
 		}
 	}
@@ -163,15 +170,15 @@ void DYNACALL writet(u32 addr, T data)
 
 	if (likely(ptr != nullptr))
 	{
-		u32 shift = iirf & HANDLER_MAX;
-        addr <<= shift;
-		        addr >>= shift;
+		u32 shift_val = iirf & HANDLER_MAX; // This is N from FindMask(page_actual_mask)
+		u32 page_offset_mask = (1U << shift_val) - 1; // Reconstruct the page_actual_mask
+		u32 actual_offset = addr & page_offset_mask;
 
 		if (page == 0xAC)
         {
-            INFO_LOG(SH4, "WRITE%u page AC host=%p offs=%06X val=%08llX", sz*8, &((u8*)ptr)[addr], addr, (unsigned long long)data);
+            INFO_LOG(SH4, "WRITE%u page AC host_at_offset=%p guest_offs_in_page=%06X val=%0*llX", sz*8, &((u8*)ptr)[actual_offset], actual_offset, (sz == 8 ? 16 : sz*2), (unsigned long long)data);
         }
-        *(T *)&((u8 *)ptr)[addr] = data;
+        *(T *)&((u8 *)ptr)[actual_offset] = data;
 	}
 	else
 	{
@@ -258,16 +265,7 @@ handler registerHandler(
 	return rv;
 }
 
-static u32 FindMask(u32 mask)
-{
-    // Count contiguous low-order 1-bits; this equals log2(block size).
-    u32 width = 0;
-    while (mask & 1) {
-        ++width;
-        mask >>= 1;
-    }
-    return width;
-}
+
 
 //map a registered handler to a mem region
 void mapHandler(handler Handler, u32 start, u32 end)
@@ -290,20 +288,26 @@ void mapBlock(void *base, u32 start, u32 end, u32 mask)
 	assert(start < 0x100);
 	assert(end < 0x100);
 	assert(start <= end);
-	assert((0xFF & (uintptr_t)base) == 0);
+	assert(((uintptr_t)base & 0xFF) == 0);
 	assert(base != nullptr);
-	    u32 j = 0;
+
+    u32 page_shift = FindMask(mask);
+    assert(page_shift <= HANDLER_MAX);
+    uintptr_t page_size = 1ULL << page_shift;
+
     for (u32 i = start; i <= end; i++)
     {
-        uintptr_t hostPtr = (uintptr_t)base + (j & mask); // wrap every 16 MiB to alias base
-        memInfo_ptr[i] = (u8*)(hostPtr | FindMask(mask));
+        uintptr_t page_offset_in_buffer = (i - start) * page_size;
+        uintptr_t current_host_ptr = (uintptr_t)base + page_offset_in_buffer;
+
+        memInfo_ptr[i] = (u8*)(current_host_ptr | page_shift);
+
         if (i >= 0xA0 && i <= 0xAF) {
             uintptr_t entry = (uintptr_t)memInfo_ptr[i];
             u32 shift = entry & HANDLER_MAX;
             void* host = (void*)(entry & ~HANDLER_MAX);
             INFO_LOG(SH4, "[map] idx=%02X host=%p shift=%u", i, host, shift);
         }
-        j += 0x1000000;
 	}
 }
 

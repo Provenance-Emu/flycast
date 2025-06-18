@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include <cassert>
 
 namespace addrspace
 {
@@ -31,22 +32,33 @@ handler registerHandler(ReadMem8FP *read8, ReadMem16FP *read16, ReadMem32FP *rea
 									(read<u8>, read<u16>, read<u32>,	\
 									write<u8>, write<u16>, write<u32>)
 
+#define HANDLER_MAX 0x1F
+
+extern void* memInfo_ptr[0x100];
+
+static inline u32 FindMask(u32 mask)
+{
+    // Count contiguous low-order 1-bits; this equals log2(block size).
+    u32 width = 0;
+    while (mask & 1) {
+        ++width;
+        mask >>= 1;
+    }
+    return width;
+}
+
 void mapHandler(handler Handler, u32 start, u32 end);
 void mapBlock(void* base, u32 start, u32 end, u32 mask);
 void mirrorMapping(u32 new_region, u32 start, u32 size);
 
-static inline void mapBlockMirror(void* base, u32 start, u32 end, u32 blck_size)
+static inline void mapBlockMirror(void *base, u32 start, u32 end, u32 mask)
 {
-    // Map every 16-MiB virtual page in [start,end] onto the backing buffer,
-    // wrapping the pointer every 16 MiB so larger buffers mirror correctly.
-    constexpr u32 PAGE16M_MASK = (1u << 24) - 1; // 0x00FFFFFF
+    u32 page_shift = FindMask(mask);
+    assert(page_shift <= HANDLER_MAX);
 
-    for (u32 vp = start; vp <= end; ++vp)
+    for (u32 i = start; i <= end; i++)
     {
-        // Offset into buffer repeats every 16 MiB.
-        u32 offset = ((vp - start) << 24) & (blck_size - 1);
-        void* hostPtr = static_cast<u8*>(base) + offset;
-        mapBlock(hostPtr, vp, vp, PAGE16M_MASK);
+        memInfo_ptr[i] = (u8*)((uintptr_t)base | page_shift);
     }
 }
 
@@ -55,6 +67,7 @@ u16 DYNACALL read16(u32 address);
 u32 DYNACALL read32(u32 address);
 u64 DYNACALL read64(u32 address);
 template<typename T> T DYNACALL readt(u32 addr);
+
 
 static inline int32_t DYNACALL read8SX32(u32 address) {
 	return (int32_t)(int8_t)readt<u8>(address);
