@@ -346,8 +346,15 @@ Block& Emitter::CreateNew(uint32_t pc) {
         }
 
         blk.pcStart = pc;
-        DEBUG_LOG(SH4, "Emitter::CreateNew: Entered for PC=0x%08X", pc);
+        INFO_LOG(SH4, "Emitter::CreateNew: Entered for PC=0x%08X", pc);
+        fflush(stdout);
+        if (pc == 0xAC000000) {
+            INFO_LOG(SH4, "Emitter::CreateNew: Processing target PC=0xAC000000");
+            fflush(stdout);
+        }
         uint16_t raw = mmu_IReadMem16(pc);
+        INFO_LOG(SH4, "Emitter::CreateNew: PC=0x%08X, raw_opcode=0x%04X", pc, raw);
+        fflush(stdout);
     if (pc == 0x8C00B6B8 || pc == 0x8C00B6BA || pc == 0x8C00B6BC) {
         INFO_LOG(SH4, "Emitter::CreateNew: At critical PC=%08X, raw=0x%04X", pc, raw);
     }
@@ -614,8 +621,10 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 4; // includes delay slot
         }
-        else if ((raw & 0xF00F) == 0x6003)
+        else if ((raw & 0xF00F) == 0x6003) // MOV Rm, Rn
         {
+            INFO_LOG(SH4, "Emitter::CreateNew: Decoding MOV R%d, R%d (raw=0x%04X, pc=0x%08X)", m, n, raw, pc);
+            fflush(stdout);
             ins.op = Op::MOV_REG;
             ins.dst.isImm = false;
             ins.dst.reg = n;
@@ -1981,8 +1990,10 @@ Block& Emitter::CreateNew(uint32_t pc) {
 
             Instr end{}; end.op = Op::END; end.pc = blk.pcNext; end.raw = 0xFFFF;
             blk.code.push_back(end);
-            g_block_sig_cache.emplace(sig, &blk);
-            return blk;
+            INFO_LOG(SH4, "Emitter::CreateNew: Finalizing block for PC=0x%08X. Instructions: %zu. pcNext=0x%08X", blk.pcStart, blk.code.size(), blk.pcNext);
+    fflush(stdout);
+    g_block_sig_cache.emplace(sig, &blk);
+    return blk;
         }
     }
     return blk;

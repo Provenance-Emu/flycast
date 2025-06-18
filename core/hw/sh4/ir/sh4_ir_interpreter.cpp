@@ -159,9 +159,12 @@ void Sh4IrInterpreter::Step()
 } // namespace ir
 } // namespace sh4
 
-#ifdef ENABLE_SH4_IR
+#ifdef SH4_IR_ENABLED
 Sh4Executor* Get_Sh4Interpreter()
 {
+    fprintf(stderr, "[DEBUG_PRINTF] IR Get_Sh4Interpreter() called THE NEW ONE\n");
+    printf("[DEBUG_PRINTF] IR Get_Sh4Interpreter() called. THE NEW ONE\n");
+    fflush(stderr);
     return new sh4::ir::Sh4IrInterpreter();
 }
-#endif
+#endif // SH4_IR_ENABLED

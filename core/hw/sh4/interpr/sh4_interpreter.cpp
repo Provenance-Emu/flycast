@@ -3,6 +3,7 @@
 */
 
 #include "types.h"
+#include <cstdio> // For fprintf
 
 #include "../sh4_interpreter.h"
 #include "../sh4_opcode_list.h"
@@ -108,6 +109,7 @@ Sh4Interpreter *Sh4Interpreter::Instance;
 
 Sh4Interpreter::Sh4Interpreter()
 {
+    fprintf(stderr, "[DEBUG_PRINTF] Classic Sh4Interpreter::Sh4Interpreter() called\n");
     Instance = this;
 }
 
@@ -353,6 +355,7 @@ void Sh4Interpreter::Step()
 
 void Sh4Interpreter::Reset(bool hard)
 {
+    fprintf(stderr, "[DEBUG_PRINTF] Classic Sh4Interpreter::Reset() called\n");
 	verify(!ctx->CpuRunning);
 
 	if (hard)
@@ -462,12 +465,13 @@ void Sh4Interpreter::Term()
 	INFO_LOG(INTERPRETER, "Sh4 Term");
 }
 
-#ifndef ENABLE_SH4_IR
-Sh4Executor *Get_Sh4Interpreter()
+#ifndef SH4_IR_ENABLED
+Sh4Executor* Get_Sh4Interpreter()
 {
+    fprintf(stderr, "[DEBUG_PRINTF] Classic Get_Sh4Interpreter() called\n");
     return new Sh4Interpreter();
 }
-#endif
+#endif // SH4_IR_ENABLED
 
 // Then modify the Sh4_int_Run function
 void Sh4_int_Run()
