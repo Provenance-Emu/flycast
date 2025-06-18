@@ -323,10 +323,22 @@ MmuError mmu_data_translation(u32 va, u32& rv)
     // Original fastmmu.cpp logic follows if CCN_MMUCR.AT == 1
 	if (fast_reg_lut[va >> 29] != 0)
 	{
-		if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000 || (va & 0xE0000000) == 0xC0000000)
-			rv = 0x0C000000 | (va & 0x00FFFFFF);
+		// fast_reg_lut signals that this region bypasses full TLB translation.
+		// For AT==1 we must still follow SH4 rules:
+		//   • P1 (0x80000000) and P2 (0xA0000000) remain identity-mapped.
+		//   • P3 (0xC0000000) is a 24-MiB mirror of SDRAM starting at 0x0C000000.
+		if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
+		{
+			rv = va; // identity map P1/P2
+		}
+		else if ((va & 0xE0000000) == 0xC0000000)
+		{
+			rv = 0x0C000000 | (va & 0x00FFFFFF); // P3 mirror
+		}
 		else
-			rv = va;
+		{
+			rv = va; // P4 etc.
+		}
 		return MmuError::NONE;
 	}
 

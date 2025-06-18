@@ -373,8 +373,8 @@ MmuError mmu_data_translation(u32 va, u32& rv)
 		}
 		else if ((va & 0xE0000000) == 0x80000000 || (va & 0xE0000000) == 0xA0000000)
 		{
-			// Map P1/P2 to main RAM window (mirror)
-			rv = 0x0C000000 | (va & 0x00FFFFFF);
+			// When MMU is disabled, P1/P2 are still identity-mapped.
+			rv = va;
 		}
 		else
 		{
