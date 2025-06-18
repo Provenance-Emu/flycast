@@ -144,15 +144,18 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
-    // MOV.L @(disp,Rm),Rn 0x5nmd : treat all Rm (including R0)
+    // MOV.L Rm,@(disp,Rn) 0x5(Rm)(Rn)disp -- This is a STORE: Store Rm to @(disp,Rn)
     else if ((raw & 0xF000) == 0x5000) {
-        uint8_t n = (raw >> 8) & 0xF;
-        uint8_t m = (raw >> 4) & 0xF;
-        uint8_t disp4 = raw & 0xF;
-        ins.op = Op::LOAD32;
-        ins.dst = {false, n};
-        ins.src1 = {false, m};
-        ins.extra = disp4 * 4;
+        uint8_t rm_val_reg = (raw >> 8) & 0xF;    // Rm (source value for STORE)
+        uint8_t rn_base_reg = (raw >> 4) & 0xF;   // Rn (base address for STORE)
+        uint8_t disp_val = raw & 0xF;
+
+        ins.op = Op::STORE32;                          // Use generic STORE32
+        ins.src1 = {false, rm_val_reg};                // Value from Rm
+        ins.src2 = {false, rn_base_reg};               // Base Rn
+        ins.extra = disp_val * 4;                      // Displacement in ins.extra
+
+        INFO_LOG(SH4, "FastDecode: Decoded STORE32 R%u, @(%u,R%u) (0x%04X) at PC=%08X", rm_val_reg, disp_val * 4, rn_base_reg, raw, pc);
         blk.pcNext = pc + 2;
         return true;
     }
