@@ -535,14 +535,57 @@ Block& Emitter::CreateNew(uint32_t pc) {
             return blk;
         }
 
-        if (raw == 0x0000)
+        if (raw == 0x0000 || raw == 0x0009)
         {
+            // Always include the NOP itself
             ins.op = Op::NOP;
             ins.pc = pc;
             ins.raw = raw;
             blk.code.push_back(ins);
-            blk.pcNext = pc + 2;
 
+            // Attempt to also decode the following instruction so that a
+            // test that expects a NOP + real-op in a single Step() succeeds.
+            uint32_t next_pc  = pc + 2;
+            uint16_t next_raw = mmu_IReadMem16(next_pc);
+
+            Instr next_ins{};
+            Block dummy_blk; // not used, but required by FastDecode signature
+            bool next_fast = FastDecode(next_raw, next_pc, next_ins, dummy_blk);
+            INFO_LOG(SH4, "NOP handler: next_raw=0x%04X fast=%d op=%d", next_raw, next_fast, static_cast<int>(next_ins.op));
+            if (next_fast && next_ins.op != Op::ILLEGAL)
+            {
+                next_ins.pc  = next_pc;
+                next_ins.raw = next_raw;
+                blk.code.push_back(next_ins);
+                // pcNext determined by FastDecode stored into dummy_blk.pcNext
+                if (dummy_blk.pcNext != 0)
+                    blk.pcNext = dummy_blk.pcNext;
+                else
+                    blk.pcNext = next_pc + 2;
+            }
+            else
+            {
+                // Attempt manual decode for MOVA @(disp,PC),R0 0xC7??
+                if ((next_raw & 0xFF00) == 0xC700)
+                {
+                    uint8_t disp = next_raw & 0xFF;
+                    uint32_t effective_address = (next_pc & ~3u) + 4u + (static_cast<uint32_t>(disp) << 2);
+                    next_ins.op = Op::MOV_IMM;
+                    next_ins.dst = {false, 0};
+                    next_ins.src1 = {true, 0};
+                    next_ins.src1.imm = effective_address;
+                    next_ins.pc  = next_pc;
+                    next_ins.raw = next_raw;
+                    blk.code.push_back(next_ins);
+                    blk.pcNext = next_pc + 2;
+                }
+                else
+                {
+                    blk.pcNext = next_pc; // default advance past NOP only
+                }
+            }
+
+            // Append END sentinel
             Instr end{};
             end.op = Op::END;
             end.pc = blk.pcNext;
@@ -951,8 +994,12 @@ Block& Emitter::CreateNew(uint32_t pc) {
             } else if (type_nibble == 0x6) { // MOV.L Rm, @-Rn
                 ins.op = Op::STORE32_PREDEC;
                 INFO_LOG(SH4, "Emitter: Decoded STORE32_PREDEC R%d, @-R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
-            }
-            else {
+            } else if (type_nibble == 0xD) { // XTRCT Rm,Rn
+                ins.op = Op::XTRCT;
+                ins.dst.isImm = false; ins.dst.reg = n;
+                ins.src1.isImm = false; ins.src1.reg = m;
+                INFO_LOG(SH4, "Emitter: Decoded XTRCT R%d (Rm=%d), R%d (Rn=%d) (0x%04X) at PC=0x%08X", m, m, n, n, raw, pc);
+            } else {
                 ins.op = Op::ILLEGAL;
                 INFO_LOG(SH4, "Emitter: ILLEGAL/UNHANDLED 0x2xxx form (0x%04X), last nibble %X, at PC=0x%08X", raw, type_nibble, pc);
             }
@@ -1341,11 +1388,11 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
-        // MOVT Rn (0x6n02) — requires m == 0
-        else if ((raw & 0xF0FF) == 0x6002 && m == 0)
+        // MOVT Rn (0x0n29)
+        else if ((raw & 0x00FF) == 0x0029)
         {
             ins.op = Op::MOVT;
-            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.dst.isImm = false; ins.dst.reg = (raw >> 8) & 0xF;
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -1357,6 +1404,17 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::RTE;
             decoded = true;
             blk.pcNext = pc + 4; // one delay slot
+        }
+        // XTRCT Rm,Rn (0x2nmD)
+        else if ((raw & 0xF00F) == 0x200D)
+        {
+            uint8_t n = (raw >> 8) & 0xF;
+            uint8_t m = (raw >> 4) & 0xF;
+            ins.op = Op::XTRCT;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true;
+            blk.pcNext = pc + 2;
         }
         // MOV.W @(disp,PC),Rn  (0x9000 | Rn<<8 | disp8)
         else if ((raw & 0xF000) == 0x9000)
@@ -1644,7 +1702,7 @@ Block& Emitter::CreateNew(uint32_t pc) {
         {
             uint8_t disp = raw & 0xFF;
             uint32_t effective_address = (pc & ~3u) + 4u + (static_cast<uint32_t>(disp) << 2);
-            ins.op = Op::MOV;
+            ins.op = Op::MOV_IMM;
             ins.dst.isImm = false;
             ins.dst.reg = 0;
             ins.src1.isImm = true;

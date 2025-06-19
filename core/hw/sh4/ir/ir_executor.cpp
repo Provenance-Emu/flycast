@@ -473,6 +473,14 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     ctx->r[ins.dst.reg] = swapped;
                     break;
                 }
+                case Op::XTRCT:
+                {
+                    uint32_t srcm = ctx->r[ins.src1.reg];
+                    uint32_t dstn = ctx->r[ins.dst.reg];
+                    uint32_t result = ((srcm & 0xFFFFu) << 16) | ((dstn >> 16) & 0xFFFFu);
+                    ctx->r[ins.dst.reg] = result;
+                    break;
+                }
                 case Op::AND_REG:
                     ctx->r[ins.dst.reg] &= ctx->r[ins.src1.reg];
                     break;
