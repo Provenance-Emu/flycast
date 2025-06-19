@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
     if (LogManager* lm = LogManager::GetInstance())
     {
         lm->SetEnable(LogTypes::SH4, true);
-        lm->SetLogLevel(LogTypes::LINFO);
+        lm->SetLogLevel(LogTypes::LDEBUG);
         INFO_LOG(COMMON, "SH4 logging enabled at LINFO level for tests.");
     }
 

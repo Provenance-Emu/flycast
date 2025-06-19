@@ -36,6 +36,7 @@ protected:
 	void PrepareOp(u16 op, u16 op2 = 0, u16 op3 = 0) override
 	{
 		ctx->pc = START_PC;
+		printf("[Sh4InterpreterTest::PrepareOp] Preparing op 0x%04X at PC 0x%08X\n", op, ctx->pc); fflush(stdout);
 		addrspace::write16(ctx->pc, op);
 		if (op2 != 0)
 			addrspace::write16(ctx->pc + 2, op2);
@@ -46,6 +47,7 @@ protected:
 	{
 		ctx->pc = START_PC;
 		for (int i = 0; i < numOp; i++)
+			printf("[Sh4InterpreterTest::RunOp] Stepping interpreter. PC=0x%08X, i=%d\n", ctx->pc, i); fflush(stdout);
 			sh4->Step();
 	}
 };

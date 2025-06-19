@@ -543,6 +543,10 @@ u16 DYNACALL mmu_IReadMem16(u32 vaddr)
 template<typename T>
 void DYNACALL mmu_WriteMem(u32 adr, T data)
 {
+    if (sizeof(T) == 4) {
+        printf("[PRINTF_DEBUG_MMU_WM_ENTRY] mmu_WriteMem<u32> adr=0x%08X, data=0x%08X\n", adr, static_cast<u32>(data));
+        fflush(stdout);
+    }
 	if (adr & (std::min((int)sizeof(T), 4) - 1))
 		// Unaligned
 		mmu_raise_exception(MmuError::BADADDR, adr, MMU_TT_DWRITE);
@@ -550,6 +554,10 @@ void DYNACALL mmu_WriteMem(u32 adr, T data)
 	MmuError rv = mmu_data_translation<MMU_TT_DWRITE>(adr, addr);
 	if (rv != MmuError::NONE)
 		mmu_raise_exception(rv, adr, MMU_TT_DWRITE);
+    if (sizeof(T) == 4) {
+        printf("[PRINTF_DEBUG_MMU_WM_PRE_AS_WRITE] mmu_WriteMem<u32> adr=0x%08X (translated to 0x%08X), data=0x%08X\n", adr, addr, static_cast<u32>(data));
+        fflush(stdout);
+    }
 	addrspace::writet<T>(addr, data);
 }
 template void mmu_WriteMem(u32 adr, u8 data);

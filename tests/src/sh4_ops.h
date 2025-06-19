@@ -340,6 +340,7 @@ protected:
 
 	void StoreTest()
 	{
+		printf("[Sh4OpTest::StoreTest] Entered.\n"); fflush(stdout);
 		ClearRegs();
 		r(14) = 0x8C001000;
 		r(11) = 0xbeeff00d;
@@ -410,11 +411,14 @@ protected:
 		ASSERT_EQ(r(8), 0x8C001000u);
 		AssertState();
 
+		printf("[Sh4OpTest::StoreTest] Entered 0x1873 (MOV.L Rm,@(disp,Rn)) sub-test. PC=0x%08X\n", ctx->pc); fflush(stdout);
 		ClearRegs();
 		r(8) = 0x8C001004;
 		r(7) = 0x50607080;
+		printf("[Sh4OpTest::StoreTest] About to PrepareOp for 0x1873. PC=0x%08X\n", ctx->pc); fflush(stdout);
 		PrepareOp(0x1000 | Rm(7) | Rn(8) | Imm4(3));// mov.l Rm, @(disp, Rn)
 		RunOp();
+		printf("[Sh4OpTest::StoreTest] After RunOp for 0x1873. Checking assertion. PC=0x%08X\n", ctx->pc); fflush(stdout);
 		ASSERT_EQ(addrspace::read32(0x8C001010), 0x50607080u);
 		ASSERT_EQ(r(7), 0x50607080u);
 		ASSERT_EQ(r(8), 0x8C001004u);
