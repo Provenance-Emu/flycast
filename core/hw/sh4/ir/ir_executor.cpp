@@ -1,4 +1,14 @@
 #include "ir_executor.h"
+#include <cstring> // for memcpy
+
+// Utility to safely reinterpret u32 bits as float without UB
+static inline float BitsToFloat(u32 bits)
+{
+    float f;
+    std::memcpy(&f, &bits, sizeof(f));
+    return f;
+}
+
 #include "hw/sh4/modules/mmu.h"
 #include "hw/sh4/sh4_core.h" // for SH4ThrownException
 #include <cmath> // for fabsf, fabs
@@ -1203,6 +1213,61 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     ctx->setDR(dr_dst, dst + src);
                     break;
                 }
+                case Op::FCNVSD:
+                {
+                    // Convert 32-bit integer in FPUL to double-precision DRn
+                    float single_val = BitsToFloat(ctx->fpul);
+                    ctx->setDR(ins.dst.reg, static_cast<double>(single_val));
+                    INFO_LOG(SH4, "FCNVSD FPUL_SINGLE(%f) -> DR%u (%.6f)", single_val, ins.dst.reg, static_cast<double>(single_val));
+                    break;
+                }
+
+                case Op::FCNVDS:
+                {
+                    // Convert double-precision DRn to 32-bit single stored in FPUL
+                    u32 srcReg = ins.src1.reg; // FR index encoded, so DR index = srcReg >> 1
+                    double dval = ctx->getDR(srcReg >> 1);
+                    float fval = static_cast<float>(dval);
+                    ctx->fpul = *reinterpret_cast<u32*>(&fval);
+                    INFO_LOG(SH4, "FCNVDS DR%u (%.6f) -> FPUL (0x%08X)", srcReg >> 1, dval, ctx->fpul);
+                    break;
+                }
+
+                case Op::FTRC:
+                {
+                    bool pr = ctx->fpscr.PR;
+                    u32 srcReg = ins.src1.reg; // for FTRC, source is in src1
+                    int32_t int_val;
+                    // According to SH4 manual, the DR variant of FTRC (opcode 0xF?3D) always
+                    // operates on a double-precision register pair regardless of FPSCR.PR.
+                    // The encoding places an *even* FR register number in m; that pair forms DRm/2.
+                    bool treat_as_double = (srcReg % 2 == 0); // even index implies DR source variant
+                    if (!treat_as_double && pr == 0) {
+                        // Single-precision variant.
+                        float fval = ctx->fr[srcReg];
+                        int_val = static_cast<int32_t>(fval);
+                    } else {
+                        // Double-precision variant (either PR=1 or opcode dictates).
+                        double dval = ctx->getDR(srcReg >> 1);
+                        int_val = static_cast<int32_t>(dval);
+                    }
+                    ctx->fpul = static_cast<u32>(int_val);
+                    INFO_LOG(SH4, "FTRC %sR%d -> FPUL (%d)", (treat_as_double ? "DR" : "FR"), srcReg, int_val);
+                    break;
+                }
+
+                case Op::FLOAT:
+                {
+                    // FLOAT FPUL -> FRn (PR==0) or FCNVSD FPUL -> DRn (PR==1)
+                    // Convert 32-bit integer in FPUL to floating-point
+                    int32_t int_val = static_cast<int32_t>(ctx->fpul);
+                    float single = static_cast<float>(int_val);
+                    // Always write double-precision DRn (instruction variant mandates .d)
+                    ctx->setDR(ins.dst.reg, static_cast<double>(single));
+                    INFO_LOG(SH4, "FLOAT FPUL_INT(%d) -> DR%u (%.6f)", int_val, ins.dst.reg, static_cast<double>(single));
+                    break;
+                }
+
                 case Op::FSUB:
                 {
                     uint32_t dr_dst = ins.dst.reg >> 1;
@@ -1269,12 +1334,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         ctx->fr[ins.dst.reg] = 1.0f;
                     }
                     break;
-                case Op::FTRC: // Truncate float to int, store in FPUL
-                {
-                    float f = ctx->fr[ins.src1.reg];
-                    ctx->fpul = static_cast<uint32_t>(static_cast<int32_t>(f));
-                    break;
-                }
+
                 case Op::FNEG:
                 {
                     uint32_t dr_idx = ins.dst.reg >> 1;
@@ -1283,28 +1343,68 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 }
                 case Op::FRCHG:
-                    // Toggle FR bit (bit 21) in FPSCR
-                    ctx->fpscr.full ^= (1 << 21);
-                    Sh4Context::UpdateFPSCR(ctx); // Update FPSCR after modification
+                    // Toggle FR bit (bit 21) – keep both packed and decoded views in sync
+                    ctx->fpscr.FR ^= 1;
+                    ctx->fpscr.full ^= (1u << 21);
                     break;
                 case Op::FCMP_EQ:
                 {
-                    if (((ins.dst.reg | ins.src1.reg) & 1) == 0) {
-                        ctx->sr.T = (ctx->getDR(ins.dst.reg >> 1) == ctx->getDR(ins.src1.reg >> 1));
-                    } else {
-                        ctx->sr.T = (ctx->fr[ins.dst.reg] == ctx->fr[ins.src1.reg]);
+                    const bool use_double = (((ins.dst.reg | ins.src1.reg) & 1) == 0);
+                    const bool use_alt_bank = ctx->fpscr.FR;
+                    if (use_double)
+                    {
+                        // helper to fetch double from specified bank
+                        auto readDR = [&](const float* bank, u32 dr) {
+                            union { double d; float f[2]; } conv{};
+                            conv.f[1] = bank[dr * 2];
+                            conv.f[0] = bank[dr * 2 + 1];
+                            return conv.d;
+                        };
+                        const float* bank = use_alt_bank ? ctx->xf : ctx->fr;
+                        double a = readDR(bank, ins.dst.reg >> 1);
+                        double b = readDR(bank, ins.src1.reg >> 1);
+                        bool res = (a == b);
+                        INFO_LOG(SH4, "FCMP_EQ DR%u(%.6f) == DR%u(%.6f) -> T=%d", ins.dst.reg>>1, a, ins.src1.reg>>1, b, res);
+                        ctx->sr.T = res;
+                    }
+                    else
+                    {
+                        const float* bank = use_alt_bank ? ctx->xf : ctx->fr;
+                        bool res = (bank[ins.dst.reg] == bank[ins.src1.reg]);
+                        INFO_LOG(SH4, "FCMP_EQ FR%u(%.6f) == FR%u(%.6f) -> T=%d", ins.dst.reg, bank[ins.dst.reg], ins.src1.reg, bank[ins.src1.reg], res);
+                        ctx->sr.T = res;
                     }
                     break;
                 }
                 case Op::FCMP_GT:
                 {
-                    if (((ins.dst.reg | ins.src1.reg) & 1) == 0) {
-                        ctx->sr.T = (ctx->getDR(ins.dst.reg >> 1) > ctx->getDR(ins.src1.reg >> 1));
-                    } else {
-                        ctx->sr.T = (ctx->fr[ins.dst.reg] > ctx->fr[ins.src1.reg]);
+                    const bool use_double = (((ins.dst.reg | ins.src1.reg) & 1) == 0);
+                    const bool use_alt_bank = ctx->fpscr.FR;
+                    if (use_double)
+                    {
+                        auto readDR = [&](const float* bank, u32 dr) {
+                            union { double d; float f[2]; } conv{};
+                            conv.f[1] = bank[dr * 2];
+                            conv.f[0] = bank[dr * 2 + 1];
+                            return conv.d;
+                        };
+                        const float* bank = use_alt_bank ? ctx->xf : ctx->fr;
+                        double a = readDR(bank, ins.dst.reg >> 1);
+                        double b = readDR(bank, ins.src1.reg >> 1);
+                        bool res = (a > b);
+                        INFO_LOG(SH4, "FCMP_GT DR%u(%.6f) > DR%u(%.6f) -> T=%d", ins.dst.reg>>1, a, ins.src1.reg>>1, b, res);
+                        ctx->sr.T = res;
+                    }
+                    else
+                    {
+                        const float* bank = use_alt_bank ? ctx->xf : ctx->fr;
+                        bool res = (bank[ins.dst.reg] > bank[ins.src1.reg]);
+                        INFO_LOG(SH4, "FCMP_GT FR%u(%.6f) > FR%u(%.6f) -> T=%d", ins.dst.reg, bank[ins.dst.reg], ins.src1.reg, bank[ins.src1.reg], res);
+                        ctx->sr.T = res;
                     }
                     break;
                 }
+
                 case Op::LOAD32_PC:
                 {
                     uint32_t disp8 = static_cast<uint32_t>(ins.extra);
@@ -1316,15 +1416,6 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         INFO_LOG(SH4, "LOAD32_PC: Loaded 0x%08X into R0 from addr 0x%08X (PC=%08X, disp=%d)", val, mem_addr, curr_pc, disp8);
                     }
                     if (ins.dst.reg == 0) INFO_LOG(SH4, "R0 updated to %08X", ctx->r[0]);
-                    break;
-                }
-                case Op::MOVA_PC:
-                {
-                    uint32_t disp8 = static_cast<uint32_t>(ins.extra);
-                    uint32_t base = (curr_pc & ~3u) + 4u;
-                    uint32_t effective_address = base + (disp8 << 2);
-                    ctx->r[0] = effective_address; // MOVA @(disp,PC),R0 always targets R0
-                    DEBUG_LOG(SH4, "MOVA_PC disp=%02X base_pc=%08X -> effective_addr=%08X into R0 at PC=%08X", disp8, base - 4, effective_address, curr_pc);
                     break;
                 }
                 case Op::FMOV_LOAD_R0:

@@ -1643,10 +1643,13 @@ Block& Emitter::CreateNew(uint32_t pc) {
         else if ((raw & 0xFF00) == 0xC700)
         {
             uint8_t disp = raw & 0xFF;
-            ins.op = Op::MOVA_PC;
-            ins.dst.isImm = false; ins.dst.reg = 0; // MOVA @(disp,PC),R0 always targets R0
-            ins.extra = disp; // Store raw 8-bit displacement for executor
-            DEBUG_LOG(SH4, "Emitter: Decoded MOVA_PC @(disp=%02X,PC=%08X) -> R0 (0x%04X)", disp, pc, raw);
+            uint32_t effective_address = (pc & ~3u) + 4u + (static_cast<uint32_t>(disp) << 2);
+            ins.op = Op::MOV;
+            ins.dst.isImm = false;
+            ins.dst.reg = 0;
+            ins.src1.isImm = true;
+            ins.src1.imm = effective_address;
+            DEBUG_LOG(SH4, "Emitter: Decoded MOVA_PC @(disp=%02X,PC=%08X) -> MOV R0, #%08X (0x%04X)", disp, pc, effective_address, raw);
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.L @(disp,PC),Rn (0xDnnn) -- This is a PC-relative literal load.
@@ -2073,8 +2076,16 @@ Block& Emitter::CreateNew(uint32_t pc) {
                         ins.dst.isImm = false; ins.dst.reg = n; ins.dst.type = RegType::FGR;
                         ins.src1.isImm = false; ins.src1.reg = m; ins.src1.type = RegType::FGR;
                         break; // FDIV FRm,FRn
-                    case 0x4: ins.op = Op::FCMP_EQ; break; // FCMP/EQ FRm,FRn (sets SR.T)
-                    case 0x5: ins.op = Op::FCMP_GT; break; // FCMP/GT FRm,FRn (sets SR.T)
+                    case 0x4:
+                        ins.op = Op::FCMP_EQ;
+                        ins.dst.isImm = false; ins.dst.reg = n; ins.dst.type = RegType::FGR;
+                        ins.src1.isImm = false; ins.src1.reg = m; ins.src1.type = RegType::FGR;
+                        break; // FCMP/EQ FRm,FRn
+                    case 0x5:
+                        ins.op = Op::FCMP_GT;
+                        ins.dst.isImm = false; ins.dst.reg = n; ins.dst.type = RegType::FGR;
+                        ins.src1.isImm = false; ins.src1.reg = m; ins.src1.type = RegType::FGR;
+                        break; // FCMP/GT FRm,FRn
 
                     case 0x6: // FSQRT single or FMOV.S @Rm+,FRn depending on m==n
                         if (m == n) {
@@ -2124,63 +2135,42 @@ Block& Emitter::CreateNew(uint32_t pc) {
                         ins.dst.isImm = false; ins.dst.reg = n; // FRn target
                         ins.dst.type = RegType::FGR;
                         break;
-                    case 0xD: // Subcode 0xD – assorted operations, also FSQRT.d when m==6
-                    {
-                        if (m == 6)
+                        case 0xD:   // assorted “…D” FPU ops (FLOAT / FCNVSD / FSQRT.d / etc.)
                         {
-                            // Double-precision square root (F26D etc.)
-                            INFO_LOG(SH4, "FSQRT.d decoded");
-                            ins.op = Op::FSQRT;
-                            ins.dst.isImm = false; ins.dst.reg = n; ins.dst.type = RegType::FGR;
-                        }
-                        else
-                        {
-                            // Other 0x?D floating-point operations distinguished by bits 7-4
-                            switch ((raw >> 4) & 0xF)
-                            {
-                                case 0x1: // FLDS FRm,FPUL (0xFm1D)
-                                    ins.op = Op::FLDS;
-                                    ins.src1.isImm = false;
-                                    ins.src1.reg = (raw >> 8) & 0xF;
-                                    ins.src1.type = RegType::FGR;
-                                    break;
-                                case 0x2: // FLOAT FPUL,FRn (0xFn2D)
-                                    ins.op = Op::FLOAT;
-                                    ins.dst.isImm = false;
-                                    ins.dst.reg = (raw >> 8) & 0xF;
-                                    ins.dst.type = RegType::FGR;
-                                    break;
-                                case 0x3: // FTRC FRm,FPUL (0xFm3D)
-                                    ins.op = Op::FTRC;
-                                    ins.src1.isImm = false;
-                                    ins.src1.reg = (raw >> 8) & 0xF;
-                                    ins.src1.type = RegType::FGR;
-                                    break;
-                                case 0x4: // FNEG FRn (0xFn4D)
-                                    ins.op = Op::FNEG;
-                                    ins.dst.isImm = false;
-                                    ins.dst.reg = (raw >> 8) & 0xF;
-                                    ins.dst.type = RegType::FGR;
-                                    break;
-                                case 0x5: // FABS FRn (0xFn5D)
-                                    ins.op = Op::FABS;
-                                    ins.dst.isImm = false;
-                                    ins.dst.reg = (raw >> 8) & 0xF;
-                                    ins.dst.type = RegType::FGR;
-                                    break;
-                                case 0xD: // FSTS FPUL,FRn (0xFnDD)
-                                    ins.op = Op::FSTS;
-                                    ins.src1.isImm = false;
-                                    ins.src1.reg = (raw >> 8) & 0xF;
-                                    ins.src1.type = RegType::FGR;
-                                    break;
-                                default:
-                                    ins.op = Op::ILLEGAL;
-                                    break;
+                            // 1. FLOAT   FPUL -> DRn     (m == 2)
+                             // 2. FCNVSD  FPUL -> DRn     (m == 0xA)
+                             if (m == 2) {
+                                   ins.op = Op::FLOAT;
+                                   ins.dst = {false, static_cast<u8>(n >> 1), RegType::FGR};
+                             }
+                             else if (m == 0xA) {
+                                   ins.op = Op::FCNVSD;
+                                   ins.dst = {false, static_cast<u8>(n >> 1), RegType::FGR};
+                             }
+                             else if (m == 0xB) {
+                                   ins.op = Op::FCNVDS;
+                                   ins.src1 = {false, n, RegType::FGR}; // DRn source encoded via n
+                             }
+                            // 2. FSQRT.d DRn                (m == 6)
+                            else if (m == 6) {
+                                INFO_LOG(SH4, "FSQRT.d decoded");
+                                ins.op = Op::FSQRT;
+                                ins.dst = {false, n, RegType::FGR};
                             }
+                            // 3. Other “…D” single-reg ops – dispatch on bits 7-4
+                            else {
+                                switch ((raw >> 4) & 0xF) {
+                                    case 0x1:  ins.op = Op::FLDS;  ins.src1 = {false, m, RegType::FGR};               break;
+                                    case 0x2:  ins.op = Op::FLOAT; ins.dst  = {false, n, RegType::FGR};               break;
+                                    case 0x3:  ins.op = Op::FTRC;  ins.src1 = {false, static_cast<uint8_t>(n), RegType::FGR};               break;
+                                    case 0x4:  ins.op = Op::FNEG;  ins.dst  = {false, n, RegType::FGR};               break;
+                                    case 0x5:  ins.op = Op::FABS;  ins.dst  = {false, n, RegType::FGR};               break;
+                                    case 0xD:  ins.op = Op::FSTS;  ins.dst  = {false, n, RegType::FGR};               break;
+                                    default:   ins.op = Op::ILLEGAL;                                                break;
+                                }
+                            }
+                            break;
                         }
-                        break;
-                    }
                         if (m == 6) {
                             // Double-precision square root (F26D etc.)
                             INFO_LOG(SH4, "FSQRT.d decoded");
