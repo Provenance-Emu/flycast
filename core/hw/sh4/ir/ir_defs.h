@@ -197,6 +197,7 @@ enum class Op : uint8_t {
         STORE32_R0,
         LOAD16_R0,
         LOAD32_R0,
+        FMOV_STORE_PREDEC,  // FMOV.S FRm,@-Rn
     NUM_OPS
 };
 

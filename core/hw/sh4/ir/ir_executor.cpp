@@ -1441,6 +1441,15 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     WriteAligned32(addr, val);
                     break;
                 }
+                case Op::FMOV_STORE_PREDEC: // FMOV.S FRm,@-Rn
+                {
+                    u32 n = ins.dst.reg;
+                    u32 m = ins.src1.reg;
+                    ctx->r[n] -= 4;
+                    u32 val = *reinterpret_cast<u32*>(&ctx->fr[m]);
+                    WriteAligned32(ctx->r[n], val);
+                    break;
+                }
                 case Op::CLRMAC:
                     ctx->mac.h = 0;
                     ctx->mac.l = 0;
