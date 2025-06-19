@@ -554,7 +554,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     if (unlikely(IsBiosAddr(addr))) {
                         LogIllegalBiosWrite(ins, addr, curr_pc);
                     } else {
-                        mmu_WriteMem<uint16_t>(addr, val_to_store);
+                        WriteAligned16(addr, val_to_store);
                     }
                     break;
                 }
@@ -571,7 +571,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     if (unlikely(IsBiosAddr(addr))) {
                         LogIllegalBiosWrite(ins, addr, curr_pc);
                     } else {
-                        mmu_WriteMem<uint32_t>(addr, val_to_store);
+                        WriteAligned32(addr, val_to_store);
                     }
                     break;
                 }
@@ -694,21 +694,14 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::LOAD16:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + static_cast<uint32_t>(ins.extra);
-                    u16 val;
-                    if (u8* p = FastRamPtr(addr))
-                        val = *reinterpret_cast<u16*>(p);
-                    else
-                        val = mmu_ReadMem<u16>(addr);
+                    u16 val = ReadAligned16(addr);
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val));
                     break;
                 }
                 case Op::LOAD32:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + static_cast<uint32_t>(ins.extra);
-                    if (u8* p = FastRamPtr(addr))
-                        ctx->r[ins.dst.reg] = *reinterpret_cast<u32*>(p);
-                    else
-                        ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(addr);
+                    ctx->r[ins.dst.reg] = ReadAligned32(addr);
                     break;
                 }
                 case Op::MOV_B_REG_PREDEC:
@@ -750,11 +743,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::LOAD16_POST:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg];
-                    u16 val;
-                    if (u8* p = FastRamPtr(addr))
-                        val = *reinterpret_cast<u16*>(p);
-                    else
-                        val = mmu_ReadMem<u16>(addr);
+                    u16 val = ReadAligned16(addr);
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val));
                     if (ins.src1.reg != ins.dst.reg)
                         ctx->r[ins.src1.reg] += 2;
@@ -763,10 +752,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::LOAD32_POST:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg];
-                    if (u8* p = FastRamPtr(addr))
-                        ctx->r[ins.dst.reg] = *reinterpret_cast<u32*>(p);
-                    else
-                        ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(addr);
+                    ctx->r[ins.dst.reg] = ReadAligned32(addr);
                     if (ins.src1.reg != ins.dst.reg)
                         ctx->r[ins.src1.reg] += 4;
                     break;
@@ -792,7 +778,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     else if (IsBiosAddr(addr)) {
                          LogIllegalBiosWrite(ins, addr, curr_pc);
                      } else
-                         mmu_WriteMem<u16>(addr, static_cast<uint16_t>(ctx->r[ins.src1.reg]));
+                         WriteAligned16(addr, static_cast<u16>(ctx->r[ins.src1.reg]));
                     ctx->r[ins.dst.reg] += 2;
                     break;
                 }
@@ -804,7 +790,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     else if (IsBiosAddr(addr)) {
                          LogIllegalBiosWrite(ins, addr, curr_pc);
                      } else
-                         mmu_WriteMem<u32>(addr, ctx->r[ins.src1.reg]);
+                         WriteAligned32(addr, ctx->r[ins.src1.reg]);
                     ctx->r[ins.dst.reg] += 4;
                     break;
                 }
@@ -814,11 +800,11 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::STORE16_GBR:
                     if (!IsBiosAddr(ctx->gbr + static_cast<uint32_t>(ins.extra)))
-                        mmu_WriteMem<u16>(ctx->gbr + static_cast<uint32_t>(ins.extra), static_cast<uint16_t>(ctx->r[ins.src1.reg]));
+                        WriteAligned16(ctx->gbr + static_cast<uint32_t>(ins.extra), static_cast<u16>(ctx->r[ins.src1.reg]));
                     break;
                 case Op::STORE32_GBR:
                     if (!IsBiosAddr(ctx->gbr + static_cast<uint32_t>(ins.extra)))
-                        mmu_WriteMem<u32>(ctx->gbr + static_cast<uint32_t>(ins.extra), ctx->r[ins.src1.reg]);
+                        WriteAligned32(ctx->gbr + static_cast<uint32_t>(ins.extra), ctx->r[ins.src1.reg]);
                     break;
 
                 case Op::LOAD8_R0:
@@ -835,33 +821,26 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::LOAD16_R0:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + ctx->r[0];
-                    u16 val;
-                    if (u8* p = FastRamPtr(addr))
-                        val = *reinterpret_cast<u16*>(p);
-                    else
-                        val = mmu_ReadMem<u16>(addr);
+                    u16 val = ReadAligned16(addr);
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val));
                     break;
                 }
                 case Op::LOAD32_R0:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + ctx->r[0];
-                    if (u8* p = FastRamPtr(addr))
-                        ctx->r[ins.dst.reg] = *reinterpret_cast<u32*>(p);
-                    else
-                        ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(addr);
+                    ctx->r[ins.dst.reg] = ReadAligned32(addr);
                     break;
                 }
 
 
                 case Op::LOAD16_IMM:
                 {
-                    u16 val = mmu_ReadMem<u16>(static_cast<uint32_t>(ins.src1.imm));
+                    u16 val = ReadAligned16(static_cast<uint32_t>(ins.src1.imm));
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val));
                     break;
                 }
                 case Op::LOAD32_IMM:
-                    ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(static_cast<uint32_t>(ins.src1.imm));
+                    ctx->r[ins.dst.reg] = ReadAligned32(static_cast<uint32_t>(ins.src1.imm));
                     break;
                 case Op::LDC_SR: // LDC Rm, SR
                     ctx->sr.setFull(ctx->r[ins.src1.reg]);
@@ -1074,7 +1053,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     }
                     break;
                 case Op::LDS_PR_L:
-                    ctx->pr = mmu_ReadMem<u32>(ctx->r[ins.src1.reg]);
+                    ctx->pr = ReadAligned32(ctx->r[ins.src1.reg]);
                     INFO_LOG(SH4, "LDS.L  PR @%08X -> %08X", ctx->r[ins.src1.reg], ctx->pr);
                     if (IsTopRegion(ctx->pr))
                         ERROR_LOG(SH4, "*** HIGH-FF PR value loaded %08X via LDS.L at PC=%08X", ctx->pr, curr_pc);
@@ -1084,7 +1063,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 {
                     uint32_t new_addr = ctx->r[ins.dst.reg] - 4;
                     ctx->r[ins.dst.reg] = new_addr;
-                    mmu_WriteMem<u32>(new_addr, ctx->pr);
+                    WriteAligned32(new_addr, ctx->pr);
                     INFO_LOG(SH4, "STS.L  PR @%08X  PR=%08X", new_addr, ctx->pr);
                     if (IsTopRegion(ctx->pr))
                         ERROR_LOG(SH4, "*** HIGH-FF PR value stored %08X via STS.L at PC=%08X", ctx->pr, curr_pc);
@@ -1093,7 +1072,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::LDC_SR_L: // LDC.L @Rm+, SR
                 {
                     uint32_t addr = ctx->r[ins.src1.reg];
-                    uint32_t value = mmu_ReadMem<u32>(addr);
+                    uint32_t value = ReadAligned32(addr);
                     ctx->r[ins.src1.reg] += 4;
 
                     INFO_LOG(SH4, "LDC.L SR <- %08X from @%08X (R%u) at PC=%08X", value, addr, ins.src1.reg, curr_pc);
@@ -1112,15 +1091,13 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     executed_delay = false;
                     break;
                 case Op::LDC_SSR_L:
-                    ctx->ssr = mmu_ReadMem<u32>(ctx->r[ins.src1.reg]);
+                    ctx->ssr = ReadAligned32(ctx->r[ins.src1.reg]);
                     ctx->r[ins.src1.reg] += 4;
                     break;
                 case Op::LDC_SPC_L:
                 {
-                    uint32_t val = mmu_ReadMem<u32>(ctx->r[ins.src1.reg]);
+                    uint32_t val = ReadAligned32(ctx->r[ins.src1.reg]);
                     INFO_LOG(SH4, "LDC.L  SPC <- %08X from @%08X (R%u)", val, ctx->r[ins.src1.reg], ins.src1.reg);
-                    if (IsTopRegion(val))
-                        ERROR_LOG(SH4, "*** HIGH-FF SPC value loaded %08X via LDC.L at PC=%08X", val, curr_pc);
                     ctx->spc = val;
                     // ctx->sr.Set(ctx->r[ins.src1.reg]); // This was incorrect for LDC_SPC_L
                     break;
@@ -1339,7 +1316,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     if (u8* p = FastRamPtr(mem_addr))
                         val = *reinterpret_cast<u32*>(p);
                     else
-                        val = mmu_ReadMem<u32>(mem_addr);
+                        val = ReadAligned32(mem_addr);
                     ctx->r[ins.dst.reg] = val;
                     if (ins.dst.reg == 0) {
                         INFO_LOG(SH4, "LOAD32_PC: Loaded 0x%08X into R0 from addr 0x%08X (PC=%08X, disp=%d)", val, mem_addr, curr_pc, disp8);
@@ -1363,7 +1340,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     if (u8* p = FastRamPtr(addr))
                         val = *reinterpret_cast<u32*>(p);
                     else
-                        val = mmu_ReadMem<u32>(addr);
+                        val = ReadAligned32(addr);
                     ctx->fr[ins.dst.reg] = *reinterpret_cast<float*>(&val);
                     break;
                 }
@@ -1374,7 +1351,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     if (u8* p = FastRamPtr(addr))
                         *reinterpret_cast<u32*>(p) = val;
                     else
-                        mmu_WriteMem<u32>(addr, val);
+                        WriteAligned32(addr, val);
                     break;
                 }
                 case Op::CLRMAC:
