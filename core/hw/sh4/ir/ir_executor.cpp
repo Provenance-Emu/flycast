@@ -27,7 +27,8 @@ static inline float BitsToFloat(u32 bits)
 #include "hw/sh4/sh4_interpreter.h"
 #include "hw/flashrom/nvmem.h" // for getBiosData()
 
-#define USE_FAST_PTR
+// FIXME: Don't use for now, not working (Bus Error)
+// #define USE_FAST_PTR
 
 // Auto-generated opcode name table
 #include "ir_opnames.inc"
