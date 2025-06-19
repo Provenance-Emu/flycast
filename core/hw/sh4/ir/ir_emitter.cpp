@@ -219,6 +219,8 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+
+
     // MOV.L Rm,@(disp,Rn) 0x5(Rm)(Rn)disp -- This is a STORE: Store Rm to @(disp,Rn)
     else if ((raw & 0xF000) == 0x5000) {
         printf("[IR_EMITTER_DEBUG] FastDecode: Entered 0x5000 block for raw=0x%04X, pc=0x%08X\n", raw, pc); fflush(stdout);
@@ -1757,8 +1759,9 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
+
         // MOV.B @(disp,Rm),R0 0x0nmd (disp = low4)  — allow n=0 too (except 0x0000 and 0x0009)
-        else if ((raw & 0xF000) == 0x0000)
+        else if ((raw & 0xF000) == 0x0000 && (raw & 0x000F) <= 0x0B)
         {
             if (raw == 0x0009 || raw == 0x0000)
             {
@@ -1887,19 +1890,29 @@ Block& Emitter::CreateNew(uint32_t pc) {
         else if ((raw & 0xF00F) == 0x000C)
         {
             ins.op = Op::LOAD8_R0;
-            ins.dst.isImm = false; ins.dst.reg = n; // dest value
-            ins.src1.isImm = false; ins.src1.reg = m; // base Rm
+            ins.dst.isImm = false; ins.dst.reg = n;      // Rn
+            ins.src1.isImm = false; ins.src1.reg = m;    // Rm base
+            INFO_LOG(SH4, "Emitter: Decoded LOAD8_R0 R%d <- @(R0,R%d) (0x%04X) at PC=0x%08X", n, m, raw, pc);
             decoded = true; blk.pcNext = pc + 2;
         }
+
         // MOV.W @(R0,Rm),Rn 0x0nmD
         else if ((raw & 0xF00F) == 0x000D)
         {
             ins.op = Op::LOAD16_R0;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
+            INFO_LOG(SH4, "Emitter: Decoded LOAD16_R0 R%d <- @(R0,R%d) (0x%04X) at PC=0x%08X", n, m, raw, pc);
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.L @(R0,Rm),Rn 0x0nmE
+        else if ((raw & 0xF00F) == 0x000E)
+        {
+            ins.op = Op::LOAD32_R0;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            decoded = true; blk.pcNext = pc + 2;
+        }
         else if ((raw & 0xF00F) == 0x000E)
         {
             ins.op = Op::LOAD32_R0;
