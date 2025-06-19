@@ -312,6 +312,31 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
     }
 
 
+    // MOV.L @(disp,PC),Rn 0xD000 | Rn<<8 | disp8
+    else if ((raw & 0xF000) == 0xD000)
+    {
+        uint8_t n   = (raw >> 8) & 0xF;
+        uint8_t disp = raw & 0xFF;
+        ins.op = Op::LOAD32_PC;
+        ins.dst = {false, n};
+        ins.extra = disp;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // MOV.W @(disp,PC),Rn 0x9000 | Rn<<8 | disp8
+    else if ((raw & 0xF000) == 0x9000)
+    {
+        uint8_t n   = (raw >> 8) & 0xF;
+        uint8_t disp = raw & 0xFF;
+        ins.op = Op::LOAD16_IMM;
+        ins.dst = {false, n};
+        uint32_t addr = (pc + 4) + (static_cast<uint32_t>(disp) << 1);
+        ins.src1.isImm = true;
+        ins.src1.imm = addr;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+
     else if ((raw & 0xF000) == 0xE000) // MOV #imm,Rn
     {
         uint8_t n = (raw >> 8) & 0xF;
@@ -376,10 +401,78 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+    // SUBX Rm, Rn (0x3nmE)
+    else if ((raw & 0xF00F) == 0x300E)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::SUBX;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
     // SETS (0x0058)
     else if (raw == 0x0058)
     {
         ins.op = Op::SETS;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // FSTS FPUL,FRn (0xF08D)
+    else if ((raw & 0xFF0F) == 0xF00D)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        ins.op = Op::FSTS;
+        ins.src1.isImm = false;
+        ins.src1.reg = n;
+        ins.src1.type = RegType::FGR;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // FLDI1 FRn (0xF39D) - Load immediate 1.0 into FRn
+    else if (raw == 0xF39D)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        ins.op = Op::FLDI1;
+        ins.dst.isImm = false;
+        ins.dst.reg = n;
+        ins.dst.type = RegType::FGR;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // FLDS FRm,FPUL (0xF21D) - Store FRm into FPUL
+    else if (raw == 0xF21D)
+    {
+        uint8_t m = (raw >> 8) & 0xF;
+        ins.op = Op::FLDS;
+        ins.src1.isImm = false;
+        ins.src1.reg = m;
+        ins.src1.type = RegType::FGR;
+        DEBUG_LOG(SH4, "FastDecode: FLDS FR%u, FPUL (0x%04X) at PC=0x%08X", m, raw, pc);
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // FSTS FPUL,FRn (0xF60D) - Store FPUL into FRn
+    else if (raw == 0xF60D)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        ins.op = Op::FSTS;
+        ins.dst.isImm = false;
+        ins.dst.reg = n;
+        ins.dst.type = RegType::FGR;
+        DEBUG_LOG(SH4, "FastDecode: FSTS FPUL, FR%u (0x%04X) at PC=0x%08X", n, raw, pc);
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // FTRC FRm,FPUL (0xF3nD with n != 9) - Float to integer conversion
+    else if ((raw & 0xFF0F) == 0xF30D && ((raw >> 8) & 0xF) != 9)
+    {
+        uint8_t m = (raw >> 8) & 0xF;
+        ins.op = Op::FTRC;
+        ins.src1.isImm = false;
+        ins.src1.reg = m;
+        ins.src1.type = RegType::FGR;
         blk.pcNext = pc + 2;
         return true;
     }
@@ -545,55 +638,47 @@ Block& Emitter::CreateNew(uint32_t pc) {
 
         if (raw == 0x0000 || raw == 0x0009)
         {
-            // Always include the NOP itself
+            // Insert NOP first
             ins.op = Op::NOP;
             ins.pc = pc;
             ins.raw = raw;
             blk.code.push_back(ins);
 
-            // Attempt to also decode the following instruction so that a
-            // test that expects a NOP + real-op in a single Step() succeeds.
+            // Decode following instruction so sequential Step(2) tests work
             uint32_t next_pc  = pc + 2;
             uint16_t next_raw = mmu_IReadMem16(next_pc);
 
-            Instr next_ins{};
-            Block dummy_blk; // not used, but required by FastDecode signature
-            bool next_fast = FastDecode(next_raw, next_pc, next_ins, dummy_blk);
-            INFO_LOG(SH4, "NOP handler: next_raw=0x%04X fast=%d op=%d", next_raw, next_fast, static_cast<int>(next_ins.op));
-            if (next_fast && next_ins.op != Op::ILLEGAL)
+            Instr next_ins{}; // zero-initialised avoids stale fields
+            Block scratch_blk; // temporary for FastDecode (fills blk.pcNext)
+            bool ok = FastDecode(next_raw, next_pc, next_ins, scratch_blk);
+
+            if (ok && next_ins.op != Op::ILLEGAL)
             {
                 next_ins.pc  = next_pc;
                 next_ins.raw = next_raw;
                 blk.code.push_back(next_ins);
-                // pcNext determined by FastDecode stored into dummy_blk.pcNext
-                if (dummy_blk.pcNext != 0)
-                    blk.pcNext = dummy_blk.pcNext;
-                else
-                    blk.pcNext = next_pc + 2;
+                blk.pcNext = scratch_blk.pcNext ? scratch_blk.pcNext : (next_pc + 2);
+            }
+            else if ((next_raw & 0xFF00) == 0xC700) // MOVA @(disp,PC),R0
+            {
+                uint8_t disp = next_raw & 0xFF;
+                uint32_t ea = (next_pc & ~3u) + 4u + (static_cast<uint32_t>(disp) << 2);
+
+                next_ins = Instr{};
+                next_ins.op = Op::MOV_IMM;
+                next_ins.dst.isImm = false; next_ins.dst.reg = 0;
+                next_ins.src1.isImm = true; next_ins.src1.imm = static_cast<int32_t>(ea);
+                next_ins.pc = next_pc;
+                next_ins.raw = next_raw;
+                blk.code.push_back(next_ins);
+                blk.pcNext = next_pc + 2;
             }
             else
             {
-                // Attempt manual decode for MOVA @(disp,PC),R0 0xC7??
-                if ((next_raw & 0xFF00) == 0xC700)
-                {
-                    uint8_t disp = next_raw & 0xFF;
-                    uint32_t effective_address = (next_pc & ~3u) + 4u + (static_cast<uint32_t>(disp) << 2);
-                    next_ins.op = Op::MOV_IMM;
-                    next_ins.dst = {false, 0};
-                    next_ins.src1 = {true, 0};
-                    next_ins.src1.imm = effective_address;
-                    next_ins.pc  = next_pc;
-                    next_ins.raw = next_raw;
-                    blk.code.push_back(next_ins);
-                    blk.pcNext = next_pc + 2;
-                }
-                else
-                {
-                    blk.pcNext = next_pc; // default advance past NOP only
-                }
+                blk.pcNext = next_pc; // could not decode
             }
 
-            // Append END sentinel
+            // END sentinel so executor stops at blk.pcNext.
             Instr end{};
             end.op = Op::END;
             end.pc = blk.pcNext;

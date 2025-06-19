@@ -265,21 +265,21 @@ static inline u8* FastRamPtrWrite(uint32_t addr)
 // -----------------------------------------------------------------------------
 static inline u16 ReadAligned16(uint32_t addr)
 {
-    // if ((addr & 1u) == 0)
-    // {
-    //     if (u8* p = FastRamPtr(addr))
-    //         return *reinterpret_cast<u16*>(p);
-    // }
+    if ((addr & 1u) == 0)
+    {
+        if (u8* p = FastRamPtr(addr))
+            return *reinterpret_cast<u16*>(p);
+    }
     return mmu_ReadMem<u16>(addr);
 }
 
 static inline u32 ReadAligned32(uint32_t addr)
 {
-    // if ((addr & 3u) == 0)
-    // {
-    //     if (u8* p = FastRamPtr(addr))
-    //         return *reinterpret_cast<u32*>(p);
-    // }
+    if ((addr & 3u) == 0)
+    {
+        if (u8* p = FastRamPtr(addr))
+            return *reinterpret_cast<u32*>(p);
+    }
     return mmu_ReadMem<u32>(addr);
 }
 
@@ -1028,6 +1028,30 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     ctx->sr.T = ov & 1;
                     break;
                 }
+                case Op::SUBC:
+                {
+                    // Rn = Rn - Rm - T
+                    uint32_t rm = ctx->r[ins.src1.reg];
+                    uint32_t rn = ctx->r[ins.dst.reg];
+                    uint32_t t = ctx->sr.T;
+                    uint32_t res = rn - rm - t;
+                    uint64_t tmp = (uint64_t)rn - (uint64_t)rm - t;
+                    ctx->sr.T = (tmp >> 32) & 1;
+                    ctx->r[ins.dst.reg] = res;
+                    break;
+                }
+                case Op::SUBX:
+                {
+                    // Rn = Rn - Rm - T
+                    uint32_t rm = ctx->r[ins.src1.reg];
+                    uint32_t rn = ctx->r[ins.dst.reg];
+                    uint32_t t = ctx->sr.T;
+                    uint32_t res = rn - rm - t;
+                    uint64_t tmp = (uint64_t)rn - (uint64_t)rm - t;
+                    ctx->sr.T = (tmp >> 32) & 1;
+                    ctx->r[ins.dst.reg] = res;
+                    break;
+                }
                 case Op::NEG:
                     ctx->r[ins.dst.reg] = -static_cast<int32_t>(ctx->r[ins.src1.reg]);
                     break;
@@ -1445,7 +1469,8 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::LOAD32_PC:
                 {
                     uint32_t disp8 = static_cast<uint32_t>(ins.extra);
-                    uint32_t base = (curr_pc & ~3u) + 4u;
+                    uint32_t base_pc = ins.pc;                // PC of this instruction
+                    uint32_t base = (base_pc & ~3u) + 4u;     // Align and add 4 per SH4 spec
                     uint32_t mem_addr = base + (disp8 << 2);
                     uint32_t val = ReadAligned32(mem_addr);
                     ctx->r[ins.dst.reg] = val;
