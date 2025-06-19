@@ -1837,38 +1837,39 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
-        // MOV.B R0,@(disp,Rn) 0x8n00 disp8
-        else if ((raw & 0xF000) == 0x8000 && ((raw >> 4) & 0xF) == 0x0)
+        // MOV.B R0,@(disp,Rn) 0x8n0d (d=disp4)
+        else if ((raw & 0xFF00) == 0x8000)
         {
-            uint8_t disp8 = raw & 0xFF; // 8-bit displacement
-            ins.op = Op::STORE8;
-            ins.dst.isImm = false; ins.dst.reg = (raw >> 8) & 0xF; // Rn base
-            ins.src1.isImm = false; ins.src1.reg = 0; // value in R0
-            ins.extra = disp8;
+            uint8_t disp4 = (raw >> 4) & 0xF;
+            ins.op = Op::STORE8_R0;
+            ins.dst.isImm = false; ins.dst.reg = (raw >> 8) & 0xF; // Rn
+            ins.src1.isImm = false; ins.src1.reg = 0;
+            ins.src2.isImm = false; ins.src2.reg = ins.dst.reg;
+            ins.extra = disp4; // byte displacement
             decoded = true;
             blk.pcNext = pc + 2;
         }
-        // MOV.W R0,@(disp,Rn) 0x8n10 disp8 (word store)
-        else if ((raw & 0xF000) == 0x8000 && ((raw >> 4) & 0xF) == 0x1)
+        // MOV.W R0,@(disp,Rn) 0x8n1d
+        else if ((raw & 0xFF00) == 0x8100)
         {
-            uint8_t disp8 = raw & 0xFF; // 8-bit displacement
+            uint8_t disp4 = static_cast<uint8_t>(raw & 0xF); // 4-bit displacement
             ins.op = Op::STORE16_R0;
-            ins.dst.isImm = false; ins.dst.reg = (raw >> 8) & 0xF; // base Rn
+            ins.dst.isImm = false; ins.dst.reg = (raw >> 8) & 0xF; // Rn
             ins.src1.isImm = false; ins.src1.reg = 0; // value in R0
             ins.src2.isImm = false; ins.src2.reg = ins.dst.reg;     // base register
-            ins.extra = disp8 * 2;
+            ins.extra = disp4 * 2;
             decoded = true;
             blk.pcNext = pc + 2;
         }
-        // MOV.L R0,@(disp,Rn) 0x8n20 disp8 (long store)
-        else if ((raw & 0xF000) == 0x8000 && ((raw >> 4) & 0xF) == 0x2)
+        // MOV.L R0,@(disp,Rn) 0x8n2d
+        else if ((raw & 0xFF00) == 0x8200)
         {
-            uint8_t disp8 = raw & 0xFF;
+            uint8_t disp4 = (raw >> 4) & 0xF;
             ins.op = Op::STORE32_R0;
             ins.dst.isImm = false; ins.dst.reg = (raw >> 8) & 0xF;
             ins.src1.isImm = false; ins.src1.reg = 0;
             ins.src2.isImm = false; ins.src2.reg = ins.dst.reg;
-            ins.extra = disp8 * 4;
+            ins.extra = disp4 * 4;
             decoded = true;
             blk.pcNext = pc + 2;
         }
