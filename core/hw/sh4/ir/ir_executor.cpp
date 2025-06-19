@@ -1,6 +1,7 @@
 #include "ir_executor.h"
 #include "hw/sh4/modules/mmu.h"
 #include "hw/sh4/sh4_core.h" // for SH4ThrownException
+#include <cmath> // for fabsf, fabs
 #include <cassert>
 #include "log/Log.h"
 #include <array>
@@ -175,7 +176,7 @@ static inline u8* FastRamPtr(uint32_t addr)
     if (addr >= 0xF8000000u && addr < 0xFF000000u)
         return addrspace::ram_base + 0x0C000000 + (addr & 0x00FFFFFF);
 
-    return nullptr;
+    return nullptr; // everything else is treated via MMU
 }
 
 // Helper to quickly identify BIOS ROM regions (including mirrors)
@@ -1020,13 +1021,13 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 }
                 case Op::LDC_SR_L: // LDC.L @Rm+, SR
                 {
-                    uint8_t rm_idx = ins.src1.reg;
-                    uint32_t addr = ctx->r[rm_idx];
+                    uint32_t addr = ctx->r[ins.src1.reg];
                     uint32_t value = mmu_ReadMem<u32>(addr);
+                    ctx->r[ins.src1.reg] += 4;
+
+                    INFO_LOG(SH4, "LDC.L SR <- %08X from @%08X (R%u) at PC=%08X", value, addr, ins.src1.reg, curr_pc);
                     ctx->sr.setFull(value);
-                    UpdateSR(); // Apply SR changes (interrupts, mode, etc.)
-                    ctx->r[rm_idx] += 4;
-                    INFO_LOG(SH4, "LDC.L SR <- %08X from @%08X (R%u) at PC=%08X", value, addr, rm_idx, curr_pc);
+                    UpdateSR(); // Essential after SR change
                     break;
                 }
                 case Op::RTE:
@@ -1148,34 +1149,79 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     ctx->sr.T = (ctx->r[ins.dst.reg] == 0);
                     break;
                 case Op::FADD:
-                    ctx->fr[ins.dst.reg] = ctx->fr[ins.dst.reg] + ctx->fr[ins.src1.reg];
+                {
+                    uint32_t dr_dst = ins.dst.reg >> 1;
+                    uint32_t dr_src = ins.src1.reg >> 1;
+                    double dst = ctx->getDR(dr_dst);
+                    double src = ctx->getDR(dr_src);
+                    ctx->setDR(dr_dst, dst + src);
                     break;
+                }
                 case Op::FSUB:
-                    ctx->fr[ins.dst.reg] = ctx->fr[ins.dst.reg] - ctx->fr[ins.src1.reg];
+                {
+                    uint32_t dr_dst = ins.dst.reg >> 1;
+                    uint32_t dr_src = ins.src1.reg >> 1;
+                    double dst = ctx->getDR(dr_dst);
+                    double src = ctx->getDR(dr_src);
+                    ctx->setDR(dr_dst, dst - src);
                     break;
+                }
                 case Op::FMUL:
-                    ctx->fr[ins.dst.reg] = ctx->fr[ins.dst.reg] * ctx->fr[ins.src1.reg];
+                {
+                    uint32_t dr_dst = ins.dst.reg >> 1;
+                    uint32_t dr_src = ins.src1.reg >> 1;
+                    double dst = ctx->getDR(dr_dst);
+                    double src = ctx->getDR(dr_src);
+                    ctx->setDR(dr_dst, dst * src);
                     break;
+                }
                 case Op::FDIV:
-                    ctx->fr[ins.dst.reg] = ctx->fr[ins.dst.reg] / ctx->fr[ins.src1.reg];
+                {
+                    if (((ins.dst.reg | ins.src1.reg) & 1) == 0) {
+                        uint32_t dr_dst = ins.dst.reg >> 1;
+                        uint32_t dr_src = ins.src1.reg >> 1;
+                        ctx->setDR(dr_dst, ctx->getDR(dr_dst) / ctx->getDR(dr_src));
+                    } else {
+                        ctx->fr[ins.dst.reg] /= ctx->fr[ins.src1.reg];
+                    }
                     break;
+                }
                 case Op::FSQRT:
-                    ctx->fr[ins.dst.reg] = std::sqrtf(ctx->fr[ins.dst.reg]);
+                {
+                    if ((ins.dst.reg & 1) == 0) {
+                        uint32_t dr_idx = ins.dst.reg >> 1;
+                        ctx->setDR(dr_idx, std::sqrt(ctx->getDR(dr_idx)));
+                    } else {
+                        ctx->fr[ins.dst.reg] = std::sqrtf(ctx->fr[ins.dst.reg]);
+                    }
                     break;
+                }
                 case Op::FSTS: // FSTS FPUL,FRn
                     ctx->fr[ins.src1.reg] = ctx->fpul;
                     break;
                 case Op::FABS:
-                    ctx->fr[ins.dst.reg] = std::fabsf(ctx->fr[ins.src1.reg]);
+                {
+                    uint32_t dr_idx = ins.dst.reg >> 1;
+                    double val = std::fabs(ctx->getDR(dr_idx));
+                    ctx->setDR(dr_idx, val);
                     break;
+                }
                 case Op::FLDS: // Move FRm -> FPUL (store as int bits)
                     ctx->fpul = *reinterpret_cast<uint32_t*>(&ctx->fr[ins.src1.reg]);
                     break;
                 case Op::FLDI0:
-                    ctx->fr[ins.dst.reg] = 0.0f;
+                    if ((ins.dst.reg & 1) == 0) {
+                        ctx->setDR(ins.dst.reg >> 1, 0.0);
+                    } else {
+                        ctx->fr[ins.dst.reg] = 0.0f;
+                    }
                     break;
                 case Op::FLDI1:
-                    ctx->fr[ins.dst.reg] = 1.0f;
+                    if ((ins.dst.reg & 1) == 0) {
+                        ctx->setDR(ins.dst.reg >> 1, 1.0);
+                    } else {
+                        ctx->fr[ins.dst.reg] = 1.0f;
+                    }
                     break;
                 case Op::FTRC: // Truncate float to int, store in FPUL
                 {
@@ -1184,19 +1230,35 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 }
                 case Op::FNEG:
-                    ctx->fr[ins.dst.reg] = -ctx->fr[ins.src1.reg];
+                {
+                    uint32_t dr_idx = ins.dst.reg >> 1;
+                    double val = -ctx->getDR(dr_idx);
+                    ctx->setDR(dr_idx, val);
                     break;
+                }
                 case Op::FRCHG:
                     // Toggle FR bit (bit 21) in FPSCR
                     ctx->fpscr.full ^= (1 << 21);
                     Sh4Context::UpdateFPSCR(ctx); // Update FPSCR after modification
                     break;
                 case Op::FCMP_EQ:
-                    ctx->sr.T = (ctx->fr[ins.dst.reg] == ctx->fr[ins.src1.reg]);
+                {
+                    if (((ins.dst.reg | ins.src1.reg) & 1) == 0) {
+                        ctx->sr.T = (ctx->getDR(ins.dst.reg >> 1) == ctx->getDR(ins.src1.reg >> 1));
+                    } else {
+                        ctx->sr.T = (ctx->fr[ins.dst.reg] == ctx->fr[ins.src1.reg]);
+                    }
                     break;
+                }
                 case Op::FCMP_GT:
-                    ctx->sr.T = (ctx->fr[ins.dst.reg] > ctx->fr[ins.src1.reg]);
+                {
+                    if (((ins.dst.reg | ins.src1.reg) & 1) == 0) {
+                        ctx->sr.T = (ctx->getDR(ins.dst.reg >> 1) > ctx->getDR(ins.src1.reg >> 1));
+                    } else {
+                        ctx->sr.T = (ctx->fr[ins.dst.reg] > ctx->fr[ins.src1.reg]);
+                    }
                     break;
+                }
                 case Op::LOAD32_PC:
                 {
                     uint32_t disp8 = static_cast<uint32_t>(ins.extra);
@@ -1287,19 +1349,39 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     }
                     break;
                 }
-                // FPU Operations - many will fall through to interpreter for now
+
                 case Op::FMOV:
                 {
                     if (ins.dst.type == RegType::FGR && ins.src1.type == RegType::FGR) {
-                        // Register-to-register move: FRn <- FRm
-                        ctx->fr[ins.dst.reg] = ctx->fr[ins.src1.reg];
+                        // Register-to-register move
+                        if (ctx->fpscr.PR) {
+                            // Double-precision : copy 64-bit DRm -> DRn
+                            double* d_fr = reinterpret_cast<double*>(ctx->fr);
+                            int dr_dst_idx = ins.dst.reg ;
+                            int dr_src_idx = ins.src1.reg ;
+                            d_fr[dr_dst_idx] = d_fr[dr_src_idx];
+                        } else {
+                            // Single-precision : copy 32-bit FRm -> FRn
+                            ctx->fr[ins.dst.reg] = ctx->fr[ins.src1.reg];
+                        }
                     } else {
-                        // Memory load variants. Currently we only need @Rm+ -> FRn.
+                        // Memory load/store variants
+                        // Currently the tests exercise the @Rm+ -> FRn/DRn form.
+                        // src1.reg = Rm holding address, dst = FGR.
                         uint32_t addr = ctx->r[ins.src1.reg];
-                        uint32_t val = mmu_ReadMem<u32>(addr);
-                        ctx->fr[ins.dst.reg] = *reinterpret_cast<float*>(&val);
-                        if (ins.extra == 1) // post-increment flag set by emitter
+                        if (ctx->fpscr.PR) {
+                            // Load 64-bit and advance Rm by 8
+                            uint64_t val64 = mmu_ReadMem<u64>(addr);
+                            double* d_fr = reinterpret_cast<double*>(ctx->fr);
+                            int dr_dst_idx = ins.dst.reg ;
+                            d_fr[dr_dst_idx] = *reinterpret_cast<double*>(&val64);
+                            ctx->r[ins.src1.reg] += 8;
+                        } else {
+                            // Load 32-bit and advance Rm by 4
+                            uint32_t val32 = mmu_ReadMem<u32>(addr);
+                            ctx->fr[ins.dst.reg] = *reinterpret_cast<float*>(&val32);
                             ctx->r[ins.src1.reg] += 4;
+                        }
                     }
                     break;
                 }
