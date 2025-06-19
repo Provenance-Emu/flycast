@@ -195,6 +195,9 @@ enum class Op : uint8_t {
         STORE8_R0,
         STORE16_R0,
         STORE32_R0,
+        STORE8_R0_REG,
+        STORE16_R0_REG,
+        STORE32_R0_REG,
         LOAD16_R0,
         LOAD32_R0,
         FMOV_STORE_PREDEC,  // FMOV.S FRm,@-Rn
