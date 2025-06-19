@@ -1848,6 +1848,30 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
+        // MOV.W R0,@(disp,Rn) 0x8n10 disp8 (word store)
+        else if ((raw & 0xF000) == 0x8000 && ((raw >> 4) & 0xF) == 0x1)
+        {
+            uint8_t disp8 = raw & 0xFF; // 8-bit displacement
+            ins.op = Op::STORE16_R0;
+            ins.dst.isImm = false; ins.dst.reg = (raw >> 8) & 0xF; // base Rn
+            ins.src1.isImm = false; ins.src1.reg = 0; // value in R0
+            ins.src2.isImm = false; ins.src2.reg = ins.dst.reg;     // base register
+            ins.extra = disp8 * 2;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
+        // MOV.L R0,@(disp,Rn) 0x8n20 disp8 (long store)
+        else if ((raw & 0xF000) == 0x8000 && ((raw >> 4) & 0xF) == 0x2)
+        {
+            uint8_t disp8 = raw & 0xFF;
+            ins.op = Op::STORE32_R0;
+            ins.dst.isImm = false; ins.dst.reg = (raw >> 8) & 0xF;
+            ins.src1.isImm = false; ins.src1.reg = 0;
+            ins.src2.isImm = false; ins.src2.reg = ins.dst.reg;
+            ins.extra = disp8 * 4;
+            decoded = true;
+            blk.pcNext = pc + 2;
+        }
         // MOV.B @(disp,Rm),Rn 0x8nmd (disp=low4)
         else if ((raw & 0xF000) == 0x8000)
         {
