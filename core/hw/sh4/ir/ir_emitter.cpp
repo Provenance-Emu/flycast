@@ -1840,9 +1840,9 @@ Block& Emitter::CreateNew(uint32_t pc) {
         // MOV.B R0,@(disp,Rn) 0x8n0d (d=disp4)
         else if ((raw & 0xFF00) == 0x8000)
         {
-            uint8_t disp4 = (raw >> 4) & 0xF;
+            uint8_t disp4 = static_cast<uint8_t>(raw & 0xF);
             ins.op = Op::STORE8_R0;
-            ins.dst.isImm = false; ins.dst.reg = (raw >> 8) & 0xF; // Rn
+            ins.dst.isImm = false; ins.dst.reg = (raw >> 4) & 0xF; // Rn
             ins.src1.isImm = false; ins.src1.reg = 0;
             ins.src2.isImm = false; ins.src2.reg = ins.dst.reg;
             ins.extra = disp4; // byte displacement
@@ -1854,7 +1854,7 @@ Block& Emitter::CreateNew(uint32_t pc) {
         {
             uint8_t disp4 = static_cast<uint8_t>(raw & 0xF); // 4-bit displacement
             ins.op = Op::STORE16_R0;
-            ins.dst.isImm = false; ins.dst.reg = (raw >> 8) & 0xF; // Rn
+            ins.dst.isImm = false; ins.dst.reg = (raw >> 4) & 0xF; // Rn
             ins.src1.isImm = false; ins.src1.reg = 0; // value in R0
             ins.src2.isImm = false; ins.src2.reg = ins.dst.reg;     // base register
             ins.extra = disp4 * 2;
@@ -1864,9 +1864,9 @@ Block& Emitter::CreateNew(uint32_t pc) {
         // MOV.L R0,@(disp,Rn) 0x8n2d
         else if ((raw & 0xFF00) == 0x8200)
         {
-            uint8_t disp4 = (raw >> 4) & 0xF;
+            uint8_t disp4 = static_cast<uint8_t>(raw & 0xF);
             ins.op = Op::STORE32_R0;
-            ins.dst.isImm = false; ins.dst.reg = (raw >> 8) & 0xF;
+            ins.dst.isImm = false; ins.dst.reg = (raw >> 4) & 0xF;
             ins.src1.isImm = false; ins.src1.reg = 0;
             ins.src2.isImm = false; ins.src2.reg = ins.dst.reg;
             ins.extra = disp4 * 4;
