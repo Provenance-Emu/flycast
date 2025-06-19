@@ -595,23 +595,51 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 }
                 case Op::STORE8_R0:
-                {
-                    uint32_t addr = ctx->r[ins.src2.reg] + ctx->r[0]; // addr = Rn + R0
-                    mmu_WriteMem<u8>(addr, ctx->r[ins.src1.reg]);
-                    break;
-                }
+                 {
+                     uint32_t addr;
+                     uint8_t value;
+                     if (ins.extra != 0 || ins.src1.reg == 0) {
+                         // displacement form (value from R0, extra holds scaled disp)
+                         addr = ctx->r[ins.src2.reg] + static_cast<uint32_t>(ins.extra);
+                         value = static_cast<uint8_t>(ctx->r[0] & 0xFF);
+                     } else {
+                         // R0-indexed register form (value from Rm, offset is R0)
+                         addr = ctx->r[ins.src2.reg] + ctx->r[0];
+                         value = static_cast<uint8_t>(ctx->r[ins.src1.reg] & 0xFF);
+                     }
+                     mmu_WriteMem<u8>(addr, value);
+                     break;
+                 }
                 case Op::STORE16_R0:
-                {
-                    uint32_t addr = ctx->r[ins.src2.reg] + ctx->r[0]; // addr = Rn + R0
-                    mmu_WriteMem<u16>(addr, ctx->r[ins.src1.reg]);
-                    break;
-                }
+                 {
+                     uint32_t addr;
+                     uint16_t value;
+                     if (ins.extra != 0 || ins.src1.reg == 0) {
+                         // displacement form (value in R0)
+                         addr = ctx->r[ins.src2.reg] + static_cast<uint32_t>(ins.extra);
+                         value = static_cast<uint16_t>(ctx->r[0] & 0xFFFF);
+                     } else {
+                         // R0-indexed register form (value in Rm)
+                         addr = ctx->r[ins.src2.reg] + ctx->r[0];
+                         value = static_cast<uint16_t>(ctx->r[ins.src1.reg] & 0xFFFF);
+                     }
+                     mmu_WriteMem<u16>(addr, value);
+                     break;
+                 }
                 case Op::STORE32_R0:
-                {
-                    uint32_t addr = ctx->r[ins.src2.reg] + ctx->r[0]; // addr = Rn + R0
-                    mmu_WriteMem<u32>(addr, ctx->r[ins.src1.reg]);
-                    break;
-                }
+                 {
+                     uint32_t addr;
+                     uint32_t value;
+                     if (ins.extra != 0 || ins.src1.reg == 0) {
+                         addr = ctx->r[ins.src2.reg] + static_cast<uint32_t>(ins.extra);
+                         value = ctx->r[0];
+                     } else {
+                         addr = ctx->r[ins.src2.reg] + ctx->r[0];
+                         value = ctx->r[ins.src1.reg];
+                     }
+                     mmu_WriteMem<u32>(addr, value);
+                     break;
+                 }
                 case Op::OR_REG:
                     ctx->r[ins.dst.reg] |= ctx->r[ins.src1.reg];
                     break;
