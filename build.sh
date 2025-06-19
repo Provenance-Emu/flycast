@@ -3,7 +3,7 @@
 # Default values
 BUILD_DIR="build/ios-arm64"
 LIBRETRO="ON"
-BUILD_TYPE="Release"
+BUILD_TYPE="Debug"
 PIC="ON"
 ARCH="arm64"
 IOS_MIN_VERSION="15.0"
