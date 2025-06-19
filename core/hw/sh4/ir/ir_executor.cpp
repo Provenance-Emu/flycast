@@ -17,6 +17,8 @@
 #include "hw/sh4/sh4_interpreter.h"
 #include "hw/flashrom/nvmem.h" // for getBiosData()
 
+#define USE_FAST_PTR
+
 // Auto-generated opcode name table
 #include "ir_opnames.inc"
 
@@ -146,8 +148,8 @@ static inline void SetPC(Sh4Context* ctx, uint32_t new_pc, const char* why)
 
 // Fast pointer fetch for main RAM aliases (P1/P2/P3) and P4 SDRAM mirrors (F8–FE)
 // Fast pointer fetch for read-only accesses (includes BIOS)
-static inline u8* FastRamPtr(uint32_t addr)
-{
+static inline u8 *FastRamPtr(uint32_t addr) {
+#ifdef USE_FAST_PTR
     // BIOS ROM 0x00000000–0x001FFFFF (2 MiB) and its mirrors in P1/P2/P3 **and P0 0x40000000**
     if ((addr & 0xFFE00000u) == 0x00000000u || // U0 window
         (addr & 0xFFE00000u) == 0x40000000u || // P0 mirror used by ITLB handler
@@ -158,13 +160,17 @@ static inline u8* FastRamPtr(uint32_t addr)
         return nvmem::getBiosData() + (addr & 0x001FFFFF);
     }
 
-    // Main RAM cached area P0: 0x00000000–0x0FFFFFFF
-    // Skip the first 2 MiB which are the BIOS shadow.
+    // Main RAM cached area P0: 0x00000000–0x0FFFFFFF (skip first 2 MiB BIOS shadow)
     if (addr < 0x10000000u && addr >= 0x00200000u)
     {
-        u32 off = addr & settings.platform.ram_mask;
-        if (off >= settings.platform.ram_size)
-            return nullptr; // out of SDRAM
+        u32 off = addr & 0x00FFFFFFu; // mask to 16 MiB
+        return addrspace::ram_base + off;
+    }
+
+    // Uncached mirrors in P1 (0x8C000000–0x8CFFFFFF) and P2 (0xAC000000–0xACFFFFFF)
+    if ((addr & 0xFF000000u) == 0x8C000000u || (addr & 0xFF000000u) == 0xAC000000u)
+    {
+        u32 off = addr & 0x00FFFFFFu;
         return addrspace::ram_base + off;
     }
 
@@ -177,6 +183,9 @@ static inline u8* FastRamPtr(uint32_t addr)
         return addrspace::ram_base + 0x0C000000 + (addr & 0x00FFFFFF);
 
     return nullptr; // everything else is treated via MMU
+#else
+    return nullptr;
+#endif
 }
 
 // Helper to quickly identify BIOS ROM regions (including mirrors)
@@ -221,16 +230,74 @@ static void LogIllegalBiosWrite(const Instr& ins, uint32_t addr, uint32_t pc)
 // Fast pointer fetch for WRITE accesses – excludes BIOS ROM regions (read-only)
 static inline u8* FastRamPtrWrite(uint32_t addr)
 {
+#ifdef USE_FAST_PTR
     // Main RAM 0x0C000000–0x0FFFFFFF
     if ((addr & 0xFC000000u) == 0x0C000000u)
         return addrspace::ram_base + (addr & 0x03FFFFFF);
+
+    // Uncached mirrors in P1 (0x8C000000–0x8CFFFFFF) and P2 (0xAC000000–0xACFFFFFF)
+    if ((addr & 0xFF000000u) == 0x8C000000u || (addr & 0xFF000000u) == 0xAC000000u)
+        return addrspace::ram_base + (addr & 0x00FFFFFF);
 
     // P4 SDRAM mirrors
     if (addr >= 0xF8000000u && addr < 0xFF000000u)
         return addrspace::ram_base + 0x0C000000 + (addr & 0x00FFFFFF);
 
     return nullptr; // everything else is treated via MMU
+#else
+    return nullptr;
+#endif
 }
+
+// -----------------------------------------------------------------------------
+//  Aligned fast-path helpers (avoid SIGBUS on unaligned host accesses)
+// -----------------------------------------------------------------------------
+static inline u16 ReadAligned16(uint32_t addr)
+{
+    if ((addr & 1u) == 0)
+    {
+        if (u8* p = FastRamPtr(addr))
+            return *reinterpret_cast<u16*>(p);
+    }
+    return mmu_ReadMem<u16>(addr);
+}
+
+static inline u32 ReadAligned32(uint32_t addr)
+{
+    if ((addr & 3u) == 0)
+    {
+        if (u8* p = FastRamPtr(addr))
+            return *reinterpret_cast<u32*>(p);
+    }
+    return mmu_ReadMem<u32>(addr);
+}
+
+static inline void WriteAligned16(uint32_t addr, u16 data)
+{
+    if ((addr & 1u) == 0)
+    {
+        if (u8* p = FastRamPtr(addr))
+        {
+            *reinterpret_cast<u16*>(p) = data;
+            return;
+        }
+    }
+    mmu_WriteMem(addr, data);
+}
+
+static inline void WriteAligned32(uint32_t addr, u32 data)
+{
+    if ((addr & 3u) == 0)
+    {
+        if (u8* p = FastRamPtr(addr))
+        {
+            *reinterpret_cast<u32*>(p) = data;
+            return;
+        }
+    }
+    mmu_WriteMem(addr, data);
+}
+
 
 // Per-opcode execution helper signature
 using ExecFn = void(*)(const sh4::ir::Instr&, Sh4Context*, uint32_t);
@@ -595,7 +662,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     if (!ins.src2.isImm && ins.src2.type != RegType::NONE) // MOV.B @(Rm,Rn),R0. Emitter: ins.src1.reg=Rm, ins.src2.reg=Rn, ins.src2.type should be GPR
                     {
                         addr = ctx->r[ins.src1.reg] + ctx->r[ins.src2.reg];
-                        INFO_LOG(SH4, "IR_EXEC: LOAD8 @(R%d,R%d),R0. PC=0x%08X. R%d(base)=0x%08X, R%d(offs)=0x%08X, Addr=0x%08X",
+                        INFO_LOG(SH4, "IR_EXEC: LOAD8 @(R%d,R%d),R%d. PC=0x%08X. R%d(base)=0x%08X, R%d(offs)=0x%08X, Addr=0x%08X",
                                  ins.src1.reg, ins.src2.reg, current_instr_pc,
                                  ins.src1.reg, ctx->r[ins.src1.reg],
                                  ins.src2.reg, ctx->r[ins.src2.reg], addr);
@@ -605,9 +672,9 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         // Assuming 'extra' is used for displacement by the emitter for this specific LOAD8 form.
                         // If other LOAD8 forms use src2.imm, that needs to be handled by emitter or here.
                         addr = ctx->r[ins.src1.reg] + ins.extra;
-                        INFO_LOG(SH4, "IR_EXEC: LOAD8 @(0x%X,R%d),R0. PC=0x%08X. R%d(base)=0x%08X, Addr=0x%08X",
+                        INFO_LOG(SH4, "IR_EXEC: LOAD8 @(0x%X,R%d),R%d. PC=0x%08X. R%d(base)=0x%08X, Addr=0x%08X",
                                  ins.extra, ins.src1.reg, current_instr_pc,
-                                 ins.src1.reg, ctx->r[ins.src1.reg], addr);
+                                 ins.dst.reg, ins.src1.reg, ctx->r[ins.src1.reg], addr);
                     }
 
                     u8 val;
@@ -628,7 +695,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + static_cast<uint32_t>(ins.extra);
                     u16 val;
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         val = *reinterpret_cast<u16*>(p);
                     else
                         val = mmu_ReadMem<u16>(addr);
@@ -638,7 +705,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::LOAD32:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + static_cast<uint32_t>(ins.extra);
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         ctx->r[ins.dst.reg] = *reinterpret_cast<u32*>(p);
                     else
                         ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(addr);
@@ -671,52 +738,56 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 {
                     uint32_t addr = ctx->r[ins.src1.reg];
                     u8 val;
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         val = *p;
                     else
                         val = mmu_ReadMem<u8>(addr);
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int8_t>(val));
-                    ctx->r[ins.src1.reg] += 1;
+                    if (ins.src1.reg != ins.dst.reg)
+                        ctx->r[ins.src1.reg] += 1;
                     break;
                 }
                 case Op::LOAD16_POST:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg];
                     u16 val;
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         val = *reinterpret_cast<u16*>(p);
                     else
                         val = mmu_ReadMem<u16>(addr);
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val));
-                    ctx->r[ins.src1.reg] += 2;
+                    if (ins.src1.reg != ins.dst.reg)
+                        ctx->r[ins.src1.reg] += 2;
                     break;
                 }
                 case Op::LOAD32_POST:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg];
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         ctx->r[ins.dst.reg] = *reinterpret_cast<u32*>(p);
                     else
                         ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(addr);
-                    ctx->r[ins.src1.reg] += 4;
+                    if (ins.src1.reg != ins.dst.reg)
+                        ctx->r[ins.src1.reg] += 4;
                     break;
                 }
                 case Op::STORE8_POST:
                 {
                     uint32_t addr = ctx->r[ins.dst.reg];
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         *p = static_cast<u8>(ctx->r[ins.src1.reg]);
                     else if (IsBiosAddr(addr)) {
                          LogIllegalBiosWrite(ins, addr, curr_pc);
                      } else
                          mmu_WriteMem<u8>(addr, ctx->r[ins.src1.reg]);
-                    ctx->r[ins.dst.reg] += 1;
+                    if (ins.dst.reg != ins.src1.reg)
+                        ctx->r[ins.dst.reg] += 1;
                     break;
                 }
                 case Op::STORE16_POST:
                 {
                     uint32_t addr = ctx->r[ins.dst.reg];
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         *reinterpret_cast<u16*>(p) = static_cast<u16>(ctx->r[ins.src1.reg]);
                     else if (IsBiosAddr(addr)) {
                          LogIllegalBiosWrite(ins, addr, curr_pc);
@@ -728,7 +799,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::STORE32_POST:
                 {
                     uint32_t addr = ctx->r[ins.dst.reg];
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         *reinterpret_cast<u32*>(p) = ctx->r[ins.src1.reg];
                     else if (IsBiosAddr(addr)) {
                          LogIllegalBiosWrite(ins, addr, curr_pc);
@@ -754,7 +825,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + ctx->r[0];
                     u8 val;
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         val = *p;
                     else
                         val = mmu_ReadMem<u8>(addr);
@@ -765,7 +836,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + ctx->r[0];
                     u16 val;
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         val = *reinterpret_cast<u16*>(p);
                     else
                         val = mmu_ReadMem<u16>(addr);
@@ -775,7 +846,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::LOAD32_R0:
                 {
                     uint32_t addr = ctx->r[ins.src1.reg] + ctx->r[0];
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         ctx->r[ins.dst.reg] = *reinterpret_cast<u32*>(p);
                     else
                         ctx->r[ins.dst.reg] = mmu_ReadMem<u32>(addr);
@@ -1289,7 +1360,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 {
                     uint32_t addr = ctx->r[0] + ctx->r[ins.src1.reg];
                     uint32_t val;
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         val = *reinterpret_cast<u32*>(p);
                     else
                         val = mmu_ReadMem<u32>(addr);
@@ -1300,7 +1371,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 {
                     uint32_t addr = ctx->r[0] + ctx->r[ins.dst.reg];
                     uint32_t val = *reinterpret_cast<u32*>(&ctx->fr[ins.src1.reg]);
-                    if (u8* p = FastRamPtrWrite(addr))
+                    if (u8* p = FastRamPtr(addr))
                         *reinterpret_cast<u32*>(p) = val;
                     else
                         mmu_WriteMem<u32>(addr, val);
