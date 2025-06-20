@@ -982,6 +982,12 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::CMP_EQ:
                     ctx->sr.T = (ctx->r[ins.dst.reg] == ctx->r[ins.src1.reg]);
                     break;
+                case Op::CMP_EQ_IMM:
+                    // Compare R0 with immediate value (sign-extended)
+                    ctx->sr.T = (ctx->r[0] == (int8_t)ins.extra);
+                    INFO_LOG(SH4, "CMP_EQ_IMM: R0(0x%08X) == #%d -> T=%d", 
+                            ctx->r[0], (int8_t)ins.extra, ctx->sr.T);
+                    break;
                 case Op::CMP_HI:
                     ctx->sr.T = (ctx->r[ins.dst.reg] > ctx->r[ins.src1.reg]);
                     break;
