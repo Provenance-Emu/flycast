@@ -22,6 +22,9 @@ public:
     void ResetCache() override { emitter_ = Emitter{}; }
     bool IsCpuRunning() override { return running_; }
     Sh4Context* GetContext() override { return ctx_; }
+    
+    // Invalidate a block at the specified address
+    void InvalidateBlock(u32 addr);
 
 private:
     bool running_ = false;

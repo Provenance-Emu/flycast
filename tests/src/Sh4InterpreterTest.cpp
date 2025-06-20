@@ -37,11 +37,21 @@ protected:
 	{
 		ctx->pc = START_PC;
 		printf("[Sh4InterpreterTest::PrepareOp] Preparing op 0x%04X at PC 0x%08X\n", op, ctx->pc); fflush(stdout);
+		
+		// Write the provided opcodes
 		addrspace::write16(ctx->pc, op);
 		if (op2 != 0)
 			addrspace::write16(ctx->pc + 2, op2);
 		if (op3 != 0)
 			addrspace::write16(ctx->pc + 4, op3);
+		
+		// Add END sentinel (0xFFFF) after the last instruction to prevent executing stale code
+		u32 lastOpAddr = ctx->pc + (op3 != 0 ? 4 : (op2 != 0 ? 2 : 0));
+		addrspace::write16(lastOpAddr + 2, 0xFFFF); // END opcode
+		
+		// Explicitly invalidate the cache for the block we just modified
+		printf("[Sh4InterpreterTest::PrepareOp] Invalidating block at PC 0x%08X\n", START_PC); fflush(stdout);
+		sh4->InvalidateBlock(START_PC);
 	}
 	void RunOp(int numOp = 1) override
 	{

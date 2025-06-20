@@ -1,9 +1,13 @@
 #include "addrspace.h"
+#include "log/LogManager.h"
+#include <cstdio> // For printf
 #include "hw/aica/aica_if.h"
 #include "hw/pvr/pvr_mem.h"
 #include "hw/pvr/elan.h"
 #include "hw/sh4/dyna/blockmanager.h"
 #include "hw/sh4/sh4_mem.h"
+#include "hw/sh4/sh4_if.h"
+#include "hw/sh4/ir/sh4_ir_interpreter.h"
 #include "oslib/oslib.h"
 #include "oslib/virtmem.h"
 #include <cassert>
@@ -104,6 +108,24 @@ void *writeConst(u32 addr, bool& ismem, u32 sz)
 template<typename T>
 T DYNACALL readt(u32 addr)
 {
+    if (sizeof(T) == 4) {
+        if (addr == 0x8C001000) {
+             printf("[PRINTF_DEBUG_CPP_READT_U32_TARGET] readt<u32> for 0x%08X\n", addr);
+        } else {
+             printf("[PRINTF_DEBUG_CPP_READT_U32_GENERIC] readt<u32> for 0x%08X\n", addr);
+        }
+        fflush(stdout);
+    } else if (sizeof(T) == 2) {
+        printf("[PRINTF_DEBUG_CPP_READT_U16_GENERIC] readt<u16> for 0x%08X\n", addr);
+        fflush(stdout);
+    } else if (sizeof(T) == 1) {
+        printf("[PRINTF_DEBUG_CPP_READT_U8_GENERIC] readt<u8> for 0x%08X\n", addr);
+        fflush(stdout);
+    }
+		else {
+			printf("[PRINTF_DEBUG_CPP_READT_GENERIC] readt for 0x%08X with size %zu	\n", addr, sizeof(T));
+			fflush(stdout);
+		}
 	constexpr u32 sz = sizeof(T);
 
 	u32 page = addr >> 24;	//1 op, shift/extract
@@ -112,10 +134,10 @@ T DYNACALL readt(u32 addr)
 
 	if (likely(ptr != nullptr))
 	{
-		addr <<= iirf;
-		addr >>= iirf;
-
-		return *(T *)&((u8 *)ptr)[addr];
+        u32 mapping_shift_val = ((uintptr_t)memInfo_ptr[page]) & HANDLER_MAX;
+        u32 offset_mask = 0xFFFFFFFF >> mapping_shift_val;
+        u32 effective_offset = addr & offset_mask;
+        return *(T *)&((u8 *)ptr)[effective_offset];
 	}
 	else
 	{
@@ -148,6 +170,28 @@ template u64 DYNACALL readt<u64>(u32 addr);
 template<typename T>
 void DYNACALL writet(u32 addr, T data)
 {
+    if (sizeof(T) == 4) {
+        if (addr == 0x8C001000) {
+             printf("[PRINTF_DEBUG_CPP_WRITET_U32_TARGET] writet<u32> for 0x%08X with data 0x%08X\n", addr, static_cast<u32>(data));
+        } else {
+             printf("[PRINTF_DEBUG_CPP_WRITET_U32_GENERIC] writet<u32> for 0x%08X with data 0x%08X\n", addr, static_cast<u32>(data));
+        }
+        fflush(stdout);
+    } else if (sizeof(T) == 2) {
+        printf("[PRINTF_DEBUG_CPP_WRITET_U16_GENERIC] writet<u16> for 0x%08X with data 0x%04X\n", addr, static_cast<u16>(data));
+        fflush(stdout);
+    } else if (sizeof(T) == 1) {
+        printf("[PRINTF_DEBUG_CPP_WRITET_U8_GENERIC] writet<u8> for 0x%08X with data 0x%02X\n", addr, static_cast<u8>(data));
+        fflush(stdout);
+    }
+		else {
+			if constexpr (sizeof(T) == 8) {
+				printf("[PRINTF_DEBUG_CPP] addrspace::writet called for 0x%08X with data 0x%08llX\n", addr, (unsigned long long)data);
+			} else {
+				printf("[PRINTF_DEBUG_CPP] addrspace::writet called for 0x%08X with data 0x%08X\n", addr, (unsigned int)data);
+			}
+			fflush(stdout);
+		}
 	constexpr u32 sz = sizeof(T);
 
 	u32 page = addr>>24;
@@ -156,10 +200,67 @@ void DYNACALL writet(u32 addr, T data)
 
 	if (likely(ptr != nullptr))
 	{
-		addr <<= iirf;
-		addr >>= iirf;
+        u32 mapping_shift_val = ((uintptr_t)memInfo_ptr[page]) & HANDLER_MAX;
+        u32 offset_mask = 0xFFFFFFFF >> mapping_shift_val;
+        u32 effective_offset = addr & offset_mask;
+        u8* effective_host_addr = &((u8*)ptr)[effective_offset];
 
-		*(T *)&((u8 *)ptr)[addr] = data;
+        // Generic logging for P1/P2 RAM/Mirror regions (0x80000000 - 0xBFFFFFFF)
+        if ((addr >= 0x80000000 && addr < 0xC0000000)) {
+            if constexpr (sz == 1) {
+                INFO_LOG(SH4, "addrspace::writet<u8>: guest_addr=0x%08X, host_addr=%p, data=0x%02X", addr, effective_host_addr, (u8)data);
+            } else if constexpr (sz == 2) {
+                INFO_LOG(SH4, "addrspace::writet<u16>: guest_addr=0x%08X, host_addr=%p, data=0x%04X, aligned=%d", addr, effective_host_addr, (u16)data, (addr & 1) == 0);
+            } else if constexpr (sz == 4) {
+                INFO_LOG(SH4, "addrspace::writet<u32>: guest_addr=0x%08X, host_addr=%p, data=0x%08X, aligned=%d", addr, effective_host_addr, (u32)data, (addr & 3) == 0);
+            } else if constexpr (sz == 8) {
+                INFO_LOG(SH4, "addrspace::writet<u64>: guest_addr=0x%08X, host_addr=%p, data_low=0x%08X, data_high=0x%08X",
+                    addr, effective_host_addr, (u32)((u64)data & 0xFFFFFFFF), (u32)(((u64)data >> 32) & 0xFFFFFFFF));
+            }
+        }
+
+        // Actual write logic with unaligned handling
+        if constexpr (sz == 4) { // u32
+            if (addr & 3) { // Unaligned u32: Manual byte-wise write
+                effective_host_addr[0] = (u8)((u32)data & 0xFF);
+                effective_host_addr[1] = (u8)(((u32)data >> 8) & 0xFF);
+                effective_host_addr[2] = (u8)(((u32)data >> 16) & 0xFF);
+                effective_host_addr[3] = (u8)(((u32)data >> 24) & 0xFF);
+            } else { // Aligned u32
+                *(u32*)effective_host_addr = (u32)data;
+            }
+        } else if constexpr (sz == 2) { // u16
+            if (addr & 1) { // Unaligned u16: Manual byte-wise write
+                effective_host_addr[0] = (u8)((u16)data & 0xFF);
+                effective_host_addr[1] = (u8)(((u16)data >> 8) & 0xFF);
+            } else { // Aligned u16
+                *(u16*)effective_host_addr = (u16)data;
+            }
+        } else if constexpr (sz == 1) { // u8
+            *effective_host_addr = (u8)data;
+        } else if constexpr (sz == 8) { // u64
+            // Assuming u64 is expected to be aligned for direct pointer write.
+            // If unaligned u64 needs special handling (e.g., writemem_emu_ptr), this would need adjustment.
+            *(u64*)effective_host_addr = (u64)data;
+        }
+        
+        // Invalidate block cache if writing to code memory regions
+        // This handles self-modifying code scenarios like in LoadTest2
+        if ((addr >= 0x8C000000 && addr <= 0x8CFFFFFF) || // P1 area (cached)
+            (addr >= 0xAC000000 && addr <= 0xACFFFFFF))   // P2 area (uncached)
+        {
+            // Get the SH4 interpreter and invalidate the block
+            Sh4Executor* sh4_exec = Get_Sh4Interpreter();
+            if (sh4_exec != nullptr) {
+                // We know the interpreter is a Sh4IrInterpreter
+                // Use dynamic_cast for safety
+                auto* irSh4 = dynamic_cast<::sh4::ir::Sh4IrInterpreter*>(sh4_exec);
+                if (irSh4 != nullptr) {
+                    irSh4->InvalidateBlock(addr);
+                    INFO_LOG(SH4, "Invalidated block cache due to write to code memory at 0x%08X", addr);
+                }
+            }
+        }
 	}
 	else
 	{

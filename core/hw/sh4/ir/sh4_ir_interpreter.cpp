@@ -170,4 +170,18 @@ Sh4Executor* Get_Sh4Interpreter()
     fflush(stderr);
     return new sh4::ir::Sh4IrInterpreter();
 }
+
+void sh4::ir::Sh4IrInterpreter::InvalidateBlock(u32 addr)
+{
+    // Simple implementation: reset both emitter and executor caches for any write to code memory
+    // This is inefficient but guarantees correctness for self-modifying code
+    INFO_LOG(SH4, "Invalidating block at address 0x%08X", addr);
+    
+    // Clear emitter caches
+    emitter_.ClearCaches();
+    
+    // Reset executor state to force re-fetching blocks
+    // This ensures any stale block pointers are discarded
+    executor_.ResetCachedBlocks();
+}
 #endif // SH4_IR_ENABLED

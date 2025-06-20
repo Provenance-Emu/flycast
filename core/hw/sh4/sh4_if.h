@@ -117,6 +117,8 @@ public:
 	virtual void ResetCache() = 0;
 	virtual bool IsCpuRunning() = 0;
 	virtual Sh4Context* GetContext() = 0;
+	// Invalidate a block at the specified address (for self-modifying code)
+	virtual void InvalidateBlock(u32 addr) { /* Default empty implementation */ }
 };
 
 struct alignas(32) SQBuffer {
