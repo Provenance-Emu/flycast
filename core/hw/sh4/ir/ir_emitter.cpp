@@ -296,12 +296,46 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         uint8_t rm_base_reg = (raw >> 4) & 0xF;    // Rm (base address register)
         uint8_t disp_val = raw & 0xF;
 
-        ins.op = Op::STORE32;                      // Use generic STORE32
-        ins.src1 = {false, rn_dst_reg};            // Value from Rn (destination)
-        ins.src2 = {false, rm_base_reg};           // Base Rm (source address)
-        ins.extra = disp_val * 4;                  // Displacement in ins.extra
+        // FIXED: This is MOV.L @(disp,Rm),Rn - a LOAD operation, not STORE
+        ins.op = Op::LOAD32;                      // Use generic LOAD32
+        ins.dst = {false, rn_dst_reg};            // Destination is Rn
+        ins.src1 = {false, rm_base_reg};          // Base address from Rm
+        ins.extra = disp_val * 4;                 // Displacement in ins.extra (disp * 4 bytes)
 
-        INFO_LOG(SH4, "FastDecode: Decoded STORE32 R%u, @(%u,R%u) (0x%04X) at PC=%08X", rn_dst_reg, disp_val * 4, rm_base_reg, raw, pc);
+        INFO_LOG(SH4, "FastDecode: Decoded LOAD32 @(%u,R%u),R%u (0x%04X) at PC=%08X", 
+                disp_val * 4, rm_base_reg, rn_dst_reg, raw, pc);
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // MOV.B @(disp,Rm),R0 0x84md
+    else if ((raw & 0xFF00) == 0x8400) {
+        printf("[IR_EMITTER_DEBUG] FastDecode: Entered 0x8400 block for raw=0x%04X, pc=0x%08X\n", raw, pc); fflush(stdout);
+        uint8_t disp4 = raw & 0xF;              // disp4 is in bits 0-3
+        uint8_t m_reg = (raw >> 4) & 0xF;       // Rm is in bits 4-7
+        
+        ins.op = Op::LOAD8;                     // Use generic LOAD8
+        ins.dst = {false, 0};                    // Destination is always R0
+        ins.src1 = {false, m_reg};               // Base address from Rm
+        ins.extra = disp4;                       // Displacement in ins.extra (disp bytes)
+        
+        INFO_LOG(SH4, "FastDecode: Decoded LOAD8 @(%u,R%u),R0 (0x%04X) at PC=%08X", 
+                disp4, m_reg, raw, pc);
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // MOV.W @(disp,Rm),R0 0x85md
+    else if ((raw & 0xFF00) == 0x8500) {
+        printf("[IR_EMITTER_DEBUG] FastDecode: Entered 0x8500 block for raw=0x%04X, pc=0x%08X\n", raw, pc); fflush(stdout);
+        uint8_t disp4 = raw & 0xF;              // disp4 is in bits 0-3
+        uint8_t m_reg = (raw >> 4) & 0xF;       // Rm is in bits 4-7
+        
+        ins.op = Op::LOAD16;                    // Use generic LOAD16
+        ins.dst = {false, 0};                    // Destination is always R0
+        ins.src1 = {false, m_reg};               // Base address from Rm
+        ins.extra = disp4 * 2;                   // Displacement in ins.extra (disp * 2 bytes)
+        
+        INFO_LOG(SH4, "FastDecode: Decoded LOAD16 @(%u,R%u),R0 (0x%04X) at PC=%08X", 
+                disp4 * 2, m_reg, raw, pc);
         blk.pcNext = pc + 2;
         return true;
     }
