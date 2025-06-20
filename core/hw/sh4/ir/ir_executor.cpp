@@ -520,21 +520,20 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 }
                 case Op::STORE32:
                 {
-                    // Added for PRINTF_DEBUG_IR_STORE32
-                    u32 rm_idx = ins.src1.reg; // Rm
-                    u32 rn_idx = ins.src2.reg; // Rn
-                    s32 disp = ins.extra;     // displacement
-                    printf("[PRINTF_DEBUG_IR_STORE32_ENTRY] STORE32: ins.src1.reg (Rm_idx)=%u (expected 14 for R14), ins.src2.reg (Rn_idx)=%u (expected 11 for R11), ins.extra (disp)=%d\n", rm_idx, rn_idx, disp);
-                    // Assuming Sh4cntx is available as ctx, or directly Sh4cntx if global/member
-                    printf("[PRINTF_DEBUG_IR_STORE32_VALS] STORE32: ctx->r[14]=0x%08X, ctx->r[rm_idx (%u)]=0x%08X /* rm_idx is ins.src1.reg */\n", ctx->r[14], rm_idx, ctx->r[rm_idx]);
+                    // Updated debug log to reflect corrected register mapping
+                    printf("[PRINTF_DEBUG_IR_STORE32_ENTRY] STORE32: ins.src1.reg (Rn_dst)=%u, ins.src2.reg (Rm_base)=%u, ins.extra (disp)=%u\n", 
+                           ins.src1.reg, ins.src2.reg, ins.extra);
                     fflush(stdout);
 
+                    // CORRECTED: ins.src1.reg is now Rn (value to store)
+                    // CORRECTED: ins.src2.reg is now Rm (base address)
                     uint32_t addr = ctx->r[ins.src2.reg] + ins.extra;
                     uint32_t val_to_store = ctx->r[ins.src1.reg];
-                    // Initial log for context
-                    // INFO_LOG(SH4, "STORE32 PRE-WRITE: R%u(0x%08X) intended for addr 0x%08X. (Rn=R%u@0x%08X, disp=%d)",
-                    //          ins.src1.reg, val_to_store, addr,
-                    //          ins.src2.reg, ctx->r[ins.src2.reg], ins.extra); // Test if this LOG_INFO causes corruption
+                    
+                    printf("[PRINTF_DEBUG_IR_STORE32_VALS] STORE32: ctx->r[%u]=%#010x, ctx->r[%u]=%#010x, addr=%#010x\n", 
+                           ins.src1.reg, val_to_store, ins.src2.reg, ctx->r[ins.src2.reg], addr);
+                    fflush(stdout);
+                    
                     if (unlikely(IsBiosAddr(addr))) {
                         LogIllegalBiosWrite(ins, addr, curr_pc);
                     } else {
@@ -880,8 +879,17 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
 
                 case Op::LOAD16_IMM:
                 {
-                    u16 val = ReadAligned16(static_cast<uint32_t>(ins.src1.imm));
+                    uint32_t addr = static_cast<uint32_t>(ins.src1.imm);
+                    u16 val = ReadAligned16(addr);
+                    uint32_t old_reg = ctx->r[ins.dst.reg];
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val));
+                    
+                    // Enhanced debug logging to track register changes
+                    printf("[PRINTF_DEBUG_LOAD16_IMM] PC=%08X, raw=0x%04X, dst=R%u, addr=%08X, val=0x%04X, sign_ext=0x%08X, old_reg=0x%08X\n", 
+                           curr_pc, ins.raw, ins.dst.reg, addr, val, ctx->r[ins.dst.reg], old_reg);
+                    printf("[PRINTF_DEBUG_LOAD16_IMM] Register state: R0-R7: %08X %08X %08X %08X %08X %08X %08X %08X\n", 
+                           ctx->r[0], ctx->r[1], ctx->r[2], ctx->r[3], ctx->r[4], ctx->r[5], ctx->r[6], ctx->r[7]);
+                    fflush(stdout);
                     break;
                 }
                 case Op::LOAD32_IMM:
@@ -1572,11 +1580,40 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     uint32_t base = (base_pc & ~3u) + 4u;     // Align and add 4 per SH4 spec
                     uint32_t mem_addr = base + (disp8 << 2);
                     uint32_t val = ReadAligned32(mem_addr);
+                    uint32_t old_reg = ctx->r[ins.dst.reg];
                     ctx->r[ins.dst.reg] = val;
+                    
+                    // Enhanced debug logging for all registers, not just R0
+                    printf("[PRINTF_DEBUG_LOAD32_PC] PC=%08X, raw=0x%04X, dst=R%u, base_pc=%08X, aligned_base=%08X, disp=%u, addr=%08X, val=0x%08X, old_reg=0x%08X\n", 
+                           curr_pc, ins.raw, ins.dst.reg, base_pc, base, disp8, mem_addr, val, old_reg);
+                    printf("[PRINTF_DEBUG_LOAD32_PC] Register state: R0-R7: %08X %08X %08X %08X %08X %08X %08X %08X\n", 
+                           ctx->r[0], ctx->r[1], ctx->r[2], ctx->r[3], ctx->r[4], ctx->r[5], ctx->r[6], ctx->r[7]);
+                    fflush(stdout);
+                    
                     if (ins.dst.reg == 0) {
                         INFO_LOG(SH4, "LOAD32_PC: Loaded 0x%08X into R0 from addr 0x%08X (PC=%08X, disp=%d)", val, mem_addr, curr_pc, disp8);
                     }
-                    if (ins.dst.reg == 0) INFO_LOG(SH4, "R0 updated to %08X", ctx->r[0]);
+                    break;
+                }
+                case Op::LOAD16_PC:
+                {
+                    uint32_t disp8 = static_cast<uint32_t>(ins.extra);
+                    uint32_t base_pc = ins.pc;                // PC of this instruction
+                    uint32_t base = (base_pc & ~1u) + 4u;     // Align and add 4 per SH4 spec
+                    uint32_t mem_addr = base + (disp8 << 1);  // Scale by 2 for word addressing
+                    u16 val = ReadAligned16(mem_addr);
+                    uint32_t old_reg = ctx->r[ins.dst.reg];
+                    ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val)); // Sign-extend 16-bit value
+                    
+                    // Enhanced debug logging
+                    printf("[PRINTF_DEBUG_LOAD16_PC] PC=%08X, raw=0x%04X, dst=R%u, base_pc=%08X, aligned_base=%08X, disp=%u, addr=%08X, val=0x%04X, sign_ext=0x%08X, old_reg=0x%08X\n", 
+                           curr_pc, ins.raw, ins.dst.reg, base_pc, base, disp8, mem_addr, val, ctx->r[ins.dst.reg], old_reg);
+                    printf("[PRINTF_DEBUG_LOAD16_PC] Register state: R0-R7: %08X %08X %08X %08X %08X %08X %08X %08X\n", 
+                           ctx->r[0], ctx->r[1], ctx->r[2], ctx->r[3], ctx->r[4], ctx->r[5], ctx->r[6], ctx->r[7]);
+                    fflush(stdout);
+                    
+                    INFO_LOG(SH4, "LOAD16_PC: Loaded 0x%04X (sign-ext: 0x%08X) into R%u from addr 0x%08X (PC=%08X, disp=%d)", 
+                             val, ctx->r[ins.dst.reg], ins.dst.reg, mem_addr, curr_pc, disp8);
                     break;
                 }
                 case Op::FMOV_LOAD_R0:

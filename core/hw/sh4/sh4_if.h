@@ -99,6 +99,9 @@ struct fpscr_t
 	};
 };
 
+// Forward declaration
+struct Sh4Context;
+
 //sh4 interface
 class Sh4Executor
 {
@@ -113,6 +116,7 @@ public:
 	virtual void Term() = 0;
 	virtual void ResetCache() = 0;
 	virtual bool IsCpuRunning() = 0;
+	virtual Sh4Context* GetContext() = 0;
 };
 
 struct alignas(32) SQBuffer {

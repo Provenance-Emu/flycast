@@ -21,6 +21,7 @@ public:
     void Term() override {}
     void ResetCache() override { emitter_ = Emitter{}; }
     bool IsCpuRunning() override { return running_; }
+    Sh4Context* GetContext() override { return ctx_; }
 
 private:
     bool running_ = false;

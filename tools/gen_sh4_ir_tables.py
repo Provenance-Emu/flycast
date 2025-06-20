@@ -105,7 +105,7 @@ def gather_helper_names(manual_names: list, mapping: dict) -> list:
     extra_internal = {
         'ILLEGAL',
         'MOV_REG', 'MOV_IMM', 'ADD_REG', 'ADD_IMM',
-        'LOAD16_IMM', 'LOAD32_IMM', 'LOAD32_PC',
+        'LOAD16_IMM', 'LOAD32_IMM', 'LOAD32_PC', 'LOAD16_PC',
         'JSR', 'RTS', 'BRA',
         'FMOV_LOAD_R0', 'FMOV_STORE_R0',
     }

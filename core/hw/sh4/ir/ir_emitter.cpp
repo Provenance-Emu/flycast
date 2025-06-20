@@ -232,16 +232,17 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
     // MOV.L Rm,@(disp,Rn) 0x5(Rm)(Rn)disp -- This is a STORE: Store Rm to @(disp,Rn)
     else if ((raw & 0xF000) == 0x5000) {
         printf("[IR_EMITTER_DEBUG] FastDecode: Entered 0x5000 block for raw=0x%04X, pc=0x%08X\n", raw, pc); fflush(stdout);
-        uint8_t rm_val_reg = (raw >> 8) & 0xF;    // Rm (source value for STORE)
-        uint8_t rn_base_reg = (raw >> 4) & 0xF;   // Rn (base address for STORE)
+        // CORRECTED: SH4 spec puts Rn in bits 8-11 and Rm in bits 4-7
+        uint8_t rn_dst_reg = (raw >> 8) & 0xF;     // Rn (destination register)
+        uint8_t rm_base_reg = (raw >> 4) & 0xF;    // Rm (base address register)
         uint8_t disp_val = raw & 0xF;
 
-        ins.op = Op::STORE32;                          // Use generic STORE32
-        ins.src1 = {false, rm_val_reg};                // Value from Rm
-        ins.src2 = {false, rn_base_reg};               // Base Rn
-        ins.extra = disp_val * 4;                      // Displacement in ins.extra
+        ins.op = Op::STORE32;                      // Use generic STORE32
+        ins.src1 = {false, rn_dst_reg};            // Value from Rn (destination)
+        ins.src2 = {false, rm_base_reg};           // Base Rm (source address)
+        ins.extra = disp_val * 4;                  // Displacement in ins.extra
 
-        INFO_LOG(SH4, "FastDecode: Decoded STORE32 R%u, @(%u,R%u) (0x%04X) at PC=%08X", rm_val_reg, disp_val * 4, rn_base_reg, raw, pc);
+        INFO_LOG(SH4, "FastDecode: Decoded STORE32 R%u, @(%u,R%u) (0x%04X) at PC=%08X", rn_dst_reg, disp_val * 4, rm_base_reg, raw, pc);
         blk.pcNext = pc + 2;
         return true;
     }
@@ -313,9 +314,10 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
 
 
     // MOV.L @(disp,PC),Rn 0xD000 | Rn<<8 | disp8
+    // Note: Tests use Rn(r) which is r<<8, so we must extract from bits 8-11 to match test expectations
     else if ((raw & 0xF000) == 0xD000)
     {
-        uint8_t n   = (raw >> 8) & 0xF;
+        uint8_t n = (raw >> 8) & 0xF;  // Match test expectations: Rn is in bits 8-11
         uint8_t disp = raw & 0xFF;
         ins.op = Op::LOAD32_PC;
         ins.dst = {false, n};
@@ -324,15 +326,14 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         return true;
     }
     // MOV.W @(disp,PC),Rn 0x9000 | Rn<<8 | disp8
+    // Note: Tests use Rn(r) which is r<<8, so we must extract from bits 8-11 to match test expectations
     else if ((raw & 0xF000) == 0x9000)
     {
-        uint8_t n   = (raw >> 8) & 0xF;
+        uint8_t n = (raw >> 8) & 0xF;  // Match test expectations: Rn is in bits 8-11
         uint8_t disp = raw & 0xFF;
-        ins.op = Op::LOAD16_IMM;
+        ins.op = Op::LOAD16_PC;
         ins.dst = {false, n};
-        uint32_t addr = (pc + 4) + (static_cast<uint32_t>(disp) << 1);
-        ins.src1.isImm = true;
-        ins.src1.imm = addr;
+        ins.extra = disp;  // Pass raw disp8 for executor to use
         blk.pcNext = pc + 2;
         return true;
     }
@@ -1604,12 +1605,11 @@ Block& Emitter::CreateNew(uint32_t pc) {
         else if ((raw & 0xF000) == 0x9000)
         {
             uint8_t disp = raw & 0xFF;
-            uint32_t addr = (pc + 4) + (disp << 1);
-            ins.op = Op::LOAD16_IMM;
+            // Use LOAD16_PC to match LOAD32_PC approach
+            ins.op = Op::LOAD16_PC;
             ins.dst.isImm = false;
             ins.dst.reg = n;
-            ins.src1.isImm = true;
-            ins.src1.imm = addr;
+            ins.extra = disp; // keep raw disp8 for executor to use
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -2727,9 +2727,34 @@ Block& Emitter::CreateNew(uint32_t pc) {
 
 const Block* Emitter::BuildBlock(uint32_t pc)
 {
+    // Calculate signature of current code at PC
+    uint64_t current_sig = CalcBlockSig(pc);
+    
     auto it = cache_.find(pc);
-    if (it != cache_.end())
-        return &it->second;
+    if (it != cache_.end()) {
+        // Block exists in cache, but check if code has changed
+        uint64_t cached_sig = 0;
+        auto sig_it = g_block_sig_cache.begin();
+        for (; sig_it != g_block_sig_cache.end(); ++sig_it) {
+            if (sig_it->second == &it->second) {
+                cached_sig = sig_it->first;
+                break;
+            }
+        }
+        
+        // If signatures match, code hasn't changed, return cached block
+        if (sig_it != g_block_sig_cache.end() && cached_sig == current_sig) {
+            return &it->second;
+        }
+        
+        // Code has changed, remove old entry and rebuild
+        if (sig_it != g_block_sig_cache.end()) {
+            g_block_sig_cache.erase(sig_it);
+        }
+        cache_.erase(it);
+        INFO_LOG(SH4, "Emitter detected self-modifying code at PC=0x%08X, rebuilding block", pc);
+    }
+    
     return &CreateNew(pc);
 }
 

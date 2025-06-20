@@ -29,9 +29,9 @@ protected:
 		emu.init();
 		mem_map_default();
 		emu.dc_reset(true);
-		ctx = &p_sh4rcb->cntx;
 		sh4 = Get_Sh4Interpreter();
 		sh4->Init();
+		ctx = sh4->GetContext();
 	}
 	void PrepareOp(u16 op, u16 op2 = 0, u16 op3 = 0) override
 	{

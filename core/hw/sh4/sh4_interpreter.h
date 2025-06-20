@@ -18,7 +18,7 @@ public:
 	bool IsCpuRunning() override;
 	void ExecuteDelayslot();
 	void ExecuteDelayslot_RTE();
-	Sh4Context *getContext() { return ctx; }
+	Sh4Context* GetContext() override { return ctx; }
 	bool UpdateSystem();
 
 	void ExecuteOpcode(u16 op);

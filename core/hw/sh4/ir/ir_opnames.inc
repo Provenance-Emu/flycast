@@ -199,6 +199,7 @@ static const char* kOpNames[] = {
     "ILLEGAL",
     "JSR",
     "LOAD16_IMM",
+    "LOAD16_PC",
     "LOAD32_IMM",
     "LOAD32_PC",
     "MOV_IMM",
