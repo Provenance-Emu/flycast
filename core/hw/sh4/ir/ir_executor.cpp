@@ -426,6 +426,44 @@ static void Exec_MAC_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) 
              m, val_m, val_m, n, val_n, val_n, ctx->mac.h, ctx->mac.l, pc);
 }
 
+// MAC.W @Rm+,@Rn+ - 16-bit multiply-accumulate with memory load and post-increment
+// temp0 = (int16_t)mem[Rm]; Rm += 2;
+// temp1 = (int16_t)mem[Rn]; Rn += 2;
+// MAC = MAC + (temp0 * temp1)
+static void Exec_MAC_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
+    // Get registers
+    uint32_t n = ins.dst.reg;
+    uint32_t m = ins.src1.reg;
+    
+    // Read memory values from addresses in Rm and Rn
+    uint32_t addr_m = ctx->r[m];
+    uint32_t addr_n = ctx->r[n];
+    
+    // Read 16-bit values from memory and sign-extend to 32-bit
+    int16_t val_m_16 = (int16_t)mmu_ReadMem<u16>(addr_m);
+    int16_t val_n_16 = (int16_t)mmu_ReadMem<u16>(addr_n);
+    int32_t val_m = (int32_t)val_m_16;
+    int32_t val_n = (int32_t)val_n_16;
+    
+    // Post-increment registers by 2 (16-bit access)
+    ctx->r[m] += 2;
+    ctx->r[n] += 2;
+    
+    // Perform signed 16-bit multiplication and accumulate
+    int64_t res = (int64_t)val_m * (int64_t)val_n;
+    
+    // Add to MAC register (64-bit)
+    int64_t mac = ((int64_t)ctx->mac.h << 32) | ctx->mac.l;
+    mac += res;
+    
+    // Update MAC registers
+    ctx->mac.h = (uint32_t)(mac >> 32);
+    ctx->mac.l = (uint32_t)mac;
+    
+    INFO_LOG(SH4, "Exec_MAC_W: mem[R%u]=0x%04X (%d), mem[R%u]=0x%04X (%d), MAC=0x%08X%08X at PC=0x%08X",
+             m, val_m_16, val_m, n, val_n_16, val_n, ctx->mac.h, ctx->mac.l, pc);
+}
+
 // MUL.L Rm,Rn - 32-bit multiply, result stored in MACL
 // MACL = Rn * Rm (signed)
 static void Exec_MUL_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
@@ -589,6 +627,7 @@ static void InitExecTable()
     g_exec_table[static_cast<int>(sh4::ir::Op::MULU_W)]     = &Exec_MULU_W;
     g_exec_table[static_cast<int>(sh4::ir::Op::MULS_W)]     = &Exec_MULS_W;
     g_exec_table[static_cast<int>(sh4::ir::Op::MAC_L)]      = &Exec_MAC_L;
+    g_exec_table[static_cast<int>(sh4::ir::Op::MAC_W)]      = &Exec_MAC_W;
     init = true;
 }
 
