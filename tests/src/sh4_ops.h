@@ -1366,6 +1366,8 @@ protected:
 		ctx->fpscr.SZ = 0;
 
 		ClearRegs();
+		// Reset PR bit after ClearRegs since it calls sh4->Init() which resets FPSCR
+		ctx->fpscr.PR = 1;
 		setDr(5, -128.0);
 		PrepareOp(0xFA5D);	// fabs dr5
 		RunOp();
@@ -1373,6 +1375,8 @@ protected:
 		AssertState();
 
 		ClearRegs();
+		// Reset PR bit after ClearRegs
+		ctx->fpscr.PR = 1;
 		setDr(4, 64.0);
 		PrepareOp(0xF84D);	// fneg dr4
 		RunOp();
@@ -1380,6 +1384,8 @@ protected:
 		AssertState();
 
 		ClearRegs();
+		// Reset PR bit after ClearRegs
+		ctx->fpscr.PR = 1;
 		setDr(6, 13.0);
 		setDr(7, 12.0);
 		PrepareOp(0xFCE0);	// fadd dr7, dr6
@@ -1389,27 +1395,45 @@ protected:
 		AssertState();
 
 		ClearRegs();
+		// Reset PR bit after ClearRegs
+		ctx->fpscr.PR = 1;
+		printf("[DoubleFloatingPointTest] After PR=1 set, PR=%d\n", ctx->fpscr.PR);
 		setDr(0, 10.0);
+		printf("[DoubleFloatingPointTest] After setDr(0), PR=%d\n", ctx->fpscr.PR);
 		setDr(1, 11.0);
+		printf("[DoubleFloatingPointTest] After setDr(1), PR=%d\n", ctx->fpscr.PR);
 		PrepareOp(0xF021);	// fsub dr1, dr0
+		printf("[DoubleFloatingPointTest] After PrepareOp(0xF021), PR=%d\n", ctx->fpscr.PR);
 		RunOp();
 		ASSERT_EQ(getDr(0), -1.0);
 		ASSERT_EQ(getDr(1), 11.0);
 		AssertState();
 
 		ClearRegs();
+		// Reset PR bit after ClearRegs
+		ctx->fpscr.PR = 1;
+		printf("[DoubleFloatingPointTest FMUL] After PR=1 set, PR=%d\n", ctx->fpscr.PR);
 		setDr(0, 4.0);
+		printf("[DoubleFloatingPointTest FMUL] After setDr(0), PR=%d\n", ctx->fpscr.PR);
 		setDr(2, 8.0);
+		printf("[DoubleFloatingPointTest FMUL] After setDr(2), PR=%d\n", ctx->fpscr.PR);
 		PrepareOp(0xF042);	// fmul dr2, dr0
+		printf("[DoubleFloatingPointTest FMUL] After PrepareOp(0xF042), PR=%d\n", ctx->fpscr.PR);
 		RunOp();
 		ASSERT_EQ(getDr(0), 32.0);
 		ASSERT_EQ(getDr(2), 8.0);
 		AssertState();
 
 		ClearRegs();
+		// Reset PR bit after ClearRegs
+		ctx->fpscr.PR = 1;
+		printf("[DoubleFloatingPointTest FDIV] After PR=1 set, PR=%d\n", ctx->fpscr.PR);
 		setDr(1, 8.0);
+		printf("[DoubleFloatingPointTest FDIV] After setDr(1), PR=%d\n", ctx->fpscr.PR);
 		setDr(3, -2.0);
+		printf("[DoubleFloatingPointTest FDIV] After setDr(3), PR=%d\n", ctx->fpscr.PR);
 		PrepareOp(0xF263);	// fdiv dr3, dr1
+		printf("[DoubleFloatingPointTest FDIV] After PrepareOp(0xF263), PR=%d\n", ctx->fpscr.PR);
 		RunOp();
 		ASSERT_EQ(getDr(1), -4.0);
 		ASSERT_EQ(getDr(3), -2.0);

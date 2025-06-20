@@ -465,6 +465,18 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+    // FNEG FRn (0xFB4D) - Negate FRn
+    else if (raw == 0xFB4D)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        ins.op = Op::FNEG;
+        ins.dst.isImm = false;
+        ins.dst.reg = n;
+        ins.dst.type = RegType::FGR;
+        DEBUG_LOG(SH4, "FastDecode: FNEG FR%u (0x%04X) at PC=0x%08X", n, raw, pc);
+        blk.pcNext = pc + 2;
+        return true;
+    }
     // FTRC FRm,FPUL (0xF3nD with n != 9) - Float to integer conversion
     else if ((raw & 0xFF0F) == 0xF30D && ((raw >> 8) & 0xF) != 9)
     {
@@ -473,6 +485,23 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         ins.src1.isImm = false;
         ins.src1.reg = m;
         ins.src1.type = RegType::FGR;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // FMAC FR0,FRm,FRn (0xFnmE) - Floating MAC: FRn = FRn + FR0 * FRm
+    else if ((raw & 0xF00F) == 0xF00E)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::FMAC;
+        ins.dst.isImm = false;
+        ins.dst.reg = n;
+        ins.dst.type = RegType::FGR;
+        ins.src1.isImm = false;
+        ins.src1.reg = m;
+        ins.src1.type = RegType::FGR;
+        // FR0 is implicit in this instruction
+        DEBUG_LOG(SH4, "FastDecode: FMAC FR0, FR%u, FR%u (0x%04X) at PC=0x%08X", m, n, raw, pc);
         blk.pcNext = pc + 2;
         return true;
     }
@@ -2345,36 +2374,41 @@ Block& Emitter::CreateNew(uint32_t pc) {
                     switch (sub)
                     {
                     case 0x0:
+                        // For double precision, the instruction format is FADD DRm,DRn
+                        // Where DRm is source and DRn is destination (and also gets the result)
+                        // For opcode 0xFCE0, m=7, n=6 -> FADD DR7,DR6 (DR6 = DR6 + DR7)
                         INFO_LOG(SH4, "FADD.d decoded");
                         ins.op = Op::FADD;
                         ins.dst.isImm = false; ins.dst.reg = n; ins.dst.type = RegType::FGR;
-                        ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; ins.src1.type = RegType::FGR;
+                        ins.src1.isImm = false; ins.src1.reg = m; ins.src1.type = RegType::FGR;
+                        ins.src2.isImm = false; ins.src2.reg = n;
                         break; // FADD FRm,FRn
                     case 0x1:
+                        // For double precision, the instruction format is FSUB DRm,DRn
+                        // Where DRm is source and DRn is destination (and also gets the result)
                         INFO_LOG(SH4, "FSUB.d decoded");
                         ins.op = Op::FSUB;
                         ins.dst.isImm = false; ins.dst.reg = n; ins.dst.type = RegType::FGR;
-                        ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; ins.src1.type = RegType::FGR;
+                        ins.src1.isImm = false; ins.src1.reg = m; ins.src1.type = RegType::FGR;
+                        ins.src2.isImm = false; ins.src2.reg = n;
                         break; // FSUB FRm,FRn
                     case 0x2:
+                        // For double precision, the instruction format is FMUL DRm,DRn
+                        // Where DRm is source and DRn is destination (and also gets the result)
                         INFO_LOG(SH4, "FMUL.d decoded");
                         ins.op = Op::FMUL;
                         ins.dst.isImm = false; ins.dst.reg = n; ins.dst.type = RegType::FGR;
-                        ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; ins.src1.type = RegType::FGR;
+                        ins.src1.isImm = false; ins.src1.reg = m; ins.src1.type = RegType::FGR;
+                        ins.src2.isImm = false; ins.src2.reg = n;
                         break; // FMUL FRm,FRn
                     case 0x3:
+                        // For double precision, the instruction format is FDIV DRm,DRn
+                        // Where DRm is source and DRn is destination (and also gets the result)
                         INFO_LOG(SH4, "FDIV.d decoded");
                         ins.op = Op::FDIV;
                         ins.dst.isImm = false; ins.dst.reg = n; ins.dst.type = RegType::FGR;
-                        ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; ins.src1.type = RegType::FGR;
+                        ins.src1.isImm = false; ins.src1.reg = m; ins.src1.type = RegType::FGR;
+                        ins.src2.isImm = false; ins.src2.reg = n;
                         break; // FDIV FRm,FRn
                     case 0x4:
                         ins.op = Op::FCMP_EQ;

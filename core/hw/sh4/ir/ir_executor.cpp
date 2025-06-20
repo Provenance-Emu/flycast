@@ -1267,11 +1267,27 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::FADD:
                 {
-                    uint32_t dr_dst = ins.dst.reg >> 1;
-                    uint32_t dr_src = ins.src1.reg >> 1;
-                    double dst = ctx->getDR(dr_dst);
-                    double src = ctx->getDR(dr_src);
-                    ctx->setDR(dr_dst, dst + src);
+                    // Check if PR bit is set (double precision) AND both registers are even
+                    if (ctx->fpscr.PR == 1 && ((ins.dst.reg & 1) == 0) && ((ins.src1.reg & 1) == 0)) {
+                        // Double precision mode
+                        // For double precision, the instruction format is FADD DRm,DRn
+                        // Where DRm is src1 and DRn is dst
+                        // The result is stored in DRn (dst)
+                        uint32_t dr_dst = ins.dst.reg >> 1;
+                        uint32_t dr_src = ins.src1.reg >> 1;
+                        double dst = ctx->getDR(dr_dst);
+                        double src = ctx->getDR(dr_src);
+                        ctx->setDR(dr_dst, dst + src);
+                        DEBUG_LOG(SH4, "FADD.d: DR%u = DR%u + DR%u (%.6f = %.6f + %.6f)", 
+                                 dr_dst, dr_dst, dr_src, dst + src, dst, src);
+                    } else {
+                        // Single precision mode
+                        float dst = ctx->fr[ins.dst.reg];
+                        float src = ctx->fr[ins.src1.reg];
+                        ctx->fr[ins.dst.reg] = dst + src;
+                        DEBUG_LOG(SH4, "FADD.s: FR%u = FR%u + FR%u (%.6f = %.6f + %.6f)", 
+                                 ins.dst.reg, ins.dst.reg, ins.src1.reg, dst + src, dst, src);
+                    }
                     break;
                 }
                 case Op::FCNVSD:
@@ -1331,30 +1347,72 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
 
                 case Op::FSUB:
                 {
-                    uint32_t dr_dst = ins.dst.reg >> 1;
-                    uint32_t dr_src = ins.src1.reg >> 1;
-                    double dst = ctx->getDR(dr_dst);
-                    double src = ctx->getDR(dr_src);
-                    ctx->setDR(dr_dst, dst - src);
+                    // Check if PR bit is set (double precision) AND both registers are even
+                    if (ctx->fpscr.PR == 1 && ((ins.dst.reg & 1) == 0) && ((ins.src1.reg & 1) == 0)) {
+                        uint32_t dr_dst = ins.dst.reg >> 1;
+                        uint32_t dr_src = ins.src1.reg >> 1;
+                        double dst = ctx->getDR(dr_dst);
+                        double src = ctx->getDR(dr_src);
+                        ctx->setDR(dr_dst, dst - src);
+                        DEBUG_LOG(SH4, "FSUB.d: DR%u = DR%u - DR%u (%.6f = %.6f - %.6f)", 
+                                 dr_dst, dr_dst, dr_src, dst - src, dst, src);
+                    } else {
+                        // Single precision mode
+                        float dst = ctx->fr[ins.dst.reg];
+                        float src = ctx->fr[ins.src1.reg];
+                        ctx->fr[ins.dst.reg] = dst - src;
+                        DEBUG_LOG(SH4, "FSUB.s: FR%u = FR%u - FR%u (%.6f = %.6f - %.6f)", 
+                                 ins.dst.reg, ins.dst.reg, ins.src1.reg, dst - src, dst, src);
+                    }
                     break;
                 }
                 case Op::FMUL:
                 {
-                    uint32_t dr_dst = ins.dst.reg >> 1;
-                    uint32_t dr_src = ins.src1.reg >> 1;
-                    double dst = ctx->getDR(dr_dst);
-                    double src = ctx->getDR(dr_src);
-                    ctx->setDR(dr_dst, dst * src);
+                    // Debug logging to check PR bit and register values
+                    INFO_LOG(SH4, "FMUL: PR=%d, dst.reg=%u (even=%d), src1.reg=%u (even=%d)", 
+                             ctx->fpscr.PR, ins.dst.reg, ((ins.dst.reg & 1) == 0), ins.src1.reg, ((ins.src1.reg & 1) == 0));
+                    
+                    // Check if PR bit is set (double precision) AND both registers are even
+                    if (ctx->fpscr.PR == 1 && ((ins.dst.reg & 1) == 0) && ((ins.src1.reg & 1) == 0)) {
+                        uint32_t dr_dst = ins.dst.reg >> 1;
+                        uint32_t dr_src = ins.src1.reg >> 1;
+                        double dst = ctx->getDR(dr_dst);
+                        double src = ctx->getDR(dr_src);
+                        ctx->setDR(dr_dst, dst * src);
+                        INFO_LOG(SH4, "FMUL.d: DR%u = DR%u * DR%u (%.6f = %.6f * %.6f)", 
+                                 dr_dst, dr_dst, dr_src, dst * src, dst, src);
+                    } else {
+                        // Single precision mode
+                        float dst = ctx->fr[ins.dst.reg];
+                        float src = ctx->fr[ins.src1.reg];
+                        ctx->fr[ins.dst.reg] = dst * src;
+                        DEBUG_LOG(SH4, "FMUL.s: FR%u = FR%u * FR%u (%.6f = %.6f * %.6f)", 
+                                 ins.dst.reg, ins.dst.reg, ins.src1.reg, dst * src, dst, src);
+                    }
                     break;
                 }
                 case Op::FDIV:
                 {
-                    if (((ins.dst.reg | ins.src1.reg) & 1) == 0) {
+                    // Debug logging to check PR bit and register values
+                    INFO_LOG(SH4, "FDIV: PR=%d, dst.reg=%u (even=%d), src1.reg=%u (even=%d)", 
+                             ctx->fpscr.PR, ins.dst.reg, ((ins.dst.reg & 1) == 0), ins.src1.reg, ((ins.src1.reg & 1) == 0));
+                    
+                    // Check if PR bit is set (double precision) AND both registers are even
+                    if (ctx->fpscr.PR == 1 && ((ins.dst.reg & 1) == 0) && ((ins.src1.reg & 1) == 0)) {
                         uint32_t dr_dst = ins.dst.reg >> 1;
                         uint32_t dr_src = ins.src1.reg >> 1;
-                        ctx->setDR(dr_dst, ctx->getDR(dr_dst) / ctx->getDR(dr_src));
+                        double dst = ctx->getDR(dr_dst);
+                        double src = ctx->getDR(dr_src);
+                        ctx->setDR(dr_dst, dst / src);
+                        INFO_LOG(SH4, "FDIV.d: DR%u = DR%u / DR%u (%.6f = %.6f / %.6f)", 
+                                 dr_dst, dr_dst, dr_src, dst / src, dst, src);
                     } else {
-                        ctx->fr[ins.dst.reg] /= ctx->fr[ins.src1.reg];
+                        // Single precision mode
+                        float dst = ctx->fr[ins.dst.reg];
+                        float src = ctx->fr[ins.src1.reg];
+                        ctx->fr[ins.dst.reg] = dst / src;
+                        DEBUG_LOG(SH4, "FDIV.s: FR%u = FR%u / FR%u (%.6f = %.6f / %.6f)", 
+                                 ins.dst.reg, ins.dst.reg, ins.src1.reg, dst / src, dst, src);
                     }
                     break;
                 }
@@ -1369,13 +1427,21 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 }
                 case Op::FSTS: // FSTS FPUL,FRn
-                    ctx->fr[ins.src1.reg] = ctx->fpul;
+                    ctx->fr[ins.dst.reg] = BitsToFloat(ctx->fpul);
+                    DEBUG_LOG(SH4, "FSTS FPUL(0x%08X) -> FR%u (%.6f)", ctx->fpul, ins.dst.reg, BitsToFloat(ctx->fpul));
                     break;
                 case Op::FABS:
                 {
-                    uint32_t dr_idx = ins.dst.reg >> 1;
-                    double val = std::fabs(ctx->getDR(dr_idx));
-                    ctx->setDR(dr_idx, val);
+                    // Check if PR bit is set (double precision)
+                    if (ctx->fpscr.PR == 1) {
+                        uint32_t dr_idx = ins.dst.reg >> 1;
+                        double val = std::fabs(ctx->getDR(dr_idx));
+                        ctx->setDR(dr_idx, val);
+                    } else {
+                        // Single precision mode
+                        ctx->fr[ins.dst.reg] = std::fabsf(ctx->fr[ins.dst.reg]);
+                        DEBUG_LOG(SH4, "FABS: FR%u = %f", ins.dst.reg, ctx->fr[ins.dst.reg]);
+                    }
                     break;
                 }
                 case Op::FLDS: // Move FRm -> FPUL (store as int bits)
@@ -1395,12 +1461,45 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         ctx->fr[ins.dst.reg] = 1.0f;
                     }
                     break;
+                case Op::FMAC: // FMAC FR0,FRm,FRn: FRn = FRn + FR0 * FRm
+                {
+                    // Check if PR bit is set and both registers are even (double precision)
+                    if (ctx->fpscr.PR == 1 && (ins.dst.reg & 1) == 0 && (ins.src1.reg & 1) == 0) {
+                        // Double precision mode
+                        uint32_t dr_dst = ins.dst.reg >> 1;
+                        uint32_t dr_src = ins.src1.reg >> 1;
+                        double fr0_val = ctx->getDR(0); // FR0 (DR0)
+                        double src_val = ctx->getDR(dr_src);
+                        double dst_val = ctx->getDR(dr_dst);
+                        double result = dst_val + (fr0_val * src_val);
+                        ctx->setDR(dr_dst, result);
+                        DEBUG_LOG(SH4, "FMAC.d: DR%u = DR%u + DR0 * DR%u (%.6f = %.6f + %.6f * %.6f)", 
+                                 dr_dst, dr_dst, dr_src, result, dst_val, fr0_val, src_val);
+                    } else {
+                        // Single precision mode
+                        float fr0_val = ctx->fr[0]; // FR0
+                        float src_val = ctx->fr[ins.src1.reg];
+                        float dst_val = ctx->fr[ins.dst.reg];
+                        float result = dst_val + (fr0_val * src_val);
+                        ctx->fr[ins.dst.reg] = result;
+                        DEBUG_LOG(SH4, "FMAC.s: FR%u = FR%u + FR0 * FR%u (%.6f = %.6f + %.6f * %.6f)", 
+                                 ins.dst.reg, ins.dst.reg, ins.src1.reg, result, dst_val, fr0_val, src_val);
+                    }
+                    break;
+                }
 
                 case Op::FNEG:
                 {
-                    uint32_t dr_idx = ins.dst.reg >> 1;
-                    double val = -ctx->getDR(dr_idx);
-                    ctx->setDR(dr_idx, val);
+                    // Check if PR bit is set (double precision)
+                    if (ctx->fpscr.PR == 1) {
+                        uint32_t dr_idx = ins.dst.reg >> 1;
+                        double val = -ctx->getDR(dr_idx);
+                        ctx->setDR(dr_idx, val);
+                    } else {
+                        // Single precision mode
+                        ctx->fr[ins.dst.reg] = -ctx->fr[ins.dst.reg];
+                        DEBUG_LOG(SH4, "FNEG: FR%u = %f", ins.dst.reg, ctx->fr[ins.dst.reg]);
+                    }
                     break;
                 }
                 case Op::FRCHG:
