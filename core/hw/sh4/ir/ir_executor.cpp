@@ -348,6 +348,48 @@ static void Exec_SETS(const sh4::ir::Instr& /*ins*/, Sh4Context* ctx, uint32_t /
     ctx->sr.S = 1;
 }
 
+// MULU.W Rm,Rn - 16-bit unsigned multiply, result stored in MACL
+// MACL = (Rn & 0xFFFF) * (Rm & 0xFFFF) (unsigned)
+static void Exec_MULU_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
+    // Get registers
+    uint32_t n = ins.dst.reg;
+    uint32_t m = ins.src1.reg;
+    
+    // Get values as unsigned 16-bit integers (lower 16 bits only)
+    uint16_t rn = (uint16_t)(ctx->r[n] & 0xFFFF);
+    uint16_t rm = (uint16_t)(ctx->r[m] & 0xFFFF);
+    
+    // Perform unsigned 16-bit multiplication
+    uint32_t res = (uint32_t)rn * (uint32_t)rm;
+    
+    // Update MACL register
+    ctx->mac.l = res;
+    
+    INFO_LOG(SH4, "Exec_MULU_W: R%u=0x%04X, R%u=0x%04X, MAC.L=0x%08X at PC=0x%08X",
+             n, rn, m, rm, ctx->mac.l, pc);
+}
+
+// MULS.W Rm,Rn - 16-bit signed multiply, result stored in MACL
+// MACL = (int16_t)(Rn & 0xFFFF) * (int16_t)(Rm & 0xFFFF) (signed)
+static void Exec_MULS_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
+    // Get registers
+    uint32_t n = ins.dst.reg;
+    uint32_t m = ins.src1.reg;
+    
+    // Get values as signed 16-bit integers (lower 16 bits only)
+    int16_t rn = (int16_t)(ctx->r[n] & 0xFFFF);
+    int16_t rm = (int16_t)(ctx->r[m] & 0xFFFF);
+    
+    // Perform signed 16-bit multiplication
+    int32_t res = (int32_t)rn * (int32_t)rm;
+    
+    // Update MACL register
+    ctx->mac.l = (uint32_t)res;
+    
+    INFO_LOG(SH4, "Exec_MULS_W: R%u=0x%04X (%d), R%u=0x%04X (%d), MAC.L=0x%08X at PC=0x%08X",
+             n, rn, rn, m, rm, rm, ctx->mac.l, pc);
+}
+
 // MUL.L Rm,Rn - 32-bit multiply, result stored in MACL
 // MACL = Rn * Rm (signed)
 static void Exec_MUL_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
@@ -508,6 +550,8 @@ static void InitExecTable()
     g_exec_table[static_cast<int>(sh4::ir::Op::DMULS_L)]    = &Exec_DMULS_L;
     g_exec_table[static_cast<int>(sh4::ir::Op::DMULU_L)]    = &Exec_DMULU_L;
     g_exec_table[static_cast<int>(sh4::ir::Op::MUL_L)]      = &Exec_MUL_L;
+    g_exec_table[static_cast<int>(sh4::ir::Op::MULU_W)]     = &Exec_MULU_W;
+    g_exec_table[static_cast<int>(sh4::ir::Op::MULS_W)]     = &Exec_MULS_W;
     init = true;
 }
 

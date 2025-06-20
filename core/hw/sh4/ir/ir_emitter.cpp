@@ -1239,6 +1239,28 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
+        // MULU.W Rm,Rn 0x2nmE - Unsigned 16-bit multiply, result in MACL
+        else if ((raw & 0xF00F) == 0x200E)
+        {
+            ins.op = Op::MULU_W;
+            ins.dst.isImm = false; ins.dst.reg = n; // use dst as Rn
+            ins.src1.isImm = false; ins.src1.reg = m; // src1 as Rm
+            decoded = true;
+            blk.pcNext = pc + 2;
+            INFO_LOG(SH4, "Emitter: Decoded MULU.W R%u,R%u (0x%04X) at PC=0x%08X",
+                     m, n, raw, pc);
+        }
+        // MULS.W Rm,Rn 0x2nmF - Signed 16-bit multiply, result in MACL
+        else if ((raw & 0xF00F) == 0x200F)
+        {
+            ins.op = Op::MULS_W;
+            ins.dst.isImm = false; ins.dst.reg = n; // use dst as Rn
+            ins.src1.isImm = false; ins.src1.reg = m; // src1 as Rm
+            decoded = true;
+            blk.pcNext = pc + 2;
+            INFO_LOG(SH4, "Emitter: Decoded MULS.W R%u,R%u (0x%04X) at PC=0x%08X",
+                     m, n, raw, pc);
+        }
         // MOV.L Rm, @(disp, Rn) or MOV.L Rm, @Rn
         else if ((raw & 0xF000) == 0x2000)
         {
@@ -2423,16 +2445,16 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
         }
-        // CMP/STR Rm,Rn 0x2nmE
+        // MULU.W Rm,Rn 0x2nmE - Unsigned 16-bit multiply, result in MACL
         else if ((raw & 0xF00F) == 0x200E)
         {
-            ins.op = Op::CMP_STR;
+            ins.op = Op::MULU_W;
             ins.dst.isImm = false; ins.dst.reg = n; // use dst as Rn
-            ins.src1.isImm = false; ins.src1.reg = m;
-            ins.src2.isImm = false;
-            ins.src2.reg = n; // src as Rm
+            ins.src1.isImm = false; ins.src1.reg = m; // src1 as Rm
             decoded = true;
             blk.pcNext = pc + 2;
+            INFO_LOG(SH4, "Emitter: Decoded MULU.W R%u,R%u (0x%04X) at PC=0x%08X",
+                     m, n, raw, pc);
         }
         // STS MACH,Rn 0x0n0A
         else if ((raw & 0x00FF) == 0x000A)
