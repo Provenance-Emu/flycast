@@ -1261,6 +1261,17 @@ Block& Emitter::CreateNew(uint32_t pc) {
             INFO_LOG(SH4, "Emitter: Decoded MULS.W R%u,R%u (0x%04X) at PC=0x%08X",
                      m, n, raw, pc);
         }
+        // MAC.L @Rm+,@Rn+ - 32-bit multiply-accumulate with memory load and post-increment
+        else if ((raw & 0xF00F) == 0x000F)
+        {
+            ins.op = Op::MAC_L;
+            ins.dst.isImm = false; ins.dst.reg = n; // use dst as Rn
+            ins.src1.isImm = false; ins.src1.reg = m; // src1 as Rm
+            decoded = true;
+            blk.pcNext = pc + 2;
+            INFO_LOG(SH4, "Emitter: Decoded MAC.L @R%u+,@R%u+ (0x%04X) at PC=0x%08X",
+                     m, n, raw, pc);
+        }
         // MOV.L Rm, @(disp, Rn) or MOV.L Rm, @Rn
         else if ((raw & 0xF000) == 0x2000)
         {

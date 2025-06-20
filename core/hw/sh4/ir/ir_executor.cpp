@@ -390,6 +390,42 @@ static void Exec_MULS_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc)
              n, rn, rn, m, rm, rm, ctx->mac.l, pc);
 }
 
+// MAC.L @Rm+,@Rn+ - 32-bit multiply-accumulate with memory load and post-increment
+// temp0 = (int32_t)mem[Rm]; Rm += 4;
+// temp1 = (int32_t)mem[Rn]; Rn += 4;
+// MAC = MAC + (temp0 * temp1)
+static void Exec_MAC_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
+    // Get registers
+    uint32_t n = ins.dst.reg;
+    uint32_t m = ins.src1.reg;
+    
+    // Read memory values from addresses in Rm and Rn
+    uint32_t addr_m = ctx->r[m];
+    uint32_t addr_n = ctx->r[n];
+    
+    // Read 32-bit values from memory
+    int32_t val_m = (int32_t)mmu_ReadMem<u32>(addr_m);
+    int32_t val_n = (int32_t)mmu_ReadMem<u32>(addr_n);
+    
+    // Post-increment registers by 4
+    ctx->r[m] += 4;
+    ctx->r[n] += 4;
+    
+    // Perform signed 32-bit multiplication and accumulate
+    int64_t res = (int64_t)val_m * (int64_t)val_n;
+    
+    // Add to MAC register (64-bit)
+    int64_t mac = ((int64_t)ctx->mac.h << 32) | ctx->mac.l;
+    mac += res;
+    
+    // Update MAC registers
+    ctx->mac.h = (uint32_t)(mac >> 32);
+    ctx->mac.l = (uint32_t)mac;
+    
+    INFO_LOG(SH4, "Exec_MAC_L: mem[R%u]=0x%08X (%d), mem[R%u]=0x%08X (%d), MAC=0x%08X%08X at PC=0x%08X",
+             m, val_m, val_m, n, val_n, val_n, ctx->mac.h, ctx->mac.l, pc);
+}
+
 // MUL.L Rm,Rn - 32-bit multiply, result stored in MACL
 // MACL = Rn * Rm (signed)
 static void Exec_MUL_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
@@ -552,6 +588,7 @@ static void InitExecTable()
     g_exec_table[static_cast<int>(sh4::ir::Op::MUL_L)]      = &Exec_MUL_L;
     g_exec_table[static_cast<int>(sh4::ir::Op::MULU_W)]     = &Exec_MULU_W;
     g_exec_table[static_cast<int>(sh4::ir::Op::MULS_W)]     = &Exec_MULS_W;
+    g_exec_table[static_cast<int>(sh4::ir::Op::MAC_L)]      = &Exec_MAC_L;
     init = true;
 }
 
