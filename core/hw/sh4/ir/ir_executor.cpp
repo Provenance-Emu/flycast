@@ -1411,15 +1411,40 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     // In our case, we know n=6 from the emitter (DR3 = FR6:FR7)
                     uint32_t fpul_value = ctx->fpul;
                     
-                    // Handle special cases for exact values
-                    if (fpul_value == 0x8000) { // π radians
-                        // sin(π) should be exactly 0.0, cos(π) should be exactly -1.0
-                        ctx->fr[6] = 0.0f;      // FR6 = sin(π) = 0
-                        ctx->fr[7] = -1.0f;     // FR7 = cos(π) = -1
-                        INFO_LOG(SH4, "FSCA FPUL(0x8000),DR3 - special case: sin=0.0, cos=-1.0");
-                    } else {
+                    // SH4 hardware likely uses a lookup table for common angles
+                    // We'll implement a similar approach for exact values at key angles
+                    
+                    // Lookup table for common angles (quarter-wave symmetry points)
+                    // Format: {angle_value, sin_result, cos_result}
+                    static const struct {
+                        uint32_t angle;
+                        float sin_val;
+                        float cos_val;
+                    } angle_table[] = {
+                        {0x0000, 0.0f, 1.0f},       // 0 radians (0°)
+                        {0x4000, 1.0f, 0.0f},       // π/2 radians (90°)
+                        {0x8000, 0.0f, -1.0f},      // π radians (180°)
+                        {0xC000, -1.0f, 0.0f},      // 3π/2 radians (270°)
+                        {0x10000, 0.0f, 1.0f}       // 2π radians (360°/0°)
+                    };
+                    
+                    // Check for exact matches in the lookup table
+                    bool found = false;
+                    for (const auto& entry : angle_table) {
+                        if (fpul_value == entry.angle) {
+                            ctx->fr[6] = entry.sin_val;  // FR6 = sin
+                            ctx->fr[7] = entry.cos_val;  // FR7 = cos
+                            INFO_LOG(SH4, "FSCA FPUL(0x%X),DR3 - lookup table: sin=%.1f, cos=%.1f",
+                                    fpul_value, entry.sin_val, entry.cos_val);
+                            found = true;
+                            break;
+                        }
+                    }
+                    
+                    // For angles not in the lookup table, calculate using standard math functions
+                    if (!found) {
                         // Convert FPUL to radians
-                        // 0x10000 (65536) represents 2π radians, so divide by 65536/(2π)
+                        // 0x10000 (65536) represents 2π radians
                         const double scale = (2.0 * M_PI) / 65536.0;
                         double angle = fpul_value * scale;
                         
@@ -1430,6 +1455,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         float cos_result = std::cos(angle);
                         
                         // Handle near-zero values for better precision
+                        // SH4 hardware likely has exact results for these common values
                         if (std::abs(sin_result) < 1e-10) {
                             sin_result = 0.0f;
                         }
