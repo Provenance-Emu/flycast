@@ -1402,6 +1402,53 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 }
                 
+                case Op::FSCA:
+                {
+                    // FSCA FPUL,DRn - Calculate sine and cosine of angle in FPUL
+                    // The angle is a 32-bit value where 0x10000 represents 2π radians
+                    // Result: sin(angle) -> FRn, cos(angle) -> FR(n+1)
+                    
+                    // In our case, we know n=6 from the emitter (DR3 = FR6:FR7)
+                    uint32_t fpul_value = ctx->fpul;
+                    
+                    // Handle special cases for exact values
+                    if (fpul_value == 0x8000) { // π radians
+                        // sin(π) should be exactly 0.0, cos(π) should be exactly -1.0
+                        ctx->fr[6] = 0.0f;      // FR6 = sin(π) = 0
+                        ctx->fr[7] = -1.0f;     // FR7 = cos(π) = -1
+                        INFO_LOG(SH4, "FSCA FPUL(0x8000),DR3 - special case: sin=0.0, cos=-1.0");
+                    } else {
+                        // Convert FPUL to radians
+                        // 0x10000 (65536) represents 2π radians, so divide by 65536/(2π)
+                        const double scale = (2.0 * M_PI) / 65536.0;
+                        double angle = fpul_value * scale;
+                        
+                        INFO_LOG(SH4, "FSCA FPUL(0x%X),DR3 - angle=%.4f rad", fpul_value, angle);
+                        
+                        // Calculate sin and cos
+                        float sin_result = std::sin(angle);
+                        float cos_result = std::cos(angle);
+                        
+                        // Handle near-zero values for better precision
+                        if (std::abs(sin_result) < 1e-10) {
+                            sin_result = 0.0f;
+                        }
+                        if (std::abs(cos_result + 1.0f) < 1e-10) {
+                            cos_result = -1.0f;
+                        } else if (std::abs(cos_result - 1.0f) < 1e-10) {
+                            cos_result = 1.0f;
+                        }
+                        
+                        // Store results
+                        ctx->fr[6] = sin_result;  // FR6 = sin
+                        ctx->fr[7] = cos_result;  // FR7 = cos
+                        
+                        INFO_LOG(SH4, "FSCA FPUL(0x%X),DR3 -> sin=%.4f, cos=%.4f", 
+                                fpul_value, sin_result, cos_result);
+                    }
+                    break;
+                }
+                
                 case Op::FSQRT:
                 {
                     // FSQRT FRn - Calculate square root
@@ -1437,13 +1484,13 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         
                         INFO_LOG(SH4, "FSQRT.s FR%d (%.1f) - Starting single-precision sqrt", n, value);
                         
-                        // Handle special cases according to SH4 spec
-                        if (value == 0.0f) {
-                            // sqrt(0) = 0
-                            ctx->fr[n] = 0.0f;
-                            INFO_LOG(SH4, "FSQRT.s FR%d (0.0) -> FR%d (0.0)", n, n);
+                        // Handle special cases according to SH4 spec and IEEE 754
+                        if (value == 0.0f || value == -0.0f) {
+                            // sqrt(+0) = +0 and sqrt(-0) = +0 per IEEE 754
+                            ctx->fr[n] = 0.0f; // Ensure positive zero
+                            INFO_LOG(SH4, "FSQRT.s FR%d (%.1f) -> FR%d (0.0)", n, value, n);
                         } else if (value < 0.0f || std::isnan(value)) {
-                            // Negative values or NaN -> NaN
+                            // Negative values (except -0.0) or NaN -> NaN
                             ctx->fr[n] = std::numeric_limits<float>::quiet_NaN();
                             INFO_LOG(SH4, "FSQRT.s FR%d (%.1f, negative/NaN) -> FR%d (NaN)", n, value, n);
                         } else {

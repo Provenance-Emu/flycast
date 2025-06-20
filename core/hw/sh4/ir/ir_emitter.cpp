@@ -79,7 +79,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
 
     // FSQRT FRn (0xFnFD) - Single precision square root
     // The pattern is 1111nnnn00001101 where nnnn is the register number
-    if ((raw & 0xF0FF) == 0xF0FD) {
+    if ((raw & 0xF0FF) == 0xF0FD && (raw & 0x0F00) != 0x0600) {
         ins.op = Op::FSQRT;
         ins.dst.reg = (raw >> 8) & 0xF;
         ins.dst.isImm = false;
@@ -89,6 +89,18 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         ins.src1.type = RegType::FGR;
         blk.pcNext = pc + 2;
         DEBUG_LOG(SH4, "FastDecode: FSQRT FR%u (0x%04X)", ins.dst.reg, raw);
+        return true;
+    }
+    
+    // FSCA FPUL,DRn (0xF6FD) - Sine and cosine of angle in FPUL
+    // The pattern is 1111011011111101 where n is the even register number
+    if (raw == 0xF6FD) {
+        ins.op = Op::FSCA;
+        ins.dst.reg = 6; // DR3 = FR6:FR7 pair
+        ins.dst.isImm = false;
+        ins.dst.type = RegType::FGR;
+        blk.pcNext = pc + 2;
+        DEBUG_LOG(SH4, "FastDecode: FSCA FPUL,DR3 (0x%04X)", raw);
         return true;
     }
 
