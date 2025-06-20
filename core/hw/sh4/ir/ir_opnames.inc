@@ -58,6 +58,7 @@ static const char* kOpNames[] = {
     "BRANCH",
     "END",
     "CMP_EQ",
+    "CMP_EQ_IMM,  // Compare R0 with immediate value",
     "CMP_PL",
     "CMP_HI",
     "CMP_HS",

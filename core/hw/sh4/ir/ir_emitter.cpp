@@ -307,6 +307,21 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+    // CMP/EQ #imm,R0 0x88ii (ii=imm8)
+    else if ((raw & 0xFF00) == 0x8800) {
+        printf("[IR_EMITTER_DEBUG] FastDecode: Entered 0x8800 block for raw=0x%04X, pc=0x%08X\n", raw, pc); fflush(stdout);
+        int8_t imm8 = raw & 0xFF;              // imm8 is in bits 0-7 (sign-extended)
+        
+        ins.op = Op::CMP_EQ_IMM;                // Use CMP_EQ_IMM operation
+        ins.dst = {false, 0};                   // Compare with R0
+        ins.src1 = {true, 0};                   // No register source, immediate value
+        ins.extra = imm8;                       // Immediate value in ins.extra
+        
+        INFO_LOG(SH4, "FastDecode: Decoded CMP/EQ #%d,R0 (0x%04X) at PC=%08X", 
+                imm8, raw, pc);
+        blk.pcNext = pc + 2;
+        return true;
+    }
     // MOV.B @(disp,Rm),R0 0x84md
     else if ((raw & 0xFF00) == 0x8400) {
         printf("[IR_EMITTER_DEBUG] FastDecode: Entered 0x8400 block for raw=0x%04X, pc=0x%08X\n", raw, pc); fflush(stdout);
