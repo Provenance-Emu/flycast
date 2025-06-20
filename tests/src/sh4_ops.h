@@ -1440,9 +1440,15 @@ protected:
 		AssertState();
 
 		ClearRegs();
+		// Reset PR bit after ClearRegs
+		ctx->fpscr.PR = 1;
+		printf("[DoubleFloatingPointTest FSQRT] After PR=1 set, PR=%d\n", ctx->fpscr.PR);
 		setDr(1, 64.0);
+		printf("[DoubleFloatingPointTest FSQRT] After setDr(1), PR=%d, value=%.1f\n", ctx->fpscr.PR, getDr(1));
 		PrepareOp(0xF26D);	// fsqrt dr1
+		printf("[DoubleFloatingPointTest FSQRT] Before RunOp, PR=%d\n", ctx->fpscr.PR);
 		RunOp();
+		printf("[DoubleFloatingPointTest FSQRT] After RunOp, PR=%d, result=%.1f\n", ctx->fpscr.PR, getDr(1));
 		ASSERT_EQ(getDr(1), 8.0);
 		AssertState();
 
