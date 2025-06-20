@@ -91,7 +91,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         DEBUG_LOG(SH4, "FastDecode: FSQRT FR%u (0x%04X)", ins.dst.reg, raw);
         return true;
     }
-    
+
     // FSCA FPUL,DRn (0xF6FD) - Sine and cosine of angle in FPUL
     // The pattern is 1111011011111101 where n is the even register number
     if (raw == 0xF6FD) {
@@ -203,6 +203,21 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+    // DIV0S Rm,Rn (0x2nm7)
+    else if ((raw & 0xF00F) == 0x2007)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::DIV0S;
+        ins.dst.isImm = false;
+        ins.dst.reg = n;
+        ins.src1.isImm = false;
+        ins.src1.reg = m;
+        INFO_LOG(SH4, "FastDecode: Decoded DIV0S R%u,R%u (0x%04X) at PC=%08X",
+                m, n, raw, pc);
+        blk.pcNext = pc + 2;
+        return true;
+    }
     // MOV.B Rm,@-Rn (0x2nm8)
     else if ((raw & 0xF00F) == 0x2008)
     {
@@ -302,7 +317,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         ins.src1 = {false, rm_base_reg};          // Base address from Rm
         ins.extra = disp_val * 4;                 // Displacement in ins.extra (disp * 4 bytes)
 
-        INFO_LOG(SH4, "FastDecode: Decoded LOAD32 @(%u,R%u),R%u (0x%04X) at PC=%08X", 
+        INFO_LOG(SH4, "FastDecode: Decoded LOAD32 @(%u,R%u),R%u (0x%04X) at PC=%08X",
                 disp_val * 4, rm_base_reg, rn_dst_reg, raw, pc);
         blk.pcNext = pc + 2;
         return true;
@@ -311,13 +326,13 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
     else if ((raw & 0xFF00) == 0x8800) {
         printf("[IR_EMITTER_DEBUG] FastDecode: Entered 0x8800 block for raw=0x%04X, pc=0x%08X\n", raw, pc); fflush(stdout);
         int8_t imm8 = raw & 0xFF;              // imm8 is in bits 0-7 (sign-extended)
-        
+
         ins.op = Op::CMP_EQ_IMM;                // Use CMP_EQ_IMM operation
         ins.dst = {false, 0};                   // Compare with R0
         ins.src1 = {true, 0};                   // No register source, immediate value
         ins.extra = imm8;                       // Immediate value in ins.extra
-        
-        INFO_LOG(SH4, "FastDecode: Decoded CMP/EQ #%d,R0 (0x%04X) at PC=%08X", 
+
+        INFO_LOG(SH4, "FastDecode: Decoded CMP/EQ #%d,R0 (0x%04X) at PC=%08X",
                 imm8, raw, pc);
         blk.pcNext = pc + 2;
         return true;
@@ -327,13 +342,13 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         printf("[IR_EMITTER_DEBUG] FastDecode: Entered 0x8400 block for raw=0x%04X, pc=0x%08X\n", raw, pc); fflush(stdout);
         uint8_t disp4 = raw & 0xF;              // disp4 is in bits 0-3
         uint8_t m_reg = (raw >> 4) & 0xF;       // Rm is in bits 4-7
-        
+
         ins.op = Op::LOAD8;                     // Use generic LOAD8
         ins.dst = {false, 0};                    // Destination is always R0
         ins.src1 = {false, m_reg};               // Base address from Rm
         ins.extra = disp4;                       // Displacement in ins.extra (disp bytes)
-        
-        INFO_LOG(SH4, "FastDecode: Decoded LOAD8 @(%u,R%u),R0 (0x%04X) at PC=%08X", 
+
+        INFO_LOG(SH4, "FastDecode: Decoded LOAD8 @(%u,R%u),R0 (0x%04X) at PC=%08X",
                 disp4, m_reg, raw, pc);
         blk.pcNext = pc + 2;
         return true;
@@ -343,13 +358,13 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         printf("[IR_EMITTER_DEBUG] FastDecode: Entered 0x8500 block for raw=0x%04X, pc=0x%08X\n", raw, pc); fflush(stdout);
         uint8_t disp4 = raw & 0xF;              // disp4 is in bits 0-3
         uint8_t m_reg = (raw >> 4) & 0xF;       // Rm is in bits 4-7
-        
+
         ins.op = Op::LOAD16;                    // Use generic LOAD16
         ins.dst = {false, 0};                    // Destination is always R0
         ins.src1 = {false, m_reg};               // Base address from Rm
         ins.extra = disp4 * 2;                   // Displacement in ins.extra (disp * 2 bytes)
-        
-        INFO_LOG(SH4, "FastDecode: Decoded LOAD16 @(%u,R%u),R0 (0x%04X) at PC=%08X", 
+
+        INFO_LOG(SH4, "FastDecode: Decoded LOAD16 @(%u,R%u),R0 (0x%04X) at PC=%08X",
                 disp4 * 2, m_reg, raw, pc);
         blk.pcNext = pc + 2;
         return true;
@@ -496,10 +511,31 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+    // MUL.L Rm,Rn (0x0007)
+    else if ((raw & 0xF00F) == 0x0007)
+    {
+        uint8_t n = (raw >> 8) & 0xF; // Extract n (bits 8-11)
+        uint8_t m = (raw >> 4) & 0xF; // Extract m (bits 4-7)
+        ins.op = Op::MUL_L;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        INFO_LOG(SH4, "FastDecode: Decoded MUL.L R%u,R%u (0x%04X) at PC=%08X", 
+                 ins.src1.reg, ins.dst.reg, raw, pc);
+        blk.pcNext = pc + 2;
+        return true;
+    }
     // SETT (0x0018)
     else if (raw == 0x0018)
     {
         ins.op = Op::SETT;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // DIV0U (0x0019)
+    else if (raw == 0x0019)
+    {
+        ins.op = Op::DIV0U;
+        INFO_LOG(SH4, "FastDecode: Decoded DIV0U (0x%04X) at PC=%08X", raw, pc);
         blk.pcNext = pc + 2;
         return true;
     }
@@ -1363,8 +1399,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.dst.reg = n;
             ins.src1.isImm = false;
             ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -1374,8 +1410,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD32;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.B @Rm+,Rn (0x6nm4)
@@ -1384,8 +1420,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD8_POST;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -1395,8 +1431,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD16_POST;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.L @Rm+,Rn (0x6nm6)
@@ -1405,8 +1441,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD32_POST;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
             INFO_LOG(SH4, "Emitter::CreateNew: Manually decoded MOV.L @R%d+,R%d (0x%04X) at PC=0x%08X", m, n, raw, pc);
         }
@@ -1426,8 +1462,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD32; // Generic load, displacement in ins.extra
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             ins.pc = pc;
             ins.raw = raw;
             ins.extra = (raw & 0xF) * 4; // disp is lower 4 bits, scaled by 4
@@ -1440,8 +1476,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::NEG;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // EXTU.B Rm -> Rn  (0x6nmC)
@@ -1450,8 +1486,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::EXTU_B;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // EXTS.B Rm -> Rn  (0x6nmD)
@@ -1460,8 +1496,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::EXTS_B;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // EXTU.W Rm -> Rn  (0x6nmE)
@@ -1470,8 +1506,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::EXTU_W;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // BF/BF_S/BT/BT_S conditional branches (0x89/8B/8D/8F)
@@ -1518,8 +1554,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::SHLD;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // EXTS.W Rm -> Rn  (0x6nmF)
@@ -1528,8 +1564,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::EXTS_W;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.B Rm,@Rn  (0x2nm0)
@@ -1538,8 +1574,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE8;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.L Rm,@Rn  (0x2nm2)
@@ -1548,8 +1584,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE32;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.B Rm,@Rn+ (0x2nm4)
@@ -1558,8 +1594,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE8_POST;
             ins.dst.isImm = false; ins.dst.reg = n; // Rn is destination address register
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; // Rm supplies value
+            ins.src2.isImm = false;
+            ins.src2.reg = n; // Rm supplies value
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.W Rm,@Rn+ (0x2nm5)
@@ -1568,8 +1604,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE16_POST;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.L Rm,@Rn+ (0x2nm6)
@@ -1578,8 +1614,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE32_POST;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // CMP/EQ Rm,Rn  (0x3nm0)
@@ -1588,8 +1624,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::CMP_EQ;
             ins.dst.isImm = false; ins.dst.reg = n; // Rn
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; // Rm
+            ins.src2.isImm = false;
+            ins.src2.reg = n; // Rm
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -1599,8 +1635,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::CMP_HI;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // CMP/HS Rm,Rn (0x3nm2)
@@ -1609,8 +1645,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::CMP_HS;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // CMP/GE Rm,Rn (0x3nm3)
@@ -1619,8 +1655,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::CMP_GE;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // CMP/GT Rm,Rn (0x3nm7)
@@ -1629,8 +1665,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::CMP_GT;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // SUB Rm,Rn (0x3nm8)
@@ -1639,8 +1675,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::SUB;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // SUBV Rm,Rn (0x3nmB)
@@ -1649,8 +1685,38 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::SUBV;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // DIV1 Rm,Rn (0x3nm4)
+        else if ((raw & 0xF00F) == 0x3004)
+        {
+            ins.op = Op::DIV1;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            INFO_LOG(SH4, "FastDecode: Decoded DIV1 R%u,R%u (0x%04X) at PC=%08X",
+                     ins.src1.reg, ins.dst.reg, raw, pc);
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // DMULS.L Rm,Rn (0x3nmD) - Signed 32x32->64 multiply
+        else if ((raw & 0xF00F) == 0x300D)
+        {
+            ins.op = Op::DMULS_L;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            INFO_LOG(SH4, "FastDecode: Decoded DMULS.L R%u,R%u (0x%04X) at PC=%08X",
+                     ins.src1.reg, ins.dst.reg, raw, pc);
+            decoded = true; blk.pcNext = pc + 2;
+        }
+        // DMULU.L Rm,Rn (0x3nm5) - Unsigned 32x32->64 multiply
+        else if ((raw & 0xF00F) == 0x3005)
+        {
+            ins.op = Op::DMULU_L;
+            ins.dst.isImm = false; ins.dst.reg = n;
+            ins.src1.isImm = false; ins.src1.reg = m;
+            INFO_LOG(SH4, "FastDecode: Decoded DMULU.L R%u,R%u (0x%04X) at PC=%08X",
+                     ins.src1.reg, ins.dst.reg, raw, pc);
             decoded = true; blk.pcNext = pc + 2;
         }
         // ADDC Rm,Rn (0x3nmC) Add with carry
@@ -1659,8 +1725,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::ADDC;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // CMP/PL Rn (0x4n05)
@@ -1704,8 +1770,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::XTRCT;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -1785,8 +1851,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::SWAP_B;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -1796,8 +1862,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::SWAP_W;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -1807,8 +1873,9 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::AND_REG;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;            decoded = true;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
+            decoded = true;
             blk.pcNext = pc + 2;
         }
         // TST Rm,Rn 0x2nm8
@@ -1817,8 +1884,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::TST_REG;
             ins.dst.isImm = false; ins.dst.reg = n; // Rn is first operand (same as AND)
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; // Rm
+            ins.src2.isImm = false;
+            ins.src2.reg = n; // Rm
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -1828,8 +1895,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::XOR_REG;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -1839,8 +1906,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::OR_REG;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -1850,8 +1917,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::NOT_OP;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -1901,8 +1968,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::SHLD;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -2052,8 +2119,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
                 ins.dst.reg = n;
                 ins.src1.isImm = false;
                 ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+                ins.src2.isImm = false;
+                ins.src2.reg = n;
                 ins.extra = disp4 * 4;
             }
             decoded = true;
@@ -2102,8 +2169,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD8;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             ins.extra = disp4; // byte displacement
             decoded = true;
             blk.pcNext = pc + 2;
@@ -2115,8 +2182,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD16;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             ins.extra = disp4 * 2;
             decoded = true;
             blk.pcNext = pc + 2;
@@ -2189,8 +2256,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
              ins.op = Op::STORE32;
              ins.dst.isImm = false; ins.dst.reg = n;    // base register Rn
              ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;  // value register Rm
+            ins.src2.isImm = false;
+            ins.src2.reg = n;  // value register Rm
              ins.extra = disp4 * 4;                     // long = 4 bytes
              decoded = true;
              blk.pcNext = pc + 2;
@@ -2202,8 +2269,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
              ins.op = Op::STORE32;
              ins.dst.isImm = false; ins.dst.reg = n;
              ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
              ins.extra = disp4 * 4;
              decoded = true;
              blk.pcNext = pc + 2;
@@ -2216,8 +2283,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
              ins.op = Op::STORE16;
              ins.dst.isImm = false; ins.dst.reg = n;
              ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
              ins.extra = disp4 * 2;
              decoded = true; blk.pcNext = pc + 2;
          }
@@ -2229,8 +2296,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE32;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             ins.extra = disp4 * 4;
             decoded = true;
             blk.pcNext = pc + 2;
@@ -2267,8 +2334,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE8;
             ins.dst.isImm = false; ins.dst.reg = n; // Rn base
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; // value in Rm
+            ins.src2.isImm = false;
+            ins.src2.reg = n; // value in Rm
             ins.extra = 0;
             decoded = true; blk.pcNext = pc + 2;
         }
@@ -2278,8 +2345,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE8_R0;
             ins.dst.isImm = false; ins.dst.reg = n; // Rn base
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; // value in Rm
+            ins.src2.isImm = false;
+            ins.src2.reg = n; // value in Rm
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.W Rm,@(R0,Rn) 0x0nm5
@@ -2298,8 +2365,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE32_R0;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.B @(R0,Rm),Rn 0x0nmC
@@ -2308,8 +2375,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD8_R0;
             ins.dst.isImm = false; ins.dst.reg = n;      // Rn
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;    // Rm base
+            ins.src2.isImm = false;
+            ins.src2.reg = n;    // Rm base
             INFO_LOG(SH4, "Emitter: Decoded LOAD8_R0 R%d <- @(R0,R%d) (0x%04X) at PC=0x%08X", n, m, raw, pc);
             decoded = true; blk.pcNext = pc + 2;
         }
@@ -2320,8 +2387,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD16_R0;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             INFO_LOG(SH4, "Emitter: Decoded LOAD16_R0 R%d <- @(R0,R%d) (0x%04X) at PC=0x%08X", n, m, raw, pc);
             decoded = true; blk.pcNext = pc + 2;
         }
@@ -2331,8 +2398,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD32_R0;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         else if ((raw & 0xF00F) == 0x000E)
@@ -2340,8 +2407,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD32_R0;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // LDC.L @Rm+,SR  (0x4m3E)
@@ -2362,8 +2429,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::CMP_STR;
             ins.dst.isImm = false; ins.dst.reg = n; // use dst as Rn
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; // src as Rm
+            ins.src2.isImm = false;
+            ins.src2.reg = n; // src as Rm
             decoded = true;
             blk.pcNext = pc + 2;
         }
@@ -2449,8 +2516,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE8_POST;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.W Rm,@Rn+ (0x2nm5)
@@ -2459,8 +2526,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE16_POST;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // MOV.L Rm,@Rn+ (0x2nm6)
@@ -2469,8 +2536,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::STORE32_POST;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             decoded = true; blk.pcNext = pc + 2;
         }
         // FPU single-precision arithmetic  (1111 nnnn mmmm xxxx)
@@ -2522,15 +2589,15 @@ Block& Emitter::CreateNew(uint32_t pc) {
                         ins.op = Op::FCMP_EQ;
                         ins.dst.isImm = false; ins.dst.reg = n; ins.dst.type = RegType::FGR;
                         ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; ins.src1.type = RegType::FGR;
+                        ins.src2.isImm = false;
+                        ins.src2.reg = n; ins.src1.type = RegType::FGR;
                         break; // FCMP/EQ FRm,FRn
                     case 0x5:
                         ins.op = Op::FCMP_GT;
                         ins.dst.isImm = false; ins.dst.reg = n; ins.dst.type = RegType::FGR;
                         ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; ins.src1.type = RegType::FGR;
+                        ins.src2.isImm = false;
+                        ins.src2.reg = n; ins.src1.type = RegType::FGR;
                         break; // FCMP/GT FRm,FRn
 
                     case 0x6: // FSQRT single or FMOV.S @Rm+,FRn depending on m==n
@@ -2543,8 +2610,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
                             ins.op = Op::FMOV;
                             ins.dst.isImm = false; ins.dst.reg = n; // FRn
                             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; // Rm address base
+                            ins.src2.isImm = false;
+                            ins.src2.reg = n; // Rm address base
                             ins.dst.type = RegType::FGR;
                             ins.src1.type = RegType::GPR;
                             ins.extra = 1; // post-increment flag
@@ -2555,36 +2622,36 @@ Block& Emitter::CreateNew(uint32_t pc) {
                         ins.op = Op::FABS;
                         ins.dst.isImm = false; ins.dst.reg = n;
                         ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+                        ins.src2.isImm = false;
+                        ins.src2.reg = n;
                         break;
                     case 0x8: // FMOV.S @(R0,Rm),FRn
                         ins.op = Op::FMOV_LOAD_R0;
                         ins.dst.isImm = false; ins.dst.reg = n; // FRn
                         ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; // Rm for address offset
+                        ins.src2.isImm = false;
+                        ins.src2.reg = n; // Rm for address offset
                         break;
                     case 0x9: // FMOV.S FRm,@(R0,Rn)
                         ins.op = Op::FMOV_STORE_R0;
                         ins.dst.isImm = false; ins.dst.reg = n; // Rn provides offset for store address
                         ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; // FRm source value register
+                        ins.src2.isImm = false;
+                        ins.src2.reg = n; // FRm source value register
                         break;
                     case 0xA: // FLDS FRm,FPUL
                         ins.op = Op::FLDS;
                         ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n; // FRm source
+                        ins.src2.isImm = false;
+                        ins.src2.reg = n; // FRm source
                         ins.src1.type = RegType::FGR;
                         break;
                     case 0xB: // FMOV FRm,FRn (register-to-register move)
                         ins.op = Op::FMOV;
                         ins.dst.isImm = false; ins.dst.reg = n;
                         ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+                        ins.src2.isImm = false;
+                        ins.src2.reg = n;
                         ins.dst.type = RegType::FGR;
                         ins.src1.type = RegType::FGR;
                         break;
@@ -2700,8 +2767,8 @@ Block& Emitter::CreateNew(uint32_t pc) {
             ins.op = Op::LOAD16;
             ins.dst.isImm = false; ins.dst.reg = n;
             ins.src1.isImm = false; ins.src1.reg = m;
-        ins.src2.isImm = false;
-        ins.src2.reg = n;
+            ins.src2.isImm = false;
+            ins.src2.reg = n;
             ins.extra = 0;
             decoded = true; blk.pcNext = pc + 2;
         }

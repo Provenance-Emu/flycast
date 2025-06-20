@@ -348,6 +348,145 @@ static void Exec_SETS(const sh4::ir::Instr& /*ins*/, Sh4Context* ctx, uint32_t /
     ctx->sr.S = 1;
 }
 
+// MUL.L Rm,Rn - 32-bit multiply, result stored in MACL
+// MACL = Rn * Rm (signed)
+static void Exec_MUL_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
+    // Get registers
+    uint32_t n = ins.dst.reg;
+    uint32_t m = ins.src1.reg;
+    
+    // Get values as signed 32-bit integers
+    int32_t rn = (int32_t)ctx->r[n];
+    int32_t rm = (int32_t)ctx->r[m];
+    
+    // Perform signed 32-bit multiplication
+    int32_t res = rn * rm;
+    
+    // Update MACL register (lower 32 bits only)
+    ctx->mac.l = (uint32_t)res;
+    
+    INFO_LOG(SH4, "Exec_MUL_L: R%u=%d, R%u=%d, MAC.L=0x%08X (res=0x%08X) at PC=0x%08X",
+             n, rn, m, rm, ctx->mac.l, res, pc);
+}
+
+// DIV0U - Division Step 0 Unsigned
+// Clear SR.Q, SR.M, and SR.T flags
+static void Exec_DIV0U(const sh4::ir::Instr& /*ins*/, Sh4Context* ctx, uint32_t pc) {
+    // Clear division flags
+    ctx->sr.Q = 0;
+    ctx->sr.M = 0;
+    ctx->sr.T = 0;
+    
+    INFO_LOG(SH4, "Exec_DIV0U: Cleared Q=%u, M=%u, T=%u at PC=0x%08X",
+             ctx->sr.Q, ctx->sr.M, ctx->sr.T, pc);
+}
+
+// DIV1 Rm,Rn - Division Step 1
+// Performs one step of a division operation
+static void Exec_DIV1(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
+    // Get registers
+    uint32_t n = ins.dst.reg;
+    uint32_t m = ins.src1.reg;
+    
+    // Get values
+    uint32_t rn = ctx->r[n]; // Dividend
+    uint32_t rm = ctx->r[m]; // Divisor
+    
+    // Get current SR flags
+    uint32_t q = ctx->sr.Q;
+    uint32_t t = ctx->sr.T;
+    
+    // Perform the division step
+    uint32_t tmp0 = rn;
+    
+    // Shift left by 1 and insert T at bit 0
+    rn = (rn << 1) | t;
+    
+    // If Q == M, subtract divisor, else add divisor
+    if (q == ctx->sr.M) {
+        rn -= rm;
+        // Set Q based on result
+        q = (rn > tmp0) ? 1 : 0;
+    } else {
+        rn += rm;
+        // Set Q based on result
+        q = (rn < tmp0) ? 1 : 0;
+    }
+    
+    // Set T to complement of MSB of result
+    t = ((rn & 0x80000000) == 0) ? 1 : 0;
+    
+    // Update registers
+    ctx->r[n] = rn;
+    ctx->sr.Q = q;
+    ctx->sr.T = t;
+    
+    INFO_LOG(SH4, "Exec_DIV1: R%u=0x%08X, R%u=0x%08X, Q=%u, M=%u, T=%u at PC=0x%08X",
+             n, ctx->r[n], m, ctx->r[m], ctx->sr.Q, ctx->sr.M, ctx->sr.T, pc);
+}
+
+// DMULS.L Rm,Rn - Signed 32x32->64 multiply
+// MACH:MACL = Rn * Rm (signed)
+static void Exec_DMULS_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
+    // Get registers
+    uint32_t n = ins.dst.reg;
+    uint32_t m = ins.src1.reg;
+    
+    // Get values as signed 32-bit integers
+    int32_t rn = (int32_t)ctx->r[n];
+    int32_t rm = (int32_t)ctx->r[m];
+    
+    // Perform signed 64-bit multiplication
+    int64_t res = (int64_t)rn * (int64_t)rm;
+    
+    // Update MAC registers (MACH:MACL)
+    ctx->mac.h = (uint32_t)(res >> 32);
+    ctx->mac.l = (uint32_t)(res & 0xFFFFFFFF);
+    
+    INFO_LOG(SH4, "Exec_DMULS_L: R%u=%d, R%u=%d, MAC.H:MAC.L=0x%08X:%08X (res=0x%016llX) at PC=0x%08X",
+             n, rn, m, rm, ctx->mac.h, ctx->mac.l, (unsigned long long)res, pc);
+}
+
+// DMULU.L Rm,Rn - Unsigned 32x32->64 multiply
+// MACH:MACL = Rn * Rm (unsigned)
+static void Exec_DMULU_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
+    // Get registers
+    uint32_t n = ins.dst.reg;
+    uint32_t m = ins.src1.reg;
+    
+    // Get values as unsigned 32-bit integers
+    uint32_t rn = ctx->r[n];
+    uint32_t rm = ctx->r[m];
+    
+    // Perform unsigned 64-bit multiplication
+    uint64_t res = (uint64_t)rn * (uint64_t)rm;
+    
+    // Update MAC registers (MACH:MACL)
+    ctx->mac.h = (uint32_t)(res >> 32);
+    ctx->mac.l = (uint32_t)(res & 0xFFFFFFFF);
+    
+    INFO_LOG(SH4, "Exec_DMULU_L: R%u=%u, R%u=%u, MAC.H:MAC.L=0x%08X:%08X (res=0x%016llX) at PC=0x%08X",
+             n, rn, m, rm, ctx->mac.h, ctx->mac.l, (unsigned long long)res, pc);
+}
+
+// DIV0S Rm,Rn
+// Set SR.Q = MSB(Rn), SR.M = MSB(Rm), SR.T = SR.M ^ SR.Q
+static void Exec_DIV0S(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
+    // Get MSB of Rn (dst register)
+    uint32_t n_msb = (ctx->r[ins.dst.reg] >> 31) & 1;
+    // Get MSB of Rm (src1 register)
+    uint32_t m_msb = (ctx->r[ins.src1.reg] >> 31) & 1;
+    
+    // Set SR flags
+    ctx->sr.Q = n_msb;
+    ctx->sr.M = m_msb;
+    ctx->sr.T = n_msb ^ m_msb;
+    
+    INFO_LOG(SH4, "Exec_DIV0S: R%u(0x%08X), R%u(0x%08X) -> Q=%u, M=%u, T=%u at PC=0x%08X",
+             ins.src1.reg, ctx->r[ins.src1.reg], ins.dst.reg, ctx->r[ins.dst.reg],
+             ctx->sr.Q, ctx->sr.M, ctx->sr.T, pc);
+}
+
 static ExecFn g_exec_table[static_cast<int>(sh4::ir::Op::NUM_OPS)]{};
 
 static void InitExecTable()
@@ -363,6 +502,12 @@ static void InitExecTable()
     g_exec_table[static_cast<int>(sh4::ir::Op::SETT)]       = &Exec_SETT;
     g_exec_table[static_cast<int>(sh4::ir::Op::CLRS)]       = &Exec_CLRS;
     g_exec_table[static_cast<int>(sh4::ir::Op::SETS)]       = &Exec_SETS;
+    g_exec_table[static_cast<int>(sh4::ir::Op::DIV0U)]      = &Exec_DIV0U;
+    g_exec_table[static_cast<int>(sh4::ir::Op::DIV0S)]      = &Exec_DIV0S;
+    g_exec_table[static_cast<int>(sh4::ir::Op::DIV1)]       = &Exec_DIV1;
+    g_exec_table[static_cast<int>(sh4::ir::Op::DMULS_L)]    = &Exec_DMULS_L;
+    g_exec_table[static_cast<int>(sh4::ir::Op::DMULU_L)]    = &Exec_DMULU_L;
+    g_exec_table[static_cast<int>(sh4::ir::Op::MUL_L)]      = &Exec_MUL_L;
     init = true;
 }
 
