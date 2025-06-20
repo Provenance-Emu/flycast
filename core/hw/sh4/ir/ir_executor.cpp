@@ -327,9 +327,17 @@ static void Exec_ADD_REG(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t) {
 static void Exec_ADD_IMM(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t) { ctx->r[ins.dst.reg] += static_cast<uint32_t>(ins.src1.imm); }
 static void Exec_ADDC(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 {
-    uint64_t sum = static_cast<uint64_t>(ctx->r[ins.dst.reg]) + ctx->r[ins.src1.reg] + (ctx->sr.T & 1);
+    // ADDC: Rn = Rn + Rm + T
+    uint32_t rm = ctx->r[ins.src1.reg];
+    uint32_t rn = ctx->r[ins.dst.reg];
+    uint32_t t = ctx->sr.T;
+    
+    // Calculate result
+    uint64_t sum = static_cast<uint64_t>(rn) + rm + t;
     ctx->r[ins.dst.reg] = static_cast<uint32_t>(sum);
-    ctx->sr.T = (sum >> 32) & 1; // carry-out sets T
+    
+    // Set T=1 if carry occurred
+    ctx->sr.T = (sum >> 32) & 1;
 }
 
 static void Exec_CLRT(const sh4::ir::Instr& /*ins*/, Sh4Context* ctx, uint32_t /*pc*/) {
@@ -1321,14 +1329,18 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 }
                 case Op::SUBX:
                 {
-                    // Rn = Rn - Rm - T
+                    // SUBX: Rn = Rn - Rm - T (T is borrow)
                     uint32_t rm = ctx->r[ins.src1.reg];
                     uint32_t rn = ctx->r[ins.dst.reg];
                     uint32_t t = ctx->sr.T;
+                    
+                    // Calculate result: Rn - Rm - T
                     uint32_t res = rn - rm - t;
-                    uint64_t tmp = (uint64_t)rn - (uint64_t)rm - t;
-                    ctx->sr.T = (tmp >> 32) & 1;
                     ctx->r[ins.dst.reg] = res;
+                    
+                    // Set T=1 if borrow occurred
+                    // Borrow occurs when: (rn < rm) OR (rn == rm AND t == 1)
+                    ctx->sr.T = (rn < rm || (rn == rm && t == 1)) ? 1 : 0;
                     break;
                 }
                 case Op::NEG:
@@ -1348,8 +1360,16 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     break;
                 case Op::ADDC:
                 {
-                    uint64_t sum = static_cast<uint64_t>(ctx->r[ins.dst.reg]) + ctx->r[ins.src1.reg] + (ctx->sr.T & 1);
+                    // ADDC: Rn = Rn + Rm + T
+                    uint32_t rm = ctx->r[ins.src1.reg];
+                    uint32_t rn = ctx->r[ins.dst.reg];
+                    uint32_t t = ctx->sr.T;
+                    
+                    // Calculate result
+                    uint64_t sum = static_cast<uint64_t>(rn) + rm + t;
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(sum);
+                    
+                    // Set T=1 if carry occurred
                     ctx->sr.T = (sum >> 32) & 1;
                     break;
                 }

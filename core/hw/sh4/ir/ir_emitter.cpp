@@ -546,12 +546,34 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
-    // SUBX Rm, Rn (0x3nmE)
-    else if ((raw & 0xF00F) == 0x300E)
+    // SUBX Rm, Rn (0x2nmE)
+    else if ((raw & 0xF00F) == 0x200E)
     {
         uint8_t n = (raw >> 8) & 0xF;
         uint8_t m = (raw >> 4) & 0xF;
         ins.op = Op::SUBX;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // ADDC Rm, Rn (0x3nmE)
+    else if ((raw & 0xF00F) == 0x300E)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::ADDC;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // ADDV Rm, Rn (0x3nmF)
+    else if ((raw & 0xF00F) == 0x300F)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::ADDV;
         ins.dst.isImm = false; ins.dst.reg = n;
         ins.src1.isImm = false; ins.src1.reg = m;
         blk.pcNext = pc + 2;
