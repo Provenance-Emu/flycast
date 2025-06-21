@@ -64,6 +64,7 @@ namespace {
     }
 }
 #include <utility>
+#include <unordered_set>
 #include "hw/mem/addrspace.h"
 #include <cstring>
 #include "ir_tables.h" // for Op enum count
@@ -359,10 +360,26 @@ static inline void WriteAligned32(uint32_t addr, u32 data)
 using ExecFn = void(*)(const sh4::ir::Instr&, Sh4Context*, uint32_t);
 
 // Generic stub that falls back to IllegalInstr -> legacy interpreter.
-static void ExecStub(const sh4::ir::Instr&, Sh4Context*, uint32_t pc)
+static void ExecStub(const sh4::ir::Instr& ins, Sh4Context*, uint32_t pc)
 {
-    INFO_LOG(SH4, "IR fallback at PC=%08X", pc);
-    DumpTrace();
+    // Get opcode name if possible
+    const char* opName = "UNKNOWN";
+    if (static_cast<size_t>(ins.op) < kOpNamesCount) {
+        opName = kOpNames[static_cast<size_t>(ins.op)];
+    }
+
+    // Log detailed information about the opcode falling back to legacy interpreter
+    WARN_LOG(SH4, "IR fallback to legacy interpreter: PC=%08X, Raw=%04X, Op=%s (%d)",
+             pc, ins.raw, opName, static_cast<int>(ins.op));
+
+    // Only dump trace on the first occurrence of each unique opcode
+    static std::unordered_set<uint16_t> logged_opcodes;
+    if (logged_opcodes.insert(ins.raw).second) {
+        // First time seeing this opcode, dump trace
+        INFO_LOG(SH4, "First occurrence of opcode %04X (%s), dumping trace:", ins.raw, opName);
+        DumpTrace();
+    }
+
     throw SH4ThrownException(pc, Sh4Ex_IllegalInstr);
 }
 
@@ -376,11 +393,11 @@ static void Exec_ADDC(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
     uint32_t rm = ctx->r[ins.src1.reg];
     uint32_t rn = ctx->r[ins.dst.reg];
     uint32_t t = ctx->sr.T;
-    
+
     // Calculate result
     uint64_t sum = static_cast<uint64_t>(rn) + rm + t;
     ctx->r[ins.dst.reg] = static_cast<uint32_t>(sum);
-    
+
     // Set T=1 if carry occurred
     ctx->sr.T = (sum >> 32) & 1;
 }
@@ -396,11 +413,11 @@ static void Exec_ADDV(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
     // Get register values
     int32_t rm = static_cast<int32_t>(ctx->r[ins.src1.reg]);
     int32_t rn = static_cast<int32_t>(ctx->r[ins.dst.reg]);
-    
+
     // Calculate result
     int32_t res = rn + rm;
     ctx->r[ins.dst.reg] = static_cast<uint32_t>(res);
-    
+
     // Set SR.T if signed overflow occurred
     // Overflow happens when adding two positives gives negative or two negatives gives positive
     ctx->sr.T = ((rm > 0 && rn > 0 && res < 0) || (rm < 0 && rn < 0 && res > 0)) ? 1 : 0;
@@ -413,7 +430,7 @@ static void Exec_SUB(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
     // Get register values
     uint32_t rm = ctx->r[ins.src1.reg];
     uint32_t rn = ctx->r[ins.dst.reg];
-    
+
     // Calculate result
     ctx->r[ins.dst.reg] = rn - rm;
 }
@@ -426,11 +443,11 @@ static void Exec_SUBC(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
     uint32_t rm = ctx->r[ins.src1.reg];
     uint32_t rn = ctx->r[ins.dst.reg];
     uint32_t t = ctx->sr.T;
-    
+
     // Calculate result: Rn - Rm - T
     uint32_t res = rn - rm - t;
     ctx->r[ins.dst.reg] = res;
-    
+
     // Set T=1 if borrow occurred
     // Borrow occurs when: (rn < rm) OR (rn == rm AND t == 1)
     ctx->sr.T = (rn < rm || (rn == rm && t == 1)) ? 1 : 0;
@@ -444,7 +461,7 @@ static void Exec_SUBX(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
     uint32_t rm = ctx->r[ins.src1.reg];
     uint32_t rn = ctx->r[ins.dst.reg];
     uint32_t t = ctx->sr.T;
-    
+
     // For SUBX, the correct calculation is:
     // When T=1, we're computing Rn = Rn - Rm - 1 (subtract with borrow)
     // When T=0, we're computing Rn = Rn - Rm (no borrow)
@@ -452,7 +469,7 @@ static void Exec_SUBX(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
     // Rn = Rn - (Rm + T)
     uint32_t res = rn - (rm + t);
     ctx->r[ins.dst.reg] = res;
-    
+
     // Set T=1 if borrow occurred
     // Borrow occurs when: (rn < rm) OR (rn == rm AND t == 1)
     ctx->sr.T = (rn < rm || (rn == rm && t == 1)) ? 1 : 0;
@@ -465,11 +482,11 @@ static void Exec_SUBV(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 {
     int32_t rm = (int32_t)ctx->r[ins.src1.reg];
     int32_t rn = (int32_t)ctx->r[ins.dst.reg];
-    
+
     // Calculate result: Rn - Rm
     int32_t res = rn - rm;
     ctx->r[ins.dst.reg] = (uint32_t)res;
-    
+
     // Set T=1 if signed overflow occurred
     // Overflow occurs when signs of operands are different and result sign differs from Rn
     bool overflow = ((rn ^ rm) & (rn ^ res)) < 0;
@@ -481,7 +498,7 @@ static void Exec_SUBV(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 static void Exec_NEG(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 {
     uint32_t rm = ctx->r[ins.src1.reg];
-    
+
     // Calculate result: 0 - Rm
     uint32_t res = 0 - rm;
     ctx->r[ins.dst.reg] = res;
@@ -494,11 +511,11 @@ static void Exec_NEGC(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 {
     uint32_t rm = ctx->r[ins.src1.reg];
     uint32_t t = ctx->sr.T;
-    
+
     // Calculate result: 0 - Rm - T
     uint32_t res = 0 - rm - t;
     ctx->r[ins.dst.reg] = res;
-    
+
     // Set T=1 if borrow occurred
     // Borrow occurs when: (0 < rm) OR (0 == rm AND t == 1)
     ctx->sr.T = (0 < rm || (0 == rm && t == 1)) ? 1 : 0;
@@ -509,7 +526,7 @@ static void Exec_NEGC(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 static void Exec_EXTS_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 {
     uint32_t rm = ctx->r[ins.src1.reg];
-    
+
     // Sign extend the lower 16 bits
     int32_t res = (int16_t)(rm & 0xFFFF);
     ctx->r[ins.dst.reg] = (uint32_t)res;
@@ -520,7 +537,7 @@ static void Exec_EXTS_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 static void Exec_EXTU_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 {
     uint32_t rm = ctx->r[ins.src1.reg];
-    
+
     // Zero extend the lower 16 bits
     uint32_t res = rm & 0xFFFF;
     ctx->r[ins.dst.reg] = res;
@@ -531,7 +548,7 @@ static void Exec_EXTU_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 static void Exec_EXTS_B(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 {
     uint32_t rm = ctx->r[ins.src1.reg];
-    
+
     // Sign extend the lower 8 bits
     int32_t res = (int8_t)(rm & 0xFF);
     ctx->r[ins.dst.reg] = (uint32_t)res;
@@ -542,7 +559,7 @@ static void Exec_EXTS_B(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 static void Exec_EXTU_B(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
 {
     uint32_t rm = ctx->r[ins.src1.reg];
-    
+
     // Zero extend the lower 8 bits
     uint32_t res = rm & 0xFF;
     ctx->r[ins.dst.reg] = res;
@@ -566,18 +583,18 @@ static void Exec_MULU_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc)
     // Get registers
     uint32_t n = ins.dst.reg;
     uint32_t m = ins.src1.reg;
-    
+
     // Get values as unsigned 16-bit integers (lower 16 bits only)
     uint16_t rn = (uint16_t)(ctx->r[n] & 0xFFFF);
     uint16_t rm = (uint16_t)(ctx->r[m] & 0xFFFF);
-    
+
     // Perform unsigned 16-bit multiplication
     uint32_t res = (uint32_t)rn * (uint32_t)rm;
-    
+
     // Update MACL register directly with the result
     // SH4 MULU.W stores the 32-bit result directly in MACL
     ctx->mac.l = res;
-    
+
     INFO_LOG(SH4, "Exec_MULU_W: R%u=0x%04X, R%u=0x%04X, MAC.L=0x%08X at PC=0x%08X",
              n, rn, m, rm, ctx->mac.l, pc);
 }
@@ -588,17 +605,17 @@ static void Exec_MULS_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc)
     // Get registers
     uint32_t n = ins.dst.reg;
     uint32_t m = ins.src1.reg;
-    
+
     // Get values as signed 16-bit integers (lower 16 bits only)
     int16_t rn = (int16_t)(ctx->r[n] & 0xFFFF);
     int16_t rm = (int16_t)(ctx->r[m] & 0xFFFF);
-    
+
     // Perform signed 16-bit multiplication
     int32_t res = (int32_t)rn * (int32_t)rm;
-    
+
     // Update MACL register
     ctx->mac.l = (uint32_t)res;
-    
+
     INFO_LOG(SH4, "Exec_MULS_W: R%u=0x%04X (%d), R%u=0x%04X (%d), MAC.L=0x%08X at PC=0x%08X",
              n, rn, rn, m, rm, rm, ctx->mac.l, pc);
 }
@@ -611,30 +628,30 @@ static void Exec_MAC_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) 
     // Get registers
     uint32_t n = ins.dst.reg;
     uint32_t m = ins.src1.reg;
-    
+
     // Read memory values from addresses in Rm and Rn
     uint32_t addr_m = ctx->r[m];
     uint32_t addr_n = ctx->r[n];
-    
+
     // Read 32-bit values from memory
     int32_t val_m = (int32_t)mmu_ReadMem<u32>(addr_m);
     int32_t val_n = (int32_t)mmu_ReadMem<u32>(addr_n);
-    
+
     // Post-increment registers by 4
     ctx->r[m] += 4;
     ctx->r[n] += 4;
-    
+
     // Perform signed 32-bit multiplication and accumulate
     int64_t res = (int64_t)val_m * (int64_t)val_n;
-    
+
     // Add to MAC register (64-bit)
     int64_t mac = ((int64_t)ctx->mac.h << 32) | ctx->mac.l;
     mac += res;
-    
+
     // Update MAC registers
     ctx->mac.h = (uint32_t)(mac >> 32);
     ctx->mac.l = (uint32_t)mac;
-    
+
     INFO_LOG(SH4, "Exec_MAC_L: mem[R%u]=0x%08X (%d), mem[R%u]=0x%08X (%d), MAC=0x%08X%08X at PC=0x%08X",
              m, val_m, val_m, n, val_n, val_n, ctx->mac.h, ctx->mac.l, pc);
 }
@@ -647,32 +664,32 @@ static void Exec_MAC_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) 
     // Get registers
     uint32_t n = ins.dst.reg;
     uint32_t m = ins.src1.reg;
-    
+
     // Read memory values from addresses in Rm and Rn
     uint32_t addr_m = ctx->r[m];
     uint32_t addr_n = ctx->r[n];
-    
+
     // Read 16-bit values from memory and sign-extend to 32-bit
     int16_t val_m_16 = (int16_t)mmu_ReadMem<u16>(addr_m);
     int16_t val_n_16 = (int16_t)mmu_ReadMem<u16>(addr_n);
     int32_t val_m = (int32_t)val_m_16;
     int32_t val_n = (int32_t)val_n_16;
-    
+
     // Post-increment registers by 2 (16-bit access)
     ctx->r[m] += 2;
     ctx->r[n] += 2;
-    
+
     // Perform signed 16-bit multiplication and accumulate
     int64_t res = (int64_t)val_m * (int64_t)val_n;
-    
+
     // Add to MAC register (64-bit)
     int64_t mac = ((int64_t)ctx->mac.h << 32) | ctx->mac.l;
     mac += res;
-    
+
     // Update MAC registers
     ctx->mac.h = (uint32_t)(mac >> 32);
     ctx->mac.l = (uint32_t)mac;
-    
+
     INFO_LOG(SH4, "Exec_MAC_W: mem[R%u]=0x%04X (%d), mem[R%u]=0x%04X (%d), MAC=0x%08X%08X at PC=0x%08X",
              m, val_m_16, val_m, n, val_n_16, val_n, ctx->mac.h, ctx->mac.l, pc);
 }
@@ -683,17 +700,17 @@ static void Exec_MUL_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) 
     // Get registers
     uint32_t n = ins.dst.reg;
     uint32_t m = ins.src1.reg;
-    
+
     // Get values as signed 32-bit integers
     int32_t rn = (int32_t)ctx->r[n];
     int32_t rm = (int32_t)ctx->r[m];
-    
+
     // Perform signed 32-bit multiplication
     int32_t res = rn * rm;
-    
+
     // Update MACL register (lower 32 bits only)
     ctx->mac.l = (uint32_t)res;
-    
+
     INFO_LOG(SH4, "Exec_MUL_L: R%u=%d, R%u=%d, MAC.L=0x%08X (res=0x%08X) at PC=0x%08X",
              n, rn, m, rm, ctx->mac.l, res, pc);
 }
@@ -705,7 +722,7 @@ static void Exec_DIV0U(const sh4::ir::Instr& /*ins*/, Sh4Context* ctx, uint32_t 
     ctx->sr.Q = 0;
     ctx->sr.M = 0;
     ctx->sr.T = 0;
-    
+
     INFO_LOG(SH4, "Exec_DIV0U: Cleared Q=%u, M=%u, T=%u at PC=0x%08X",
              ctx->sr.Q, ctx->sr.M, ctx->sr.T, pc);
 }
@@ -716,21 +733,21 @@ static void Exec_DIV1(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
     // Get registers
     uint32_t n = ins.dst.reg;
     uint32_t m = ins.src1.reg;
-    
+
     // Get values
     uint32_t rn = ctx->r[n]; // Dividend
     uint32_t rm = ctx->r[m]; // Divisor
-    
+
     // Get current SR flags
     uint32_t q = ctx->sr.Q;
     uint32_t t = ctx->sr.T;
-    
+
     // Perform the division step
     uint32_t tmp0 = rn;
-    
+
     // Shift left by 1 and insert T at bit 0
     rn = (rn << 1) | t;
-    
+
     // If Q == M, subtract divisor, else add divisor
     if (q == ctx->sr.M) {
         rn -= rm;
@@ -741,15 +758,15 @@ static void Exec_DIV1(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) {
         // Set Q based on result
         q = (rn < tmp0) ? 1 : 0;
     }
-    
+
     // Set T to complement of MSB of result
     t = ((rn & 0x80000000) == 0) ? 1 : 0;
-    
+
     // Update registers
     ctx->r[n] = rn;
     ctx->sr.Q = q;
     ctx->sr.T = t;
-    
+
     INFO_LOG(SH4, "Exec_DIV1: R%u=0x%08X, R%u=0x%08X, Q=%u, M=%u, T=%u at PC=0x%08X",
              n, ctx->r[n], m, ctx->r[m], ctx->sr.Q, ctx->sr.M, ctx->sr.T, pc);
 }
@@ -760,18 +777,18 @@ static void Exec_DMULS_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc
     // Get registers
     uint32_t n = ins.dst.reg;
     uint32_t m = ins.src1.reg;
-    
+
     // Get values as signed 32-bit integers
     int32_t rn = (int32_t)ctx->r[n];
     int32_t rm = (int32_t)ctx->r[m];
-    
+
     // Perform signed 64-bit multiplication
     int64_t res = (int64_t)rn * (int64_t)rm;
-    
+
     // Update MAC registers (MACH:MACL)
     ctx->mac.h = (uint32_t)(res >> 32);
     ctx->mac.l = (uint32_t)(res & 0xFFFFFFFF);
-    
+
     INFO_LOG(SH4, "Exec_DMULS_L: R%u=%d, R%u=%d, MAC.H:MAC.L=0x%08X:%08X (res=0x%016llX) at PC=0x%08X",
              n, rn, m, rm, ctx->mac.h, ctx->mac.l, (unsigned long long)res, pc);
 }
@@ -782,18 +799,18 @@ static void Exec_DMULU_L(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc
     // Get registers
     uint32_t n = ins.dst.reg;
     uint32_t m = ins.src1.reg;
-    
+
     // Get values as unsigned 32-bit integers
     uint32_t rn = ctx->r[n];
     uint32_t rm = ctx->r[m];
-    
+
     // Perform unsigned 64-bit multiplication
     uint64_t res = (uint64_t)rn * (uint64_t)rm;
-    
+
     // Update MAC registers (MACH:MACL)
     ctx->mac.h = (uint32_t)(res >> 32);
     ctx->mac.l = (uint32_t)(res & 0xFFFFFFFF);
-    
+
     INFO_LOG(SH4, "Exec_DMULU_L: R%u=%u, R%u=%u, MAC.H:MAC.L=0x%08X:%08X (res=0x%016llX) at PC=0x%08X",
              n, rn, m, rm, ctx->mac.h, ctx->mac.l, (unsigned long long)res, pc);
 }
@@ -805,12 +822,12 @@ static void Exec_DIV0S(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc) 
     uint32_t n_msb = (ctx->r[ins.dst.reg] >> 31) & 1;
     // Get MSB of Rm (src1 register)
     uint32_t m_msb = (ctx->r[ins.src1.reg] >> 31) & 1;
-    
+
     // Set SR flags
     ctx->sr.Q = n_msb;
     ctx->sr.M = m_msb;
     ctx->sr.T = n_msb ^ m_msb;
-    
+
     INFO_LOG(SH4, "Exec_DIV0S: R%u(0x%08X), R%u(0x%08X) -> Q=%u, M=%u, T=%u at PC=0x%08X",
              ins.src1.reg, ctx->r[ins.src1.reg], ins.dst.reg, ctx->r[ins.dst.reg],
              ctx->sr.Q, ctx->sr.M, ctx->sr.T, pc);
@@ -1010,7 +1027,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::STORE32:
                 {
                     // Updated debug log to reflect corrected register mapping
-                    printf("[PRINTF_DEBUG_IR_STORE32_ENTRY] STORE32: ins.src1.reg (Rn_dst)=%u, ins.src2.reg (Rm_base)=%u, ins.extra (disp)=%u\n", 
+                    printf("[PRINTF_DEBUG_IR_STORE32_ENTRY] STORE32: ins.src1.reg (Rn_dst)=%u, ins.src2.reg (Rm_base)=%u, ins.extra (disp)=%u\n",
                            ins.src1.reg, ins.src2.reg, ins.extra);
                     fflush(stdout);
 
@@ -1018,11 +1035,11 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     // CORRECTED: ins.src2.reg is now Rm (base address)
                     uint32_t addr = ctx->r[ins.src2.reg] + ins.extra;
                     uint32_t val_to_store = ctx->r[ins.src1.reg];
-                    
-                    printf("[PRINTF_DEBUG_IR_STORE32_VALS] STORE32: ctx->r[%u]=%#010x, ctx->r[%u]=%#010x, addr=%#010x\n", 
+
+                    printf("[PRINTF_DEBUG_IR_STORE32_VALS] STORE32: ctx->r[%u]=%#010x, ctx->r[%u]=%#010x, addr=%#010x\n",
                            ins.src1.reg, val_to_store, ins.src2.reg, ctx->r[ins.src2.reg], addr);
                     fflush(stdout);
-                    
+
                     if (unlikely(IsBiosAddr(addr))) {
                         LogIllegalBiosWrite(ins, addr, curr_pc);
                     } else {
@@ -1198,7 +1215,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     {
                         addr = ctx->r[ins.src1.reg] + ctx->r[ins.src2.reg];
                         INFO_LOG(SH4, "IR_EXEC: LOAD8 @(R%d,R%d),R%d. PC=0x%08X. R%d(base)=0x%08X, R%d(offs)=0x%08X, Addr=0x%08X",
-                                 ins.src1.reg, ins.src2.reg, current_instr_pc,
+                                 ins.src1.reg, ins.src2.reg, ins.dst.reg, current_instr_pc,
                                  ins.src1.reg, ctx->r[ins.src1.reg],
                                  ins.src2.reg, ctx->r[ins.src2.reg], addr);
                     }
@@ -1372,11 +1389,11 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     u16 val = ReadAligned16(addr);
                     uint32_t old_reg = ctx->r[ins.dst.reg];
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val));
-                    
+
                     // Enhanced debug logging to track register changes
-                    printf("[PRINTF_DEBUG_LOAD16_IMM] PC=%08X, raw=0x%04X, dst=R%u, addr=%08X, val=0x%04X, sign_ext=0x%08X, old_reg=0x%08X\n", 
+                    printf("[PRINTF_DEBUG_LOAD16_IMM] PC=%08X, raw=0x%04X, dst=R%u, addr=%08X, val=0x%04X, sign_ext=0x%08X, old_reg=0x%08X\n",
                            curr_pc, ins.raw, ins.dst.reg, addr, val, ctx->r[ins.dst.reg], old_reg);
-                    printf("[PRINTF_DEBUG_LOAD16_IMM] Register state: R0-R7: %08X %08X %08X %08X %08X %08X %08X %08X\n", 
+                    printf("[PRINTF_DEBUG_LOAD16_IMM] Register state: R0-R7: %08X %08X %08X %08X %08X %08X %08X %08X\n",
                            ctx->r[0], ctx->r[1], ctx->r[2], ctx->r[3], ctx->r[4], ctx->r[5], ctx->r[6], ctx->r[7]);
                     fflush(stdout);
                     break;
@@ -1474,7 +1491,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::CMP_EQ_IMM:
                     // Compare R0 with immediate value (sign-extended)
                     ctx->sr.T = (ctx->r[0] == (int8_t)ins.extra);
-                    INFO_LOG(SH4, "CMP_EQ_IMM: R0(0x%08X) == #%d -> T=%d", 
+                    INFO_LOG(SH4, "CMP_EQ_IMM: R0(0x%08X) == #%d -> T=%d",
                             ctx->r[0], (int8_t)ins.extra, ctx->sr.T);
                     break;
                 case Op::CMP_HI:
@@ -1549,11 +1566,11 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     uint32_t rm = ctx->r[ins.src1.reg];
                     uint32_t rn = ctx->r[ins.dst.reg];
                     uint32_t t = ctx->sr.T;
-                    
+
                     // Calculate result: Rn - Rm - T
                     uint32_t res = rn - rm - t;
                     ctx->r[ins.dst.reg] = res;
-                    
+
                     // Set T=1 if borrow occurred
                     // Borrow occurs when: (rn < rm) OR (rn == rm AND t == 1)
                     ctx->sr.T = (rn < rm || (rn == rm && t == 1)) ? 1 : 0;
@@ -1580,11 +1597,11 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     uint32_t rm = ctx->r[ins.src1.reg];
                     uint32_t rn = ctx->r[ins.dst.reg];
                     uint32_t t = ctx->sr.T;
-                    
+
                     // Calculate result
                     uint64_t sum = static_cast<uint64_t>(rn) + rm + t;
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(sum);
-                    
+
                     // Set T=1 if carry occurred
                     ctx->sr.T = (sum >> 32) & 1;
                     break;
@@ -1793,14 +1810,14 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         double dst = ctx->getDR(dr_dst);
                         double src = ctx->getDR(dr_src);
                         ctx->setDR(dr_dst, dst + src);
-                        DEBUG_LOG(SH4, "FADD.d: DR%u = DR%u + DR%u (%.6f = %.6f + %.6f)", 
+                        DEBUG_LOG(SH4, "FADD.d: DR%u = DR%u + DR%u (%.6f = %.6f + %.6f)",
                                  dr_dst, dr_dst, dr_src, dst + src, dst, src);
                     } else {
                         // Single precision mode
                         float dst = ctx->fr[ins.dst.reg];
                         float src = ctx->fr[ins.src1.reg];
                         ctx->fr[ins.dst.reg] = dst + src;
-                        DEBUG_LOG(SH4, "FADD.s: FR%u = FR%u + FR%u (%.6f = %.6f + %.6f)", 
+                        DEBUG_LOG(SH4, "FADD.s: FR%u = FR%u + FR%u (%.6f = %.6f + %.6f)",
                                  ins.dst.reg, ins.dst.reg, ins.src1.reg, dst + src, dst, src);
                     }
                     break;
@@ -1834,11 +1851,11 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     // operates on a double-precision register pair regardless of FPSCR.PR.
                     // The encoding places an *even* FR register number in m; that pair forms DRm/2.
                     bool treat_as_double = (srcReg % 2 == 0); // even index implies DR source variant
-                    
+
                     if (!treat_as_double && pr == 0) {
                         // Single-precision variant.
                         float fval = ctx->fr[srcReg];
-                        
+
                         // Handle special cases according to SH4 spec and test expectations
                         if (std::isnan(fval)) {
                             // NaN -> 0x80000000
@@ -1860,7 +1877,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     } else {
                         // Double-precision variant (either PR=1 or opcode dictates).
                         double dval = ctx->getDR(srcReg >> 1);
-                        
+
                         // Handle special cases for double precision too
                         if (std::isnan(dval)) {
                             // NaN -> 0x80000000
@@ -1880,7 +1897,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                             INFO_LOG(SH4, "FTRC DR%d (%.1f) -> FPUL (%d)", srcReg >> 1, dval, int_val);
                         }
                     }
-                    
+
                     ctx->fpul = static_cast<u32>(int_val);
                     break;
                 }
@@ -1891,7 +1908,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     // FRn = 1/sqrt(FRn)
                     uint32_t n = ins.dst.reg;
                     float value = ctx->fr[n];
-                    
+
                     // Handle special cases according to SH4 spec
                     if (value == 0.0f) {
                         // 1/sqrt(0) = Infinity
@@ -1908,44 +1925,44 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     }
                     break;
                 }
-                
+
                 case Op::FSCA:
                 {
                     // FSCA FPUL,DRn - Calculate sine and cosine of angle in FPUL
                     // The angle is a 32-bit value where 0x10000 represents 2π radians
                     // Result: sin(angle) -> FRn, cos(angle) -> FR(n+1)
-                    
+
                     // In our case, we know n=6 from the emitter (DR3 = FR6:FR7)
                     uint32_t fpul_value = ctx->fpul;
-                    
+
                     // Extract the table index and fractional part for interpolation
                     // We use the high 8 bits as the index into our 256-entry table
                     // and the low 24 bits for the fractional part (similar to the example code)
-                    
+
                     // Get the integer index (0-255)
                     uint32_t index = (fpul_value >> 8) & 0xFF;
-                    
+
                     // Get the fractional part for interpolation (0-255)
                     float frac = (fpul_value & 0xFF) / 256.0f;
-                    
+
                     // Perform linear interpolation for sine
                     float sin_v1 = kSinTable[index];
                     float sin_v2 = kSinTable[index + 1]; // Safe because table has 257 entries
                     float sin_result = sin_v1 + (sin_v2 - sin_v1) * frac;
-                    
+
                     // Perform linear interpolation for cosine (shifted by 64 entries = π/2)
                     float cos_v1 = getCosValue(index);
                     float cos_v2 = getCosValue(index + 1);
                     float cos_result = cos_v1 + (cos_v2 - cos_v1) * frac;
-                    
+
                     // Store results
                     ctx->fr[6] = sin_result;  // FR6 = sin
                     ctx->fr[7] = cos_result;  // FR7 = cos
-                    
+
                     // Log at debug level to avoid excessive output
-                    DEBUG_LOG(SH4, "FSCA FPUL(0x%X),DR3 -> sin=%.4f, cos=%.4f (index=%u, frac=%.4f)", 
+                    DEBUG_LOG(SH4, "FSCA FPUL(0x%X),DR3 -> sin=%.4f, cos=%.4f (index=%u, frac=%.4f)",
                              fpul_value, sin_result, cos_result, index, frac);
-                    
+
                     // For exact key angles, ensure precise results (matching hardware behavior)
                     if (fpul_value == 0x0000 || fpul_value == 0x10000) {
                         // 0 or 2π radians (0° or 360°)
@@ -1966,20 +1983,20 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     }
                     break;
                 }
-                
+
                 case Op::FSQRT:
                 {
                     // FSQRT FRn - Calculate square root
                     // FRn = sqrt(FRn) or DRn = sqrt(DRn) depending on PR bit
-                    
+
                     // Check if PR bit is set (double precision) and register is even
                     if (ctx->fpscr.PR == 1 && (ins.dst.reg & 1) == 0) {
                         // Double precision mode
                         uint32_t dr_idx = ins.dst.reg >> 1;
                         double value = ctx->getDR(dr_idx);
-                        
+
                         INFO_LOG(SH4, "FSQRT.d DR%d (%.1f) - Starting double-precision sqrt", dr_idx, value);
-                        
+
                         // Handle special cases according to SH4 spec
                         if (value == 0.0) {
                             // sqrt(0) = 0
@@ -1999,9 +2016,9 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         // Single precision mode
                         uint32_t n = ins.dst.reg;
                         float value = ctx->fr[n];
-                        
+
                         INFO_LOG(SH4, "FSQRT.s FR%d (%.1f) - Starting single-precision sqrt", n, value);
-                        
+
                         // Handle special cases according to SH4 spec and IEEE 754
                         if (value == 0.0f || value == -0.0f) {
                             // sqrt(+0) = +0 and sqrt(-0) = +0 per IEEE 754
@@ -2020,7 +2037,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     }
                     break;
                 }
-                
+
                 case Op::FLOAT:
                 {
                     // FLOAT FPUL -> FRn (PR==0) or FLOAT FPUL -> DRn (PR==1)
@@ -2028,15 +2045,15 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     int32_t int_val = static_cast<int32_t>(ctx->fpul);
                     float single = static_cast<float>(int_val);
                     double dbl_val = static_cast<double>(int_val);
-                    
+
                     // Debug log to trace instruction data
-                    INFO_LOG(SH4, "FLOAT DEBUG: raw=0x%04X, dst.reg=%u, dst.isImm=%d, dst.type=%d, PR=%d", 
+                    INFO_LOG(SH4, "FLOAT DEBUG: raw=0x%04X, dst.reg=%u, dst.isImm=%d, dst.type=%d, PR=%d",
                              ins.raw, ins.dst.reg, ins.dst.isImm, static_cast<int>(ins.dst.type), ctx->fpscr.PR);
-                    
+
                     // The emitter decodes the destination register from bits 8-11 of the opcode
                     // For opcode 0xFC2D (FLOAT FPUL, DR6), the emitter sets dst.reg = 12 (FR12)
                     // In the test, this is expected to write to DR6 (FR12+FR13 pair)
-                    
+
                     // Handle based on precision mode
                     if (ctx->fpscr.PR == 1) {
                         // Double precision mode - write to DRn
@@ -2045,7 +2062,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         // So DR index = FR index / 2 (integer division)
                         uint32_t dr_idx = ins.dst.reg / 2;
                         ctx->setDR(dr_idx, dbl_val);
-                        INFO_LOG(SH4, "FLOAT (PR=1) FPUL_INT(%d) -> DR%u (%.6f) [FR%u]", 
+                        INFO_LOG(SH4, "FLOAT (PR=1) FPUL_INT(%d) -> DR%u (%.6f) [FR%u]",
                                  int_val, dr_idx, dbl_val, ins.dst.reg);
                     } else {
                         // Single precision mode (PR=0)
@@ -2054,7 +2071,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         if (ins.raw == 0xF62D) {
                             // Special case for FloatingPointTest
                             ctx->fr[6] = single;
-                            INFO_LOG(SH4, "FLOAT (PR=0, special case) FPUL_INT(%d) -> FR6 (%.6f)", 
+                            INFO_LOG(SH4, "FLOAT (PR=0, special case) FPUL_INT(%d) -> FR6 (%.6f)",
                                     int_val, single);
                         } else if (ins.raw == 0xFC2D) {
                             // Special case for DoubleFloatingPointTest
@@ -2062,12 +2079,12 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                             // even though we're in single-precision mode
                             uint32_t dr_idx = 6; // DR6 = FR12+FR13
                             ctx->setDR(dr_idx, dbl_val);
-                            INFO_LOG(SH4, "FLOAT (PR=0, DR special case) FPUL_INT(%d) -> DR%u (%.6f)", 
+                            INFO_LOG(SH4, "FLOAT (PR=0, DR special case) FPUL_INT(%d) -> DR%u (%.6f)",
                                     int_val, dr_idx, dbl_val);
                         } else {
                             // Generic case - write to FRn directly
                             ctx->fr[ins.dst.reg] = single;
-                            INFO_LOG(SH4, "FLOAT (PR=0) FPUL_INT(%d) -> FR%u (%.6f)", 
+                            INFO_LOG(SH4, "FLOAT (PR=0) FPUL_INT(%d) -> FR%u (%.6f)",
                                     int_val, ins.dst.reg, single);
                         }
                     }
@@ -2083,14 +2100,14 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         double dst = ctx->getDR(dr_dst);
                         double src = ctx->getDR(dr_src);
                         ctx->setDR(dr_dst, dst - src);
-                        DEBUG_LOG(SH4, "FSUB.d: DR%u = DR%u - DR%u (%.6f = %.6f - %.6f)", 
+                        DEBUG_LOG(SH4, "FSUB.d: DR%u = DR%u - DR%u (%.6f = %.6f - %.6f)",
                                  dr_dst, dr_dst, dr_src, dst - src, dst, src);
                     } else {
                         // Single precision mode
                         float dst = ctx->fr[ins.dst.reg];
                         float src = ctx->fr[ins.src1.reg];
                         ctx->fr[ins.dst.reg] = dst - src;
-                        DEBUG_LOG(SH4, "FSUB.s: FR%u = FR%u - FR%u (%.6f = %.6f - %.6f)", 
+                        DEBUG_LOG(SH4, "FSUB.s: FR%u = FR%u - FR%u (%.6f = %.6f - %.6f)",
                                  ins.dst.reg, ins.dst.reg, ins.src1.reg, dst - src, dst, src);
                     }
                     break;
@@ -2098,9 +2115,9 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::FMUL:
                 {
                     // Debug logging to check PR bit and register values
-                    INFO_LOG(SH4, "FMUL: PR=%d, dst.reg=%u (even=%d), src1.reg=%u (even=%d)", 
+                    INFO_LOG(SH4, "FMUL: PR=%d, dst.reg=%u (even=%d), src1.reg=%u (even=%d)",
                              ctx->fpscr.PR, ins.dst.reg, ((ins.dst.reg & 1) == 0), ins.src1.reg, ((ins.src1.reg & 1) == 0));
-                    
+
                     // Check if PR bit is set (double precision) AND both registers are even
                     if (ctx->fpscr.PR == 1 && ((ins.dst.reg & 1) == 0) && ((ins.src1.reg & 1) == 0)) {
                         uint32_t dr_dst = ins.dst.reg >> 1;
@@ -2108,14 +2125,14 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         double dst = ctx->getDR(dr_dst);
                         double src = ctx->getDR(dr_src);
                         ctx->setDR(dr_dst, dst * src);
-                        INFO_LOG(SH4, "FMUL.d: DR%u = DR%u * DR%u (%.6f = %.6f * %.6f)", 
+                        INFO_LOG(SH4, "FMUL.d: DR%u = DR%u * DR%u (%.6f = %.6f * %.6f)",
                                  dr_dst, dr_dst, dr_src, dst * src, dst, src);
                     } else {
                         // Single precision mode
                         float dst = ctx->fr[ins.dst.reg];
                         float src = ctx->fr[ins.src1.reg];
                         ctx->fr[ins.dst.reg] = dst * src;
-                        DEBUG_LOG(SH4, "FMUL.s: FR%u = FR%u * FR%u (%.6f = %.6f * %.6f)", 
+                        DEBUG_LOG(SH4, "FMUL.s: FR%u = FR%u * FR%u (%.6f = %.6f * %.6f)",
                                  ins.dst.reg, ins.dst.reg, ins.src1.reg, dst * src, dst, src);
                     }
                     break;
@@ -2123,9 +2140,9 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                 case Op::FDIV:
                 {
                     // Debug logging to check PR bit and register values
-                    INFO_LOG(SH4, "FDIV: PR=%d, dst.reg=%u (even=%d), src1.reg=%u (even=%d)", 
+                    INFO_LOG(SH4, "FDIV: PR=%d, dst.reg=%u (even=%d), src1.reg=%u (even=%d)",
                              ctx->fpscr.PR, ins.dst.reg, ((ins.dst.reg & 1) == 0), ins.src1.reg, ((ins.src1.reg & 1) == 0));
-                    
+
                     // Check if PR bit is set (double precision) AND both registers are even
                     if (ctx->fpscr.PR == 1 && ((ins.dst.reg & 1) == 0) && ((ins.src1.reg & 1) == 0)) {
                         uint32_t dr_dst = ins.dst.reg >> 1;
@@ -2133,14 +2150,14 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         double dst = ctx->getDR(dr_dst);
                         double src = ctx->getDR(dr_src);
                         ctx->setDR(dr_dst, dst / src);
-                        INFO_LOG(SH4, "FDIV.d: DR%u = DR%u / DR%u (%.6f = %.6f / %.6f)", 
+                        INFO_LOG(SH4, "FDIV.d: DR%u = DR%u / DR%u (%.6f = %.6f / %.6f)",
                                  dr_dst, dr_dst, dr_src, dst / src, dst, src);
                     } else {
                         // Single precision mode
                         float dst = ctx->fr[ins.dst.reg];
                         float src = ctx->fr[ins.src1.reg];
                         ctx->fr[ins.dst.reg] = dst / src;
-                        DEBUG_LOG(SH4, "FDIV.s: FR%u = FR%u / FR%u (%.6f = %.6f / %.6f)", 
+                        DEBUG_LOG(SH4, "FDIV.s: FR%u = FR%u / FR%u (%.6f = %.6f / %.6f)",
                                  ins.dst.reg, ins.dst.reg, ins.src1.reg, dst / src, dst, src);
                     }
                     break;
@@ -2193,7 +2210,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         double dst_val = ctx->getDR(dr_dst);
                         double result = dst_val + (fr0_val * src_val);
                         ctx->setDR(dr_dst, result);
-                        DEBUG_LOG(SH4, "FMAC.d: DR%u = DR%u + DR0 * DR%u (%.6f = %.6f + %.6f * %.6f)", 
+                        DEBUG_LOG(SH4, "FMAC.d: DR%u = DR%u + DR0 * DR%u (%.6f = %.6f + %.6f * %.6f)",
                                  dr_dst, dr_dst, dr_src, result, dst_val, fr0_val, src_val);
                     } else {
                         // Single precision mode
@@ -2202,7 +2219,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                         float dst_val = ctx->fr[ins.dst.reg];
                         float result = dst_val + (fr0_val * src_val);
                         ctx->fr[ins.dst.reg] = result;
-                        DEBUG_LOG(SH4, "FMAC.s: FR%u = FR%u + FR0 * FR%u (%.6f = %.6f + %.6f * %.6f)", 
+                        DEBUG_LOG(SH4, "FMAC.s: FR%u = FR%u + FR0 * FR%u (%.6f = %.6f + %.6f * %.6f)",
                                  ins.dst.reg, ins.dst.reg, ins.src1.reg, result, dst_val, fr0_val, src_val);
                     }
                     break;
@@ -2294,14 +2311,14 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     uint32_t val = ReadAligned32(mem_addr);
                     uint32_t old_reg = ctx->r[ins.dst.reg];
                     ctx->r[ins.dst.reg] = val;
-                    
+
                     // Enhanced debug logging for all registers, not just R0
-                    printf("[PRINTF_DEBUG_LOAD32_PC] PC=%08X, raw=0x%04X, dst=R%u, base_pc=%08X, aligned_base=%08X, disp=%u, addr=%08X, val=0x%08X, old_reg=0x%08X\n", 
+                    printf("[PRINTF_DEBUG_LOAD32_PC] PC=%08X, raw=0x%04X, dst=R%u, base_pc=%08X, aligned_base=%08X, disp=%u, addr=%08X, val=0x%08X, old_reg=0x%08X\n",
                            curr_pc, ins.raw, ins.dst.reg, base_pc, base, disp8, mem_addr, val, old_reg);
-                    printf("[PRINTF_DEBUG_LOAD32_PC] Register state: R0-R7: %08X %08X %08X %08X %08X %08X %08X %08X\n", 
+                    printf("[PRINTF_DEBUG_LOAD32_PC] Register state: R0-R7: %08X %08X %08X %08X %08X %08X %08X %08X\n",
                            ctx->r[0], ctx->r[1], ctx->r[2], ctx->r[3], ctx->r[4], ctx->r[5], ctx->r[6], ctx->r[7]);
                     fflush(stdout);
-                    
+
                     if (ins.dst.reg == 0) {
                         INFO_LOG(SH4, "LOAD32_PC: Loaded 0x%08X into R0 from addr 0x%08X (PC=%08X, disp=%d)", val, mem_addr, curr_pc, disp8);
                     }
@@ -2316,15 +2333,15 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     u16 val = ReadAligned16(mem_addr);
                     uint32_t old_reg = ctx->r[ins.dst.reg];
                     ctx->r[ins.dst.reg] = static_cast<uint32_t>(static_cast<int16_t>(val)); // Sign-extend 16-bit value
-                    
+
                     // Enhanced debug logging
-                    printf("[PRINTF_DEBUG_LOAD16_PC] PC=%08X, raw=0x%04X, dst=R%u, base_pc=%08X, aligned_base=%08X, disp=%u, addr=%08X, val=0x%04X, sign_ext=0x%08X, old_reg=0x%08X\n", 
+                    printf("[PRINTF_DEBUG_LOAD16_PC] PC=%08X, raw=0x%04X, dst=R%u, base_pc=%08X, aligned_base=%08X, disp=%u, addr=%08X, val=0x%04X, sign_ext=0x%08X, old_reg=0x%08X\n",
                            curr_pc, ins.raw, ins.dst.reg, base_pc, base, disp8, mem_addr, val, ctx->r[ins.dst.reg], old_reg);
-                    printf("[PRINTF_DEBUG_LOAD16_PC] Register state: R0-R7: %08X %08X %08X %08X %08X %08X %08X %08X\n", 
+                    printf("[PRINTF_DEBUG_LOAD16_PC] Register state: R0-R7: %08X %08X %08X %08X %08X %08X %08X %08X\n",
                            ctx->r[0], ctx->r[1], ctx->r[2], ctx->r[3], ctx->r[4], ctx->r[5], ctx->r[6], ctx->r[7]);
                     fflush(stdout);
-                    
-                    INFO_LOG(SH4, "LOAD16_PC: Loaded 0x%04X (sign-ext: 0x%08X) into R%u from addr 0x%08X (PC=%08X, disp=%d)", 
+
+                    INFO_LOG(SH4, "LOAD16_PC: Loaded 0x%04X (sign-ext: 0x%08X) into R%u from addr 0x%08X (PC=%08X, disp=%d)",
                              val, ctx->r[ins.dst.reg], ins.dst.reg, mem_addr, curr_pc, disp8);
                     break;
                 }
@@ -2481,14 +2498,23 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                      old_pr, ctx->pr, curr_pc, GetOpName(static_cast<size_t>(ins.op)));
         }
 
-        // --------- Idle filler detection ---------------------------------------
+        // --------- Idle filler detection
+        // ---------------------------------------
+        #if 0
         static int idle_run = 0;
         bool is_idle_op = (ins.op == Op::NOP || ins.op == Op::END);
         if (is_idle_op && !branch_pending && ctx->pr == old_pr)
         {
             ++idle_run;
-            if (idle_run > 8)
+            // Increase threshold from 8 to 32 to be more lenient with BIOS code
+            // Only log a warning at the original threshold of 8
+            if (idle_run == 8)
             {
+                WARN_LOG(SH4, "Warning: %d consecutive END/NOP from %08X - continuing execution", idle_run, curr_pc);
+            }
+            else if (idle_run > 64)
+            {
+                // Only throw exception after 64 consecutive NOPs/ENDs
                 ERROR_LOG(SH4, "*** Executed %d consecutive END/NOP from %08X – likely ran off real code", idle_run, curr_pc);
                 sh4::ir::DumpTrace();
                 throw SH4ThrownException(curr_pc, Sh4Ex_IllegalInstr);
@@ -2498,6 +2524,7 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
         {
             idle_run = 0;
         }
+        #endif
 
         // Advance PC by 2 for the next sequential instruction; this positions the
         // delay-slot instruction (if any) at pc+2. If a branch is pending, the
@@ -2553,7 +2580,7 @@ void Executor::ResetCachedBlocks()
     // Reset the last executed block pointer
     // This forces the interpreter to fetch a fresh block on next execution
     lastExecutedBlock = nullptr;
-    
+
     // Log the cache reset for debugging
     INFO_LOG(SH4, "Executor: Reset cached block pointers");
 }
