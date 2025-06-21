@@ -546,18 +546,8 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
-    // SUBX Rm, Rn (0x2nmE)
-    else if ((raw & 0xF00F) == 0x200E)
-    {
-        uint8_t n = (raw >> 8) & 0xF;
-        uint8_t m = (raw >> 4) & 0xF;
-        ins.op = Op::SUBX;
-        ins.dst.isImm = false; ins.dst.reg = n;
-        ins.src1.isImm = false; ins.src1.reg = m;
-        blk.pcNext = pc + 2;
-        return true;
-    }
-    // ADDC Rm, Rn (0x3nmE)
+
+    // ADDC Rm, Rn (0x3nmE) - Add with carry
     else if ((raw & 0xF00F) == 0x300E)
     {
         uint8_t n = (raw >> 8) & 0xF;
@@ -568,6 +558,7 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+
     // ADDV Rm, Rn (0x3nmF)
     else if ((raw & 0xF00F) == 0x300F)
     {
@@ -1369,6 +1360,17 @@ Block& Emitter::CreateNew(uint32_t pc) {
             decoded = true;
             blk.pcNext = pc + 2;
             INFO_LOG(SH4, "Emitter: Decoded MULS.W R%u,R%u (0x%04X) at PC=0x%08X",
+                     m, n, raw, pc);
+        }
+        // SUBX Rm,Rn 0x2nmE - Subtract with borrow
+        else if ((raw & 0xF00F) == 0x200E && !decoded) // Add !decoded to avoid conflict with MULU.W
+        {
+            ins.op = Op::SUBX;
+            ins.dst.isImm = false; ins.dst.reg = n; // use dst as Rn
+            ins.src1.isImm = false; ins.src1.reg = m; // src1 as Rm
+            decoded = true;
+            blk.pcNext = pc + 2;
+            INFO_LOG(SH4, "Emitter: Decoded SUBX R%u,R%u (0x%04X) at PC=0x%08X",
                      m, n, raw, pc);
         }
         // MAC.L @Rm+,@Rn+ - 32-bit multiply-accumulate with memory load and post-increment

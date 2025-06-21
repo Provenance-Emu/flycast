@@ -400,8 +400,12 @@ static void Exec_SUBX(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
     uint32_t rn = ctx->r[ins.dst.reg];
     uint32_t t = ctx->sr.T;
     
-    // Calculate result: Rn - Rm - T
-    uint32_t res = rn - rm - t;
+    // For SUBX, the correct calculation is:
+    // When T=1, we're computing Rn = Rn - Rm - 1 (subtract with borrow)
+    // When T=0, we're computing Rn = Rn - Rm (no borrow)
+    // According to SH4 manual, this is actually implemented as:
+    // Rn = Rn - (Rm + T)
+    uint32_t res = rn - (rm + t);
     ctx->r[ins.dst.reg] = res;
     
     // Set T=1 if borrow occurred
@@ -525,7 +529,8 @@ static void Exec_MULU_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t pc)
     // Perform unsigned 16-bit multiplication
     uint32_t res = (uint32_t)rn * (uint32_t)rm;
     
-    // Update MACL register
+    // Update MACL register directly with the result
+    // SH4 MULU.W stores the 32-bit result directly in MACL
     ctx->mac.l = res;
     
     INFO_LOG(SH4, "Exec_MULU_W: R%u=0x%04X, R%u=0x%04X, MAC.L=0x%08X at PC=0x%08X",
