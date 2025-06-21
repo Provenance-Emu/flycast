@@ -344,6 +344,161 @@ static void Exec_CLRT(const sh4::ir::Instr& /*ins*/, Sh4Context* ctx, uint32_t /
     ctx->sr.T = 0;
 }
 
+// ADDV Rm,Rn - Add with overflow detection
+// Rn = Rn + Rm, SR.T = 1 if signed overflow
+static void Exec_ADDV(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
+{
+    // Get register values
+    int32_t rm = static_cast<int32_t>(ctx->r[ins.src1.reg]);
+    int32_t rn = static_cast<int32_t>(ctx->r[ins.dst.reg]);
+    
+    // Calculate result
+    int32_t res = rn + rm;
+    ctx->r[ins.dst.reg] = static_cast<uint32_t>(res);
+    
+    // Set SR.T if signed overflow occurred
+    // Overflow happens when adding two positives gives negative or two negatives gives positive
+    ctx->sr.T = ((rm > 0 && rn > 0 && res < 0) || (rm < 0 && rn < 0 && res > 0)) ? 1 : 0;
+}
+
+// SUB Rm,Rn - Subtract
+// Rn = Rn - Rm
+static void Exec_SUB(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
+{
+    // Get register values
+    uint32_t rm = ctx->r[ins.src1.reg];
+    uint32_t rn = ctx->r[ins.dst.reg];
+    
+    // Calculate result
+    ctx->r[ins.dst.reg] = rn - rm;
+}
+
+// SUBC Rm,Rn - Subtract with Carry
+// Rn = Rn - Rm - T
+// SR.T = borrow
+static void Exec_SUBC(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
+{
+    uint32_t rm = ctx->r[ins.src1.reg];
+    uint32_t rn = ctx->r[ins.dst.reg];
+    uint32_t t = ctx->sr.T;
+    
+    // Calculate result: Rn - Rm - T
+    uint32_t res = rn - rm - t;
+    ctx->r[ins.dst.reg] = res;
+    
+    // Set T=1 if borrow occurred
+    // Borrow occurs when: (rn < rm) OR (rn == rm AND t == 1)
+    ctx->sr.T = (rn < rm || (rn == rm && t == 1)) ? 1 : 0;
+}
+
+// SUBX Rm,Rn - Subtract with borrow
+// Rn = Rn - Rm - T
+// SR.T = borrow
+static void Exec_SUBX(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
+{
+    uint32_t rm = ctx->r[ins.src1.reg];
+    uint32_t rn = ctx->r[ins.dst.reg];
+    uint32_t t = ctx->sr.T;
+    
+    // Calculate result: Rn - Rm - T
+    uint32_t res = rn - rm - t;
+    ctx->r[ins.dst.reg] = res;
+    
+    // Set T=1 if borrow occurred
+    // Borrow occurs when: (rn < rm) OR (rn == rm AND t == 1)
+    ctx->sr.T = (rn < rm || (rn == rm && t == 1)) ? 1 : 0;
+}
+
+// SUBV Rm,Rn - Subtract with overflow check
+// Rn = Rn - Rm
+// SR.T = 1 if signed overflow
+static void Exec_SUBV(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
+{
+    int32_t rm = (int32_t)ctx->r[ins.src1.reg];
+    int32_t rn = (int32_t)ctx->r[ins.dst.reg];
+    
+    // Calculate result: Rn - Rm
+    int32_t res = rn - rm;
+    ctx->r[ins.dst.reg] = (uint32_t)res;
+    
+    // Set T=1 if signed overflow occurred
+    // Overflow occurs when signs of operands are different and result sign differs from Rn
+    bool overflow = ((rn ^ rm) & (rn ^ res)) < 0;
+    ctx->sr.T = overflow ? 1 : 0;
+}
+
+// NEG Rm,Rn - Negate
+// Rn = 0 - Rm
+static void Exec_NEG(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
+{
+    uint32_t rm = ctx->r[ins.src1.reg];
+    
+    // Calculate result: 0 - Rm
+    uint32_t res = 0 - rm;
+    ctx->r[ins.dst.reg] = res;
+}
+
+// NEGC Rm,Rn - Negate with carry
+// Rn = 0 - Rm - T
+// SR.T = borrow
+static void Exec_NEGC(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
+{
+    uint32_t rm = ctx->r[ins.src1.reg];
+    uint32_t t = ctx->sr.T;
+    
+    // Calculate result: 0 - Rm - T
+    uint32_t res = 0 - rm - t;
+    ctx->r[ins.dst.reg] = res;
+    
+    // Set T=1 if borrow occurred
+    // Borrow occurs when: (0 < rm) OR (0 == rm AND t == 1)
+    ctx->sr.T = (0 < rm || (0 == rm && t == 1)) ? 1 : 0;
+}
+
+// EXTS.W Rm,Rn - Sign extend word
+// Rn = Sign_Extend(Rm[15:0])
+static void Exec_EXTS_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
+{
+    uint32_t rm = ctx->r[ins.src1.reg];
+    
+    // Sign extend the lower 16 bits
+    int32_t res = (int16_t)(rm & 0xFFFF);
+    ctx->r[ins.dst.reg] = (uint32_t)res;
+}
+
+// EXTU.W Rm,Rn - Zero extend word
+// Rn = Zero_Extend(Rm[15:0])
+static void Exec_EXTU_W(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
+{
+    uint32_t rm = ctx->r[ins.src1.reg];
+    
+    // Zero extend the lower 16 bits
+    uint32_t res = rm & 0xFFFF;
+    ctx->r[ins.dst.reg] = res;
+}
+
+// EXTS.B Rm,Rn - Sign extend byte
+// Rn = Sign_Extend(Rm[7:0])
+static void Exec_EXTS_B(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
+{
+    uint32_t rm = ctx->r[ins.src1.reg];
+    
+    // Sign extend the lower 8 bits
+    int32_t res = (int8_t)(rm & 0xFF);
+    ctx->r[ins.dst.reg] = (uint32_t)res;
+}
+
+// EXTU.B Rm,Rn - Zero extend byte
+// Rn = Zero_Extend(Rm[7:0])
+static void Exec_EXTU_B(const sh4::ir::Instr& ins, Sh4Context* ctx, uint32_t)
+{
+    uint32_t rm = ctx->r[ins.src1.reg];
+    
+    // Zero extend the lower 8 bits
+    uint32_t res = rm & 0xFF;
+    ctx->r[ins.dst.reg] = res;
+}
+
 static void Exec_SETT(const sh4::ir::Instr& /*ins*/, Sh4Context* ctx, uint32_t /*pc*/) {
     ctx->sr.T = 1;
 }
@@ -622,6 +777,17 @@ static void InitExecTable()
     g_exec_table[static_cast<int>(sh4::ir::Op::ADD_REG)]  = &Exec_ADD_REG;
     g_exec_table[static_cast<int>(sh4::ir::Op::ADD_IMM)]  = &Exec_ADD_IMM;
     g_exec_table[static_cast<int>(sh4::ir::Op::ADDC)]       = &Exec_ADDC;
+    g_exec_table[static_cast<int>(sh4::ir::Op::ADDV)]       = &Exec_ADDV;
+    g_exec_table[static_cast<int>(sh4::ir::Op::SUB)]        = &Exec_SUB;
+    g_exec_table[static_cast<int>(sh4::ir::Op::SUBC)]       = &Exec_SUBC;
+    g_exec_table[static_cast<int>(sh4::ir::Op::SUBV)]       = &Exec_SUBV;
+    g_exec_table[static_cast<int>(sh4::ir::Op::SUBX)]       = &Exec_SUBX;
+    g_exec_table[static_cast<int>(sh4::ir::Op::NEG)]        = &Exec_NEG;
+    g_exec_table[static_cast<int>(sh4::ir::Op::NEGC)]       = &Exec_NEGC;
+    g_exec_table[static_cast<int>(sh4::ir::Op::EXTS_W)]     = &Exec_EXTS_W;
+    g_exec_table[static_cast<int>(sh4::ir::Op::EXTU_W)]     = &Exec_EXTU_W;
+    g_exec_table[static_cast<int>(sh4::ir::Op::EXTS_B)]     = &Exec_EXTS_B;
+    g_exec_table[static_cast<int>(sh4::ir::Op::EXTU_B)]     = &Exec_EXTU_B;
     g_exec_table[static_cast<int>(sh4::ir::Op::CLRT)]       = &Exec_CLRT;
     g_exec_table[static_cast<int>(sh4::ir::Op::SETT)]       = &Exec_SETT;
     g_exec_table[static_cast<int>(sh4::ir::Op::CLRS)]       = &Exec_CLRS;

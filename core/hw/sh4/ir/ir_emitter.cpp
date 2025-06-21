@@ -579,6 +579,94 @@ static bool FastDecode(uint16_t raw, uint32_t pc, Instr &ins, Block &blk)
         blk.pcNext = pc + 2;
         return true;
     }
+    // SUBC Rm, Rn (0x3nmA)
+    else if ((raw & 0xF00F) == 0x300A)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::SUBC;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // SUBV Rm, Rn (0x3nmB)
+    else if ((raw & 0xF00F) == 0x300B)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::SUBV;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // NEG Rm, Rn (0x6nmB)
+    else if ((raw & 0xF00F) == 0x600B)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::NEG;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // NEGC Rm, Rn (0x6nmA)
+    else if ((raw & 0xF00F) == 0x600A)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::NEGC;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // EXTS.W Rm, Rn (0x6nmF)
+    else if ((raw & 0xF00F) == 0x600F)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::EXTS_W;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // EXTU.W Rm, Rn (0x6nmD)
+    else if ((raw & 0xF00F) == 0x600D)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::EXTU_W;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // EXTS.B Rm, Rn (0x6nmE)
+    else if ((raw & 0xF00F) == 0x600E)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::EXTS_B;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
+    // EXTU.B Rm, Rn (0x6nmC)
+    else if ((raw & 0xF00F) == 0x600C)
+    {
+        uint8_t n = (raw >> 8) & 0xF;
+        uint8_t m = (raw >> 4) & 0xF;
+        ins.op = Op::EXTU_B;
+        ins.dst.isImm = false; ins.dst.reg = n;
+        ins.src1.isImm = false; ins.src1.reg = m;
+        blk.pcNext = pc + 2;
+        return true;
+    }
     // SETS (0x0058)
     else if (raw == 0x0058)
     {
