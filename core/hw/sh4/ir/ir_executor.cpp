@@ -18,6 +18,51 @@ static inline float BitsToFloat(u32 bits)
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
+
+// 256-entry sine lookup table for FSCA instruction
+// Generated with: sin(2.0*M_PI*(float)i/256.0)
+namespace {
+    constexpr std::array<float, 257> kSinTable = {
+        0.0f, 0.0245f, 0.0491f, 0.0736f, 0.0980f, 0.1224f, 0.1467f, 0.1710f,
+        0.1951f, 0.2191f, 0.2430f, 0.2667f, 0.2903f, 0.3137f, 0.3369f, 0.3599f,
+        0.3827f, 0.4052f, 0.4276f, 0.4496f, 0.4714f, 0.4929f, 0.5141f, 0.5350f,
+        0.5556f, 0.5758f, 0.5957f, 0.6152f, 0.6344f, 0.6532f, 0.6716f, 0.6895f,
+        0.7071f, 0.7242f, 0.7410f, 0.7572f, 0.7730f, 0.7883f, 0.8032f, 0.8176f,
+        0.8315f, 0.8449f, 0.8577f, 0.8701f, 0.8819f, 0.8932f, 0.9040f, 0.9142f,
+        0.9239f, 0.9330f, 0.9415f, 0.9495f, 0.9569f, 0.9638f, 0.9700f, 0.9757f,
+        0.9808f, 0.9853f, 0.9892f, 0.9925f, 0.9952f, 0.9973f, 0.9988f, 0.9997f,
+        1.0000f, 0.9997f, 0.9988f, 0.9973f, 0.9952f, 0.9925f, 0.9892f, 0.9853f,
+        0.9808f, 0.9757f, 0.9700f, 0.9638f, 0.9569f, 0.9495f, 0.9415f, 0.9330f,
+        0.9239f, 0.9142f, 0.9040f, 0.8932f, 0.8819f, 0.8701f, 0.8577f, 0.8449f,
+        0.8315f, 0.8176f, 0.8032f, 0.7883f, 0.7730f, 0.7572f, 0.7410f, 0.7242f,
+        0.7071f, 0.6895f, 0.6716f, 0.6532f, 0.6344f, 0.6152f, 0.5957f, 0.5758f,
+        0.5556f, 0.5350f, 0.5141f, 0.4929f, 0.4714f, 0.4496f, 0.4276f, 0.4052f,
+        0.3827f, 0.3599f, 0.3369f, 0.3137f, 0.2903f, 0.2667f, 0.2430f, 0.2191f,
+        0.1951f, 0.1710f, 0.1467f, 0.1224f, 0.0980f, 0.0736f, 0.0491f, 0.0245f,
+        0.0000f, -0.0245f, -0.0491f, -0.0736f, -0.0980f, -0.1224f, -0.1467f, -0.1710f,
+        -0.1951f, -0.2191f, -0.2430f, -0.2667f, -0.2903f, -0.3137f, -0.3369f, -0.3599f,
+        -0.3827f, -0.4052f, -0.4276f, -0.4496f, -0.4714f, -0.4929f, -0.5141f, -0.5350f,
+        -0.5556f, -0.5758f, -0.5957f, -0.6152f, -0.6344f, -0.6532f, -0.6716f, -0.6895f,
+        -0.7071f, -0.7242f, -0.7410f, -0.7572f, -0.7730f, -0.7883f, -0.8032f, -0.8176f,
+        -0.8315f, -0.8449f, -0.8577f, -0.8701f, -0.8819f, -0.8932f, -0.9040f, -0.9142f,
+        -0.9239f, -0.9330f, -0.9415f, -0.9495f, -0.9569f, -0.9638f, -0.9700f, -0.9757f,
+        -0.9808f, -0.9853f, -0.9892f, -0.9925f, -0.9952f, -0.9973f, -0.9988f, -0.9997f,
+        -1.0000f, -0.9997f, -0.9988f, -0.9973f, -0.9952f, -0.9925f, -0.9892f, -0.9853f,
+        -0.9808f, -0.9757f, -0.9700f, -0.9638f, -0.9569f, -0.9495f, -0.9415f, -0.9330f,
+        -0.9239f, -0.9142f, -0.9040f, -0.8932f, -0.8819f, -0.8701f, -0.8577f, -0.8449f,
+        -0.8315f, -0.8176f, -0.8032f, -0.7883f, -0.7730f, -0.7572f, -0.7410f, -0.7242f,
+        -0.7071f, -0.6895f, -0.6716f, -0.6532f, -0.6344f, -0.6152f, -0.5957f, -0.5758f,
+        -0.5556f, -0.5350f, -0.5141f, -0.4929f, -0.4714f, -0.4496f, -0.4276f, -0.4052f,
+        -0.3827f, -0.3599f, -0.3369f, -0.3137f, -0.2903f, -0.2667f, -0.2430f, -0.2191f,
+        -0.1951f, -0.1710f, -0.1467f, -0.1224f, -0.0980f, -0.0736f, -0.0491f, -0.0245f,
+        0.0000f
+    };
+
+    // Cosine is just sine shifted by π/2 (64 entries)
+    constexpr float getCosValue(uint32_t index) {
+        return kSinTable[(index + 64) & 0xFF];
+    }
+}
 #include <utility>
 #include "hw/mem/addrspace.h"
 #include <cstring>
@@ -1873,66 +1918,51 @@ void Executor::ExecuteBlock(const Block* blk, Sh4Context* ctx)
                     // In our case, we know n=6 from the emitter (DR3 = FR6:FR7)
                     uint32_t fpul_value = ctx->fpul;
                     
-                    // SH4 hardware likely uses a lookup table for common angles
-                    // We'll implement a similar approach for exact values at key angles
+                    // Extract the table index and fractional part for interpolation
+                    // We use the high 8 bits as the index into our 256-entry table
+                    // and the low 24 bits for the fractional part (similar to the example code)
                     
-                    // Lookup table for common angles (quarter-wave symmetry points)
-                    // Format: {angle_value, sin_result, cos_result}
-                    static const struct {
-                        uint32_t angle;
-                        float sin_val;
-                        float cos_val;
-                    } angle_table[] = {
-                        {0x0000, 0.0f, 1.0f},       // 0 radians (0°)
-                        {0x4000, 1.0f, 0.0f},       // π/2 radians (90°)
-                        {0x8000, 0.0f, -1.0f},      // π radians (180°)
-                        {0xC000, -1.0f, 0.0f},      // 3π/2 radians (270°)
-                        {0x10000, 0.0f, 1.0f}       // 2π radians (360°/0°)
-                    };
+                    // Get the integer index (0-255)
+                    uint32_t index = (fpul_value >> 8) & 0xFF;
                     
-                    // Check for exact matches in the lookup table
-                    bool found = false;
-                    for (const auto& entry : angle_table) {
-                        if (fpul_value == entry.angle) {
-                            ctx->fr[6] = entry.sin_val;  // FR6 = sin
-                            ctx->fr[7] = entry.cos_val;  // FR7 = cos
-                            INFO_LOG(SH4, "FSCA FPUL(0x%X),DR3 - lookup table: sin=%.1f, cos=%.1f",
-                                    fpul_value, entry.sin_val, entry.cos_val);
-                            found = true;
-                            break;
-                        }
-                    }
+                    // Get the fractional part for interpolation (0-255)
+                    float frac = (fpul_value & 0xFF) / 256.0f;
                     
-                    // For angles not in the lookup table, calculate using standard math functions
-                    if (!found) {
-                        // Convert FPUL to radians
-                        // 0x10000 (65536) represents 2π radians
-                        const double scale = (2.0 * M_PI) / 65536.0;
-                        double angle = fpul_value * scale;
-                        
-                        INFO_LOG(SH4, "FSCA FPUL(0x%X),DR3 - angle=%.4f rad", fpul_value, angle);
-                        
-                        // Calculate sin and cos
-                        float sin_result = std::sin(angle);
-                        float cos_result = std::cos(angle);
-                        
-                        // Handle near-zero values for better precision
-                        // SH4 hardware likely has exact results for these common values
-                        if (std::abs(sin_result) < 1e-10) {
-                            sin_result = 0.0f;
-                        }
-                        if (std::abs(cos_result + 1.0f) < 1e-10) {
-                            cos_result = -1.0f;
-                        } else if (std::abs(cos_result - 1.0f) < 1e-10) {
-                            cos_result = 1.0f;
-                        }
-                        
-                        // Store results
-                        ctx->fr[6] = sin_result;  // FR6 = sin
-                        ctx->fr[7] = cos_result;  // FR7 = cos
-                        
-                        INFO_LOG(SH4, "FSCA FPUL(0x%X),DR3 -> sin=%.4f, cos=%.4f", 
-                                fpul_value, sin_result, cos_result);
+                    // Perform linear interpolation for sine
+                    float sin_v1 = kSinTable[index];
+                    float sin_v2 = kSinTable[index + 1]; // Safe because table has 257 entries
+                    float sin_result = sin_v1 + (sin_v2 - sin_v1) * frac;
+                    
+                    // Perform linear interpolation for cosine (shifted by 64 entries = π/2)
+                    float cos_v1 = getCosValue(index);
+                    float cos_v2 = getCosValue(index + 1);
+                    float cos_result = cos_v1 + (cos_v2 - cos_v1) * frac;
+                    
+                    // Store results
+                    ctx->fr[6] = sin_result;  // FR6 = sin
+                    ctx->fr[7] = cos_result;  // FR7 = cos
+                    
+                    // Log at debug level to avoid excessive output
+                    DEBUG_LOG(SH4, "FSCA FPUL(0x%X),DR3 -> sin=%.4f, cos=%.4f (index=%u, frac=%.4f)", 
+                             fpul_value, sin_result, cos_result, index, frac);
+                    
+                    // For exact key angles, ensure precise results (matching hardware behavior)
+                    if (fpul_value == 0x0000 || fpul_value == 0x10000) {
+                        // 0 or 2π radians (0° or 360°)
+                        ctx->fr[6] = 0.0f;  // sin(0) = 0
+                        ctx->fr[7] = 1.0f;  // cos(0) = 1
+                    } else if (fpul_value == 0x4000) {
+                        // π/2 radians (90°)
+                        ctx->fr[6] = 1.0f;   // sin(π/2) = 1
+                        ctx->fr[7] = 0.0f;   // cos(π/2) = 0
+                    } else if (fpul_value == 0x8000) {
+                        // π radians (180°)
+                        ctx->fr[6] = 0.0f;   // sin(π) = 0
+                        ctx->fr[7] = -1.0f;  // cos(π) = -1
+                    } else if (fpul_value == 0xC000) {
+                        // 3π/2 radians (270°)
+                        ctx->fr[6] = -1.0f;  // sin(3π/2) = -1
+                        ctx->fr[7] = 0.0f;   // cos(3π/2) = 0
                     }
                     break;
                 }
