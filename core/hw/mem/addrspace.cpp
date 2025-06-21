@@ -110,20 +110,20 @@ T DYNACALL readt(u32 addr)
 {
     if (sizeof(T) == 4) {
         if (addr == 0x8C001000) {
-             printf("[PRINTF_DEBUG_CPP_READT_U32_TARGET] readt<u32> for 0x%08X\n", addr);
+					DEBUG_LOG(MEMORY, "[PRINTF_DEBUG_CPP_READT_U32_TARGET] readt<u32> for 0x%08X", addr);
         } else {
-             printf("[PRINTF_DEBUG_CPP_READT_U32_GENERIC] readt<u32> for 0x%08X\n", addr);
+					DEBUG_LOG(MEMORY, "[PRINTF_DEBUG_CPP_READT_U32_GENERIC] readt<u32> for 0x%08X", addr);
         }
         fflush(stdout);
     } else if (sizeof(T) == 2) {
-        printf("[PRINTF_DEBUG_CPP_READT_U16_GENERIC] readt<u16> for 0x%08X\n", addr);
+        DEBUG_LOG(MEMORY, "[PRINTF_DEBUG_CPP_READT_U16_GENERIC] readt<u16> for 0x%08X", addr);
         fflush(stdout);
     } else if (sizeof(T) == 1) {
-        printf("[PRINTF_DEBUG_CPP_READT_U8_GENERIC] readt<u8> for 0x%08X\n", addr);
+			DEBUG_LOG(MEMORY, "[PRINTF_DEBUG_CPP_READT_U8_GENERIC] readt<u8> for 0x%08X", addr);
         fflush(stdout);
     }
 		else {
-			printf("[PRINTF_DEBUG_CPP_READT_GENERIC] readt for 0x%08X with size %zu	\n", addr, sizeof(T));
+			DEBUG_LOG(MEMORY, "[PRINTF_DEBUG_CPP_READT_GENERIC] readt for 0x%08X with size %zu", addr, sizeof(T));
 			fflush(stdout);
 		}
 	constexpr u32 sz = sizeof(T);
@@ -243,7 +243,7 @@ void DYNACALL writet(u32 addr, T data)
             // If unaligned u64 needs special handling (e.g., writemem_emu_ptr), this would need adjustment.
             *(u64*)effective_host_addr = (u64)data;
         }
-        
+
         // Invalidate block cache if writing to code memory regions
         // This handles self-modifying code scenarios like in LoadTest2
         if ((addr >= 0x8C000000 && addr <= 0x8CFFFFFF) || // P1 area (cached)
