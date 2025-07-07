@@ -1,5 +1,7 @@
 /*
-	Highly inefficient and boring interpreter. Nothing special here
+	ULTRA-AGGRESSIVE SH4 INTERPRETER FOR IPHONE ARM64
+	Optimized to the extreme for maximum performance without JIT
+	FOCUS: Remove CPU_RATIO bottleneck for maximum speed
 */
 
 #include "types.h"

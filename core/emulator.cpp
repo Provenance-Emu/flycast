@@ -1140,8 +1140,9 @@ bool Emulator::render()
 void Emulator::vblank()
 {
 	EventManager::event(Event::VBlank);
-	// Time out if a frame hasn't been rendered for 50 ms
-	if (sh4_sched_now64() - startTime <= 10000000)
+	// 🚀 OPTIMIZED TIMEOUT: Increased from 50ms to 200ms for better interpreter performance
+	// Time out if a frame hasn't been rendered for 200 ms (was 50ms = 10000000 cycles)
+	if (sh4_sched_now64() - startTime <= 40000000)  // 200ms = 40M cycles at 200MHz
 		return;
 	renderTimeout = true;
 	if (ggpo::active())
