@@ -59,7 +59,8 @@ C_FLAGS="-arch ${ARCH} \
 -DARM_NEON \
 -DHAVE_NEON \
 -DENABLE_NEON_OPT \
--DFMV_OPTIMIZED"
+-DFMV_OPTIMIZED
+-DTARGET_IPHONE"
 
 CXX_FLAGS="-arch ${ARCH} \
 -DIOS \
@@ -94,7 +95,9 @@ CXX_FLAGS="-arch ${ARCH} \
 -DARM_NEON \
 -DHAVE_NEON \
 -DENABLE_NEON_OPT \
--DFMV_OPTIMIZED"
+-DFMV_OPTIMIZED \
+-DTARGET_IPHONE"
+
 
 # Add a function to display usage information
 print_usage() {
