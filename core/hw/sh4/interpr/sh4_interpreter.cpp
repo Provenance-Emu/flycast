@@ -105,12 +105,135 @@ static inline void FlushCycleDebt() {
 static inline bool ExecuteFastPath(u16 op) {
     // Fast path for most common opcodes during FMV playback
     switch (op & 0xF000) {
-        case 0x6000: // mov family - very common
-            if ((op & 0x000F) == 0x0003) { // mov Rm,Rn
-                u32 m = (op >> 4) & 0xF;
-                u32 n = (op >> 8) & 0xF;
-                r[n] = r[m];
-                return true;
+        case 0x6000: // mov family - very common memory loads
+            switch (op & 0x000F) {
+                case 0x0003: // mov Rm,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        r[n] = r[m];
+                        return true;
+                    }
+                case 0x0002: // mov.l @Rm,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        r[n] = ReadMem32(r[m]);
+                        return true;
+                    }
+                case 0x0001: // mov.w @Rm,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        r[n] = (u32)(s32)(s16)ReadMem16(r[m]);
+                        return true;
+                    }
+                case 0x0000: // mov.b @Rm,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        r[n] = (u32)(s32)(s8)ReadMem8(r[m]);
+                        return true;
+                    }
+                case 0x0006: // mov.l @Rm+,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        r[n] = ReadMem32(r[m]);
+                        if (n != m) r[m] += 4;
+                        return true;
+                    }
+                case 0x0005: // mov.w @Rm+,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        r[n] = (u32)(s32)(s16)ReadMem16(r[m]);
+                        if (n != m) r[m] += 2;
+                        return true;
+                    }
+                case 0x0004: // mov.b @Rm+,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        r[n] = (u32)(s32)(s8)ReadMem8(r[m]);
+                        if (n != m) r[m] += 1;
+                        return true;
+                    }
+            }
+            break;
+            
+        case 0x2000: // mov family - memory stores
+            switch (op & 0x000F) {
+                case 0x0002: // mov.l Rm,@Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        WriteMem32(r[n], r[m]);
+                        return true;
+                    }
+                case 0x0001: // mov.w Rm,@Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        WriteMem16(r[n], r[m]);
+                        return true;
+                    }
+                case 0x0000: // mov.b Rm,@Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        WriteMem8(r[n], r[m]);
+                        return true;
+                    }
+                case 0x0006: // mov.l Rm,@-Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        u32 addr = r[n] - 4;
+                        WriteMem32(addr, r[m]);
+                        r[n] = addr;
+                        return true;
+                    }
+            }
+            break;
+            
+        case 0x3000: // arithmetic operations
+            switch (op & 0x000F) {
+                case 0x000C: // add Rm,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        r[n] += r[m];
+                        return true;
+                    }
+                case 0x0008: // sub Rm,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        r[n] -= r[m];
+                        return true;
+                    }
+                case 0x0000: // cmp/eq Rm,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        sr.T = (r[n] == r[m]) ? 1 : 0;
+                        return true;
+                    }
+                case 0x0002: // cmp/hs Rm,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        sr.T = (r[n] >= r[m]) ? 1 : 0;
+                        return true;
+                    }
+                case 0x0006: // cmp/hi Rm,Rn
+                    {
+                        u32 m = (op >> 4) & 0xF;
+                        u32 n = (op >> 8) & 0xF;
+                        sr.T = (r[n] > r[m]) ? 1 : 0;
+                        return true;
+                    }
             }
             break;
             
@@ -129,7 +252,7 @@ static inline bool ExecuteFastPath(u16 op) {
                 return true;
             }
             
-        case 0x0000: // Simple operations
+        case 0x0000: // Simple operations and nop
             if ((op & 0x00FF) == 0x0009) { // nop
                 return true;
             }
