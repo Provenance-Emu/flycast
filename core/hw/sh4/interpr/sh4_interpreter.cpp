@@ -28,7 +28,7 @@ Sh4ICache icache;
 Sh4OCache ocache;
 
 // === SIMPLE INSTRUCTION CACHE FOR BETTER PERFORMANCE ===
-#define SIMPLE_ICACHE_SIZE 1024
+#define SIMPLE_ICACHE_SIZE 2048 // This is the best balance for FMVs (2048), less is too slow, more is too much memory
 #define SIMPLE_ICACHE_MASK (SIMPLE_ICACHE_SIZE - 1)
 
 struct SimpleInstructionCache {
