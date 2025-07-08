@@ -27,90 +27,24 @@ extern int getDynamicCpuRatio();
 Sh4ICache icache;
 Sh4OCache ocache;
 
-// === SAFE ADVANCED INSTRUCTION CACHE ===
-// This is the key to FMV speed - larger cache with prediction but NO timing disruption
-// Expand cache to keep more prefetched instructions for FMV heavy sequences
-#define ADVANCED_ICACHE_SIZE 2048 // 2048 seems like the sweet spot.
-#define ADVANCED_ICACHE_MASK (ADVANCED_ICACHE_SIZE - 1)
+// === SIMPLE INSTRUCTION CACHE FOR BETTER PERFORMANCE ===
+#define SIMPLE_ICACHE_SIZE 2048 // This is the best balance for FMVs (2048), less is too slow, more is too much memory
+#define SIMPLE_ICACHE_MASK (SIMPLE_ICACHE_SIZE - 1)
 
-struct SafeAdvancedInstructionCache {
-    u32 pc[ADVANCED_ICACHE_SIZE];
-    u16 opcode[ADVANCED_ICACHE_SIZE];
-    u8 predicted_next[ADVANCED_ICACHE_SIZE];  // Safe instruction type prediction  
-    u32 access_count[ADVANCED_ICACHE_SIZE];   // Access frequency (but NO hot path execution)
+struct SimpleInstructionCache {
+    u32 pc[SIMPLE_ICACHE_SIZE];
+    u16 opcode[SIMPLE_ICACHE_SIZE];
     
     void reset() {
-        // Ultra-fast reset using memset - preserves audio timing
-        memset(pc, 0xFF, sizeof(pc));
-        memset(predicted_next, 0, sizeof(predicted_next));
-        memset(access_count, 0, sizeof(access_count));
-    }
-    
-    // Simple instruction type prediction for better branch prediction (from original AdvancedInstructionCache)
-    u8 predictNextInstructionType(u16 op) {
-        // Basic categorization for better CPU branch prediction
-        if ((op & 0xF000) == 0x6000) return 1; // mov instructions
-        if ((op & 0xF000) == 0x3000) return 2; // arithmetic
-        if ((op & 0xF000) == 0x8000) return 3; // conditional branches  
-        if ((op & 0xF000) == 0xA000) return 4; // unconditional branches
-        return 0; // other
-    }
-    
-    // Check if an opcode is safe to predict (no branches, exceptions, system calls)
-    inline bool is_safe_for_prediction(u16 op) {
-        // Incrementally expand safe opcodes for better FMV performance
-        u16 opcode_family = op & 0xF000;
-        
-        switch (opcode_family) {
-            case 0x6000: // mov.l @Rm,Rn / mov.w @Rm,Rn / mov.b @Rm,Rn and variants
-            case 0x2000: // mov.l Rm,@Rn / mov.w Rm,@Rn / mov.b Rm,@Rn and variants  
-            case 0x1000: // mov.l Rm,@(disp,Rn) / mov.w Rm,@(disp,Rn) / mov.b Rm,@(disp,Rn)
-            case 0x5000: // mov.l @(disp,Rm),Rn / mov.w @(disp,Rm),Rn / mov.b @(disp,Rm),Rn
-                return true;
-            case 0x3000: // cmp/eq, cmp/hs, cmp/ge, cmp/hi, cmp/gt, add, sub, etc.
-                return true;
-            case 0xE000: // mov #imm,Rn - very safe immediate moves
-                return true;
-            case 0x7000: // add #imm,Rn - safe immediate arithmetic
-                return true;
-            case 0x4000: // Safe 4xxx opcodes commonly used in FMV loops
-                {
-                    u16 sub_op = op & 0x00FF;
-                    switch (sub_op) {
-                        case 0x0015: // cmp/pl Rn - test if positive
-                        case 0x0011: // cmp/pz Rn - test if positive or zero  
-                        case 0x0008: // shll2 Rn - shift left logical 2
-                        case 0x0009: // shlr2 Rn - shift right logical 2
-                        case 0x0018: // shll8 Rn - shift left logical 8
-                        case 0x0019: // shlr8 Rn - shift right logical 8
-                        case 0x0028: // shll16 Rn - shift left logical 16
-                        case 0x0029: // shlr16 Rn - shift right logical 16
-                        case 0x0020: // shal Rn - shift arithmetic left
-                        case 0x0021: // shar Rn - shift arithmetic right
-                        case 0x0000: // shll Rn - shift left logical 1
-                        case 0x0001: // shlr Rn - shift right logical 1
-                            return true;
-                        default:
-                            return false;
-                    }
-                }
-            case 0x9000: // mov.w @(disp,PC),Rn - PC-relative loads (common in FMVs)
-            case 0xD000: // mov.l @(disp,PC),Rn - PC-relative loads (common in FMVs)
-            case 0xC000: // pref / fmov (FMV decode uses pref)
-            case 0xF000: // mac.w / fmac – inner loops in mpegsofdec
-            case 0xB000: // bt/s bf/s forward branches – safe for look-ahead
-                return true;
-            default:
-                return false;
+        for (int i = 0; i < SIMPLE_ICACHE_SIZE; i++) {
+            pc[i] = 0xFFFFFFFF;
         }
     }
     
     u16 fetch(u32 addr) {
-        u32 index = (addr >> 1) & ADVANCED_ICACHE_MASK;
+        u32 index = (addr >> 1) & SIMPLE_ICACHE_MASK;
         
         if (__builtin_expect(pc[index] == addr, 1)) {
-            // Cache hit - track access frequency for FMV detection
-            access_count[index]++;
             return opcode[index];
         }
         
@@ -118,81 +52,18 @@ struct SafeAdvancedInstructionCache {
         u16 op = IReadMem16(addr);
         pc[index] = addr;
         opcode[index] = op;
-        access_count[index] = 1;
-        predicted_next[index] = predictNextInstructionType(op);
-        
-        // 🚀 AGGRESSIVE SEQUENTIAL PREFETCH for FMV performance
-        // This is the key optimization that made the original AdvancedInstructionCache fast!
-        // Prefetch the next 2-4 sequential instructions during cache misses
-        // This dramatically improves FMV decode performance
-        
-        // Only prefetch if this looks like sequential code (not a branch target)
-        if (is_safe_for_prediction(op)) {
-            // Adaptive sequential prefetch: 4 → 8 → 16 as the loop stays hot
-            int max_ahead = 4;
-            if (access_count[index] > 5)
-                max_ahead = 16;
-            else if (access_count[index] > 1)
-                max_ahead = 8;
-
-            for (int lookahead = 1; lookahead <= max_ahead; lookahead++) {
-                u32 prefetch_addr = addr + (lookahead * 2);
-                u32 prefetch_index = (prefetch_addr >> 1) & ADVANCED_ICACHE_MASK;
-                
-                // Only prefetch if the cache slot is empty
-                if (pc[prefetch_index] != prefetch_addr) {
-                    try {
-                        u16 prefetch_op = IReadMem16(prefetch_addr);
-                        pc[prefetch_index] = prefetch_addr;
-                        opcode[prefetch_index] = prefetch_op;
-                        access_count[prefetch_index] = 0; // Mark as prefetched
-                        predicted_next[prefetch_index] = predictNextInstructionType(prefetch_op);
-                        
-                        // Stop prefetching if we hit a branch or jump instruction
-                        u16 op_family = prefetch_op & 0xF000;
-                        if (op_family == 0x8000 || op_family == 0xA000 || 
-                            op_family == 0xB000 || op_family == 0xC000) {
-                            break; // Stop on branches/jumps
-                        }
-                    } catch (...) {
-                        // Stop prefetching on memory access error
-                        break;
-                    }
-                }
-            }
-        }
-        
         return op;
     }
 };
 
-static SafeAdvancedInstructionCache g_advanced_icache;
-
-// === MICRO CYCLE-BATCHING ===
-static int g_cycle_debt = 0;
-static constexpr int CYCLE_BATCH_SIZE = 32; // small enough not to disturb audio timing
-
-inline void DebtAddCycles(int c) {
-    g_cycle_debt += c;
-    if (__builtin_expect(g_cycle_debt >= CYCLE_BATCH_SIZE, 0)) {
-        sh4cycles.addCycles(g_cycle_debt);
-        g_cycle_debt = 0;
-    }
-}
-
-inline void FlushCycleDebt() {
-    if (g_cycle_debt) {
-        sh4cycles.addCycles(g_cycle_debt);
-        g_cycle_debt = 0;
-    }
-}
+static SimpleInstructionCache g_simple_icache;
 
 static inline void ExecuteOpcode(u16 op)
 {
 	if (__builtin_expect(sr.FD == 1 && OpDesc[op]->IsFloatingPoint(), 0))
 		RaiseFPUDisableException();
 	OpPtr[op](op);
-	DebtAddCycles(sh4cycles.countCycles(op));
+	sh4cycles.executeCycles(op);
 }
 
 static inline u16 ReadNexOp()
@@ -204,8 +75,8 @@ static inline u16 ReadNexOp()
 	u32 addr = next_pc;
 	next_pc += 2;
 
-	// Use advanced instruction cache for better performance
-	return g_advanced_icache.fetch(addr);
+	// Use simple instruction cache for better performance
+	return g_simple_icache.fetch(addr);
 }
 
 static void Sh4_int_Run()
@@ -213,7 +84,7 @@ static void Sh4_int_Run()
 	RestoreHostRoundingMode();
 
 	// Reset instruction cache at start
-	g_advanced_icache.reset();
+	g_simple_icache.reset();
 
 	try {
 		do
@@ -224,16 +95,11 @@ static void Sh4_int_Run()
 				{
 					u32 op = ReadNexOp();
 					ExecuteOpcode(op);
-					// flush batch each inner loop to avoid debt runaway on long loops
-					if (unlikely(g_cycle_debt >= CYCLE_BATCH_SIZE))
-						FlushCycleDebt();
 				} while (__builtin_expect(p_sh4rcb->cntx.cycle_counter > 0, 1));
 				
-				FlushCycleDebt();
 				p_sh4rcb->cntx.cycle_counter += SH4_TIMESLICE;
 				UpdateSystem_INTC();
 			} catch (const SH4ThrownException& ex) {
-				FlushCycleDebt();
 				Do_Exception(ex.epc, ex.expEvn);
 				// an exception requires the instruction pipeline to drain, so approx 5 cycles
 				sh4cycles.addCycles(5 * getDynamicCpuRatio());
@@ -242,7 +108,6 @@ static void Sh4_int_Run()
 	} catch (const debugger::Stop&) {
 	}
 
-	FlushCycleDebt();
 	sh4_int_bCpuRun = false;
 }
 
@@ -254,7 +119,6 @@ static void Sh4_int_Start()
 static void Sh4_int_Stop()
 {
 	sh4_int_bCpuRun = false;
-	FlushCycleDebt();
 }
 
 void Sh4_int_Step()
@@ -304,10 +168,9 @@ static void Sh4_int_Reset(bool hard)
 	p_sh4rcb->cntx.cycle_counter = SH4_TIMESLICE;
 	
 	// Reset simple instruction cache
-	g_advanced_icache.reset();
-	g_cycle_debt = 0;
+	g_simple_icache.reset();
 
-	INFO_LOG(INTERPRETER, "🚀 SAFE ADVANCED INTERPRETER Reset - FMV-optimized cache without timing issues!");
+	INFO_LOG(INTERPRETER, "🚀 ENHANCED DYNAMIC CPU_RATIO ARM64 Interpreter Reset - Dynamic CPU_RATIO active!");
 }
 
 static bool Sh4_int_IsCpuRunning()
@@ -371,8 +234,7 @@ int UpdateSystem_INTC()
 }
 
 static void sh4_int_resetcache() {
-	g_advanced_icache.reset();
-	g_cycle_debt = 0;
+	g_simple_icache.reset();
 }
 
 static void Sh4_int_Init()
@@ -380,8 +242,7 @@ static void Sh4_int_Init()
 	static_assert(sizeof(Sh4cntx) == 448, "Invalid Sh4Cntx size");
 
 	memset(&p_sh4rcb->cntx, 0, sizeof(p_sh4rcb->cntx));
-	g_advanced_icache.reset();
-	g_cycle_debt = 0;
+	g_simple_icache.reset();
 }
 
 static void Sh4_int_Term()
