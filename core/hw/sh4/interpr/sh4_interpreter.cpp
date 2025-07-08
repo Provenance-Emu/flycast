@@ -14,11 +14,14 @@
 #include "debug/gdb_server.h"
 #include "../sh4_cycles.h"
 
-// SH4 underclock factor when using the interpreter so that it's somewhat usable
+// === ENHANCED DYNAMIC CPU_RATIO SYSTEM ===
+// Forward declaration from sh4_cycles.cpp
+extern int getDynamicCpuRatio();
+
 #ifdef STRICT_MODE
-constexpr int CPU_RATIO = 1;
+// Use dynamic ratio instead of static
 #else
-constexpr int CPU_RATIO = 1;  // REMOVED BOTTLENECK: Set to 1 for maximum speed!
+// Use dynamic ratio instead of static  
 #endif
 
 Sh4ICache icache;
@@ -99,7 +102,7 @@ static void Sh4_int_Run()
 			} catch (const SH4ThrownException& ex) {
 				Do_Exception(ex.epc, ex.expEvn);
 				// an exception requires the instruction pipeline to drain, so approx 5 cycles
-				sh4cycles.addCycles(5 * CPU_RATIO);
+				sh4cycles.addCycles(5 * getDynamicCpuRatio());
 			}
 		} while (__builtin_expect(sh4_int_bCpuRun, 1));
 	} catch (const debugger::Stop&) {
@@ -129,7 +132,7 @@ void Sh4_int_Step()
 	} catch (const SH4ThrownException& ex) {
 		Do_Exception(ex.epc, ex.expEvn);
 		// an exception requires the instruction pipeline to drain, so approx 5 cycles
-		sh4cycles.addCycles(5 * CPU_RATIO);
+		sh4cycles.addCycles(5 * getDynamicCpuRatio());
 	} catch (const debugger::Stop&) {
 	}
 }
@@ -167,7 +170,7 @@ static void Sh4_int_Reset(bool hard)
 	// Reset simple instruction cache
 	g_simple_icache.reset();
 
-	INFO_LOG(INTERPRETER, "Sh4 Reset");
+	INFO_LOG(INTERPRETER, "🚀 ENHANCED DYNAMIC CPU_RATIO ARM64 Interpreter Reset - Dynamic CPU_RATIO active!");
 }
 
 static bool Sh4_int_IsCpuRunning()

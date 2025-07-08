@@ -145,3 +145,6 @@ private:
 };
 
 extern Sh4Cycles sh4cycles;
+
+// Enhanced Dynamic CPU_RATIO system
+int getDynamicCpuRatio();
