@@ -21,7 +21,6 @@ if(APPLE)
 		set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS deployment version")
 		set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "")
 	endif()
-	set(ZLIB_LIBRARY "-lz" CACHE STRING "Use generic linker flag for Xcode to support multiple SDKs")
 endif()
 
 if(LIBRETRO)
@@ -523,10 +522,7 @@ if(NOT WITH_SYSTEM_ZLIB)
 	# help libzip find the package
 	set(ZLIB_FOUND TRUE)
 	set(ZLIB_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${ZLIB_RELATIVE_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/${ZLIB_RELATIVE_PATH}")
-	
-	cmake_policy(SET CMP0026 OLD)
-	get_target_property(ZLIB_LIBRARY_RELEASE zlibstatic LOCATION)
-	get_target_property(ZLIB_LIBRARY_DEBUG zlibstatic LOCATION_Debug)
+	target_link_libraries(${PROJECT_NAME} PRIVATE zlibstatic)
 endif()
 
 if(PKG_CONFIG_FOUND AND NOT ANDROID AND NOT APPLE AND NOT LIBRETRO)
@@ -672,9 +668,7 @@ if(NOT MINIUPNP_FOUND)
 endif()
 
 if(NOT LIBZIP_FOUND OR NINTENDO_SWITCH)
-	cmake_policy(SET CMP0026 OLD)
 	set(zstd_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/core/deps/libchdr/deps/zstd-1.5.6/lib")
-	get_target_property(zstd_STATIC_LIBRARY libzstd_static LOCATION)
 
 	option(ENABLE_COMMONCRYPTO "Enable use of CommonCrypto" OFF)
 	option(ENABLE_GNUTLS "Enable use of GnuTLS" OFF)
