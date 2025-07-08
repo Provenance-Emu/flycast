@@ -39,64 +39,23 @@ struct AdvancedInstructionCache {
     u8 predicted_next[ADVANCED_ICACHE_SIZE];  // Predicted next instruction type
     u32 access_count[ADVANCED_ICACHE_SIZE];   // Access frequency for hot path detection
     
-    /// Smart cache management to prevent stutters
-    u32 entries_used = 0;
-    bool needs_partial_cleanup = false;
-    
-    /// Smart cache management to prevent stutters
-    u32 cleanup_counter = 0;
-    static constexpr u32 CLEANUP_INTERVAL = 2000;  // Clean every 2000 fetches (less frequent)
-    static constexpr u32 MAX_ACCESS_COUNT = 10000; // Prevent overflow
-    static constexpr u32 MICRO_CLEANUP_SIZE = 32;  // Only clean 32 entries at a time
-    
     inline void reset() {
         /// ULTRA-FAST RESET: Use memset instead of loop to eliminate stalls
         /// This is 10-100x faster than the original loop and prevents scene change stalls
         memset(pc, 0xFF, sizeof(pc));
         memset(predicted_next, 0, sizeof(predicted_next));
         memset(access_count, 0, sizeof(access_count));
-        cleanup_counter = 0;
-    }
-    
-    /// Ultra-light incremental cache cleanup to prevent stutters
-    inline void incrementalCleanup() {
-        cleanup_counter++;
-        if (__builtin_expect(cleanup_counter >= CLEANUP_INTERVAL, 0)) {
-            /// MICRO-CLEANUP: Only clean a tiny portion (32 entries) to prevent stutters
-            /// This is the key to eliminating end-of-FMV stutters
-            static u32 cleanup_position = 0;
-            u32 end_pos = cleanup_position + MICRO_CLEANUP_SIZE;
-            
-            for (u32 i = cleanup_position; i < end_pos && i < ADVANCED_ICACHE_SIZE; i++) {
-                /// Only invalidate very cold entries (access_count <= 1)
-                if (access_count[i] <= 1) {
-                    pc[i] = 0xFFFFFFFF;  // Invalidate cold entry
-                    access_count[i] = 0;
-                } else if (access_count[i] > 1) {
-                    access_count[i]--;  // Gentle aging instead of dividing
-                }
-            }
-            
-            /// Move cleanup position for next time (circular)
-            cleanup_position = (cleanup_position + MICRO_CLEANUP_SIZE) % ADVANCED_ICACHE_SIZE;
-            cleanup_counter = 0;
-        }
     }
     
     inline u16 fetch(u32 addr) {
         u32 index = (addr >> 1) & ADVANCED_ICACHE_MASK;
         
         if (__builtin_expect(pc[index] == addr, 1)) {
-            /// Prevent access count overflow that could cause performance issues
-            if (__builtin_expect(access_count[index] < MAX_ACCESS_COUNT, 1)) {
-                access_count[index]++;
-            }
+            access_count[index]++;
             return opcode[index];
         }
         
-        /// Cache miss - fetch from memory and do incremental cleanup
-        incrementalCleanup();
-        
+        // Cache miss - fetch from memory
         u16 op = IReadMem16(addr);
         pc[index] = addr;
         opcode[index] = op;
