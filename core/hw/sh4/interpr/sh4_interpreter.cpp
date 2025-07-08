@@ -83,9 +83,19 @@ static AdvancedInstructionCache g_advanced_icache;
 // === OPTIMIZED CYCLE COUNTING ===
 // Batch cycle counting to reduce overhead
 static int g_cycle_debt = 0;
-static constexpr int CYCLE_BATCH_SIZE = 8;
+static constexpr int CYCLE_BATCH_SIZE = 16;  // Increased from 8 to 16 for better batching
 
 static inline void BatchedExecuteCycles(u16 op) {
+    // For fast path operations, use simplified cycle counting
+    g_cycle_debt += 1;  // Most fast path ops are 1 cycle
+    if (__builtin_expect(g_cycle_debt >= CYCLE_BATCH_SIZE, 0)) {
+        sh4cycles.addCycles(g_cycle_debt);
+        g_cycle_debt = 0;
+    }
+}
+
+static inline void BatchedExecuteCyclesStandard(u16 op) {
+    // For standard path operations, use full cycle counting
     g_cycle_debt += sh4cycles.countCycles(op);
     if (__builtin_expect(g_cycle_debt >= CYCLE_BATCH_SIZE, 0)) {
         sh4cycles.addCycles(g_cycle_debt);
@@ -112,6 +122,32 @@ static inline bool ExecuteFastPath(u16 op) {
                 r[n] = r[m];
                 return true;
             }
+            if ((op & 0x000F) == 0x0002) { // mov.l @Rm,Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                r[n] = ReadMem32(r[m]);
+                return true;
+            }
+            if ((op & 0x000F) == 0x0006) { // mov.l @Rm+,Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                r[n] = ReadMem32(r[m]);
+                if (n != m) r[m] += 4;
+                return true;
+            }
+            if ((op & 0x000F) == 0x0001) { // mov.w @Rm,Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                r[n] = (u32)(s32)(s16)ReadMem16(r[m]);
+                return true;
+            }
+            if ((op & 0x000F) == 0x0005) { // mov.w @Rm+,Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                r[n] = (u32)(s32)(s16)ReadMem16(r[m]);
+                if (n != m) r[m] += 2;
+                return true;
+            }
             break;
             
         case 0x7000: // add #imm,Rn - very common
@@ -129,8 +165,188 @@ static inline bool ExecuteFastPath(u16 op) {
                 return true;
             }
             
+        case 0x2000: // Memory store operations - common in FMV
+            if ((op & 0x000F) == 0x0002) { // mov.l Rm,@Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                WriteMem32(r[n], r[m]);
+                return true;
+            }
+            if ((op & 0x000F) == 0x0006) { // mov.l Rm,@-Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                r[n] -= 4;
+                WriteMem32(r[n], r[m]);
+                return true;
+            }
+            if ((op & 0x000F) == 0x0001) { // mov.w Rm,@Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                WriteMem16(r[n], r[m]);
+                return true;
+            }
+            if ((op & 0x000F) == 0x0000) { // mov.b Rm,@Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                WriteMem8(r[n], r[m]);
+                return true;
+            }
+            break;
+            
+        case 0x3000: // Arithmetic operations - common in loops
+            if ((op & 0x000F) == 0x000C) { // add Rm,Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                r[n] += r[m];
+                return true;
+            }
+            if ((op & 0x000F) == 0x0008) { // sub Rm,Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                r[n] -= r[m];
+                return true;
+            }
+            if ((op & 0x000F) == 0x0000) { // cmp/eq Rm,Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                sr.T = (r[n] == r[m]) ? 1 : 0;
+                return true;
+            }
+            if ((op & 0x000F) == 0x0002) { // cmp/hs Rm,Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                sr.T = (r[n] >= r[m]) ? 1 : 0;
+                return true;
+            }
+            if ((op & 0x000F) == 0x0006) { // cmp/hi Rm,Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                sr.T = (r[n] > r[m]) ? 1 : 0;
+                return true;
+            }
+            break;
+            
+        case 0x4000: // Single operand operations
+            if ((op & 0x00FF) == 0x0000) { // shll Rn
+                u32 n = (op >> 8) & 0xF;
+                sr.T = r[n] >> 31;
+                r[n] <<= 1;
+                return true;
+            }
+            if ((op & 0x00FF) == 0x0001) { // shlr Rn
+                u32 n = (op >> 8) & 0xF;
+                sr.T = r[n] & 1;
+                r[n] >>= 1;
+                return true;
+            }
+            if ((op & 0x00FF) == 0x0020) { // shal Rn
+                u32 n = (op >> 8) & 0xF;
+                sr.T = r[n] >> 31;
+                r[n] = ((s32)r[n]) << 1;
+                return true;
+            }
+            if ((op & 0x00FF) == 0x0021) { // shar Rn
+                u32 n = (op >> 8) & 0xF;
+                sr.T = r[n] & 1;
+                r[n] = ((s32)r[n]) >> 1;
+                return true;
+            }
+            if ((op & 0x00FF) == 0x0010) { // dt Rn
+                u32 n = (op >> 8) & 0xF;
+                r[n] -= 1;
+                sr.T = (r[n] == 0) ? 1 : 0;
+                return true;
+            }
+            break;
+            
+        case 0x8000: // Conditional branches and immediate operations
+            if ((op & 0x0F00) == 0x0B00) { // bf label
+                s32 disp = (s32)(s8)(op & 0xFF);
+                if (sr.T == 0) {
+                    next_pc = next_pc + (disp << 1);
+                }
+                return true;
+            }
+            if ((op & 0x0F00) == 0x0900) { // bt label
+                s32 disp = (s32)(s8)(op & 0xFF);
+                if (sr.T == 1) {
+                    next_pc = next_pc + (disp << 1);
+                }
+                return true;
+            }
+            break;
+            
+        case 0x9000: // mov.w @(disp,PC),Rn - PC-relative loads
+            {
+                u32 n = (op >> 8) & 0xF;
+                u32 disp = op & 0xFF;
+                r[n] = (u32)(s32)(s16)ReadMem16((disp << 1) + next_pc + 2);
+                return true;
+            }
+            
+        case 0xD000: // mov.l @(disp,PC),Rn - PC-relative loads
+            {
+                u32 n = (op >> 8) & 0xF;
+                u32 disp = op & 0xFF;
+                r[n] = ReadMem32(((disp << 2) + (next_pc & ~3) + 4));
+                return true;
+            }
+            
+        case 0x1000: // mov.l Rm,@(disp,Rn) - displaced stores
+            {
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                u32 disp = (op & 0xF) << 2;
+                WriteMem32(r[n] + disp, r[m]);
+                return true;
+            }
+            
+        case 0x5000: // mov.l @(disp,Rm),Rn - displaced loads
+            {
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                u32 disp = (op & 0xF) << 2;
+                r[n] = ReadMem32(r[m] + disp);
+                return true;
+            }
+            
         case 0x0000: // Simple operations
             if ((op & 0x00FF) == 0x0009) { // nop
+                return true;
+            }
+            if ((op & 0x000F) == 0x000C) { // mov.l @(R0,Rm),Rn
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                r[n] = ReadMem32(r[0] + r[m]);
+                return true;
+            }
+            if ((op & 0x000F) == 0x000E) { // mov.l @(R0,Rm),Rn (alternate encoding)
+                u32 m = (op >> 4) & 0xF;
+                u32 n = (op >> 8) & 0xF;
+                r[n] = ReadMem32(r[0] + r[m]);
+                return true;
+            }
+            break;
+            
+        case 0xC000: // GBR-relative and immediate operations
+            if ((op & 0xFF00) == 0xC800) { // tst #imm,R0
+                u32 imm = op & 0xFF;
+                sr.T = ((r[0] & imm) == 0) ? 1 : 0;
+                return true;
+            }
+            if ((op & 0xFF00) == 0xC900) { // and #imm,R0
+                u32 imm = op & 0xFF;
+                r[0] &= imm;
+                return true;
+            }
+            if ((op & 0xFF00) == 0xCA00) { // xor #imm,R0
+                u32 imm = op & 0xFF;
+                r[0] ^= imm;
+                return true;
+            }
+            if ((op & 0xFF00) == 0xCB00) { // or #imm,R0
+                u32 imm = op & 0xFF;
+                r[0] |= imm;
                 return true;
             }
             break;
@@ -151,7 +367,7 @@ static inline void ExecuteOpcode(u16 op)
         RaiseFPUDisableException();
     
     OpPtr[op](op);
-    BatchedExecuteCycles(op);
+    BatchedExecuteCyclesStandard(op);
 }
 
 static inline u16 ReadNexOp()
@@ -170,18 +386,39 @@ static inline u16 ReadNexOp()
 // === HOT PATH DETECTION AND OPTIMIZATION ===
 static u32 g_last_pc = 0;
 static u32 g_hot_path_counter = 0;
+static u32 g_sequential_counter = 0;
+static bool g_in_fmv_mode = false;
 
 static inline bool IsInHotPath(u32 pc) {
     if (pc == g_last_pc + 2) {
+        g_sequential_counter++;
         g_hot_path_counter++;
-        if (g_hot_path_counter > 10) {
+        
+        // More aggressive hot path detection for FMV
+        if (g_sequential_counter > 5) {  // Reduced from 10 to 5
+            g_in_fmv_mode = true;
             return true;
         }
     } else {
-        g_hot_path_counter = 0;
+        g_sequential_counter = 0;
+        if (g_hot_path_counter > 0) {
+            g_hot_path_counter--;  // Gradually reduce counter for non-sequential access
+        }
+        if (g_hot_path_counter == 0) {
+            g_in_fmv_mode = false;
+        }
     }
     g_last_pc = pc;
-    return false;
+    return g_in_fmv_mode && g_hot_path_counter > 3;
+}
+
+// === ENHANCED CACHE PREFETCHING FOR FMV ===
+static inline void PrefetchForFMV(u32 pc) {
+    if (g_in_fmv_mode) {
+        // Prefetch next few instructions for better cache performance
+        __builtin_prefetch((void*)(uintptr_t)pc, 0, 3);  // Prefetch for read, high temporal locality
+        __builtin_prefetch((void*)(uintptr_t)(pc + 8), 0, 2);  // Prefetch next instruction pair
+    }
 }
 
 static void Sh4_int_Run()
@@ -204,6 +441,9 @@ static void Sh4_int_Run()
                 {
                     u32 current_pc = next_pc;
                     
+                    // Enhanced prefetching for FMV performance
+                    PrefetchForFMV(current_pc);
+                    
                     // Detect hot paths for additional optimization
                     if (!in_hot_path && IsInHotPath(current_pc)) {
                         in_hot_path = true;
@@ -219,7 +459,7 @@ static void Sh4_int_Run()
                         
                         // Check if we can continue hot path execution
                         if (p_sh4rcb->cntx.cycle_counter <= 0 || 
-                            (next_pc - hot_path_start) > 64) { // Limit hot path length
+                            (next_pc - hot_path_start) > 128) { // Increased from 64 to 128 for longer hot paths
                             in_hot_path = false;
                             FlushCycleDebt();
                             break;
@@ -317,6 +557,8 @@ static void Sh4_int_Reset(bool hard)
     g_cycle_debt = 0;
     g_last_pc = 0;
     g_hot_path_counter = 0;
+    g_sequential_counter = 0;
+    g_in_fmv_mode = false;
 
     INFO_LOG(INTERPRETER, "🚀 OPTIMIZED SH4 Interpreter Reset - Advanced caching and hot path detection active!");
 }
@@ -391,6 +633,8 @@ static void sh4_int_resetcache() {
     g_cycle_debt = 0;
     g_last_pc = 0;
     g_hot_path_counter = 0;
+    g_sequential_counter = 0;
+    g_in_fmv_mode = false;
 }
 
 static void Sh4_int_Init()
@@ -402,6 +646,8 @@ static void Sh4_int_Init()
     g_cycle_debt = 0;
     g_last_pc = 0;
     g_hot_path_counter = 0;
+    g_sequential_counter = 0;
+    g_in_fmv_mode = false;
 }
 
 static void Sh4_int_Term()
