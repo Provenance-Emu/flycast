@@ -23,6 +23,347 @@
 #include <algorithm>
 #include <memory>
 
+/// iOS MoltenVK texture streaming optimizations for FMV performance
+#if defined(__APPLE__) && defined(TARGET_IPHONE)
+// Use C++ compatible includes for iOS optimization
+#include <mach/mach_time.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+/// iOS-specific constants for optimal texture streaming
+#define IOS_TEXTURE_POOL_SIZE 32
+#define IOS_STAGING_BUFFER_POOL_SIZE 16
+#define IOS_CACHE_LINE_SIZE 64
+#define IOS_MEMORY_ALIGNMENT 256
+#define IOS_ASYNC_UPLOAD_THRESHOLD (512 * 512)  // 512x512 pixels
+#define IOS_LARGE_TEXTURE_THRESHOLD (1024 * 1024)  // 1MB
+
+/// iOS texture streaming performance metrics
+struct IOSTextureMetrics {
+	uint64_t total_uploads = 0;
+	uint64_t async_uploads = 0;
+	uint64_t pool_hits = 0;
+	uint64_t pool_misses = 0;
+	uint64_t staging_reuse = 0;
+	double avg_upload_time_ms = 0.0;
+	
+	void logPerformanceStats() {
+		if (total_uploads > 0) {
+			INFO_LOG(RENDERER, "🚀 iOS Texture Streaming Stats: %llu uploads (%.1f%% async), %.1f%% pool hits, %.2fms avg",
+			         total_uploads, 
+			         (async_uploads * 100.0) / total_uploads,
+			         (pool_hits * 100.0) / (pool_hits + pool_misses),
+			         avg_upload_time_ms);
+		}
+	}
+} g_ios_tex_metrics;
+
+/// iOS texture pool for efficient reuse
+struct IOSTexturePool {
+	struct PooledTexture {
+		vk::UniqueImage image;
+		vk::UniqueImageView imageView;
+		Allocation allocation;
+		vk::Extent2D extent;
+		vk::Format format;
+		u32 mipmapLevels;
+		bool inUse = false;
+		uint64_t lastUsed = 0;
+		
+		bool matches(vk::Extent2D reqExtent, vk::Format reqFormat, u32 reqMipmaps) const {
+			return extent.width == reqExtent.width && 
+			       extent.height == reqExtent.height &&
+			       format == reqFormat && 
+			       mipmapLevels == reqMipmaps;
+		}
+	};
+	
+	std::vector<std::unique_ptr<PooledTexture>> textures;
+	std::mutex poolMutex;
+	
+	PooledTexture* acquireTexture(vk::Extent2D extent, vk::Format format, u32 mipmapLevels) {
+		std::lock_guard<std::mutex> lock(poolMutex);
+		
+		// Try to find matching unused texture
+		for (auto& tex : textures) {
+			if (!tex->inUse && tex->matches(extent, format, mipmapLevels)) {
+				tex->inUse = true;
+				tex->lastUsed = mach_absolute_time();
+				g_ios_tex_metrics.pool_hits++;
+				return tex.get();
+			}
+		}
+		
+		// Create new texture if pool not full
+		if (textures.size() < IOS_TEXTURE_POOL_SIZE) {
+			auto newTex = std::make_unique<PooledTexture>();
+			newTex->extent = extent;
+			newTex->format = format;
+			newTex->mipmapLevels = mipmapLevels;
+			newTex->inUse = true;
+			newTex->lastUsed = mach_absolute_time();
+			
+			PooledTexture* result = newTex.get();
+			textures.push_back(std::move(newTex));
+			g_ios_tex_metrics.pool_misses++;
+			return result;
+		}
+		
+		// Pool full, reuse oldest texture
+		PooledTexture* oldest = nullptr;
+		uint64_t oldestTime = UINT64_MAX;
+		for (auto& tex : textures) {
+			if (!tex->inUse && tex->lastUsed < oldestTime) {
+				oldest = tex.get();
+				oldestTime = tex->lastUsed;
+			}
+		}
+		
+		if (oldest) {
+			oldest->inUse = true;
+			oldest->lastUsed = mach_absolute_time();
+			oldest->extent = extent;
+			oldest->format = format;
+			oldest->mipmapLevels = mipmapLevels;
+			// Will need to recreate image/view for this texture
+			oldest->image.reset();
+			oldest->imageView.reset();
+			g_ios_tex_metrics.pool_misses++;
+			return oldest;
+		}
+		
+		g_ios_tex_metrics.pool_misses++;
+		return nullptr;  // Fallback to regular allocation
+	}
+	
+	void releaseTexture(PooledTexture* texture) {
+		std::lock_guard<std::mutex> lock(poolMutex);
+		texture->inUse = false;
+	}
+	
+	void cleanup() {
+		std::lock_guard<std::mutex> lock(poolMutex);
+		uint64_t currentTime = mach_absolute_time();
+		static mach_timebase_info_data_t timebase = {};
+		if (timebase.denom == 0) {
+			mach_timebase_info(&timebase);
+		}
+		
+		// Remove textures unused for more than 5 seconds
+		const uint64_t maxAge = 5ULL * 1000000000ULL * timebase.denom / timebase.numer;
+		
+		textures.erase(
+			std::remove_if(textures.begin(), textures.end(),
+				[currentTime, maxAge](const auto& tex) {
+					return !tex->inUse && (currentTime - tex->lastUsed) > maxAge;
+				}),
+			textures.end()
+		);
+	}
+} g_ios_texture_pool;
+
+/// iOS staging buffer pool for efficient memory reuse
+struct IOSStagingBufferPool {
+	struct PooledBuffer {
+		std::unique_ptr<BufferData> bufferData;
+		u32 size;
+		bool inUse = false;
+		uint64_t lastUsed = 0;
+	};
+	
+	std::vector<std::unique_ptr<PooledBuffer>> buffers;
+	std::mutex poolMutex;
+	
+	BufferData* acquireBuffer(u32 size) {
+		std::lock_guard<std::mutex> lock(poolMutex);
+		
+		// Find best fit buffer (smallest that's >= required size)
+		PooledBuffer* bestFit = nullptr;
+		u32 bestSize = UINT32_MAX;
+		
+		for (auto& buf : buffers) {
+			if (!buf->inUse && buf->size >= size && buf->size < bestSize) {
+				bestFit = buf.get();
+				bestSize = buf->size;
+			}
+		}
+		
+		if (bestFit) {
+			bestFit->inUse = true;
+			bestFit->lastUsed = mach_absolute_time();
+			g_ios_tex_metrics.staging_reuse++;
+			return bestFit->bufferData.get();
+		}
+		
+		// Create new buffer if pool not full
+		if (buffers.size() < IOS_STAGING_BUFFER_POOL_SIZE) {
+			auto newBuf = std::make_unique<PooledBuffer>();
+			newBuf->size = std::max(size, 1024u * 1024u);  // Minimum 1MB for efficiency
+			newBuf->bufferData = std::make_unique<BufferData>(newBuf->size, vk::BufferUsageFlagBits::eTransferSrc);
+			newBuf->inUse = true;
+			newBuf->lastUsed = mach_absolute_time();
+			
+			BufferData* result = newBuf->bufferData.get();
+			buffers.push_back(std::move(newBuf));
+			return result;
+		}
+		
+		return nullptr;  // Pool exhausted, fallback to regular allocation
+	}
+	
+	void releaseBuffer(BufferData* buffer) {
+		std::lock_guard<std::mutex> lock(poolMutex);
+		for (auto& buf : buffers) {
+			if (buf->bufferData.get() == buffer) {
+				buf->inUse = false;
+				break;
+			}
+		}
+	}
+} g_ios_staging_pool;
+
+/// iOS async texture upload tracking
+struct IOSAsyncUpload {
+	vk::Fence fence;
+	BufferData* stagingBuffer = nullptr;
+	uint64_t startTime;
+	u32 textureSize;
+	
+	bool isComplete() const {
+		if (!fence) return true;
+		VulkanContext* ctx = VulkanContext::Instance();
+		return ctx->GetDevice().getFenceStatus(fence) == vk::Result::eSuccess;
+	}
+};
+
+static std::vector<IOSAsyncUpload> g_pending_uploads;
+static std::mutex g_async_mutex;
+
+/// iOS unified memory optimization for texture data
+static void OptimizeIOSTextureMemory(const void* data, u32 size) {
+	if (!data || size == 0) return;
+	
+	// Prefetch data for Metal unified memory architecture
+	const char* ptr = static_cast<const char*>(data);
+	for (u32 i = 0; i < size; i += IOS_CACHE_LINE_SIZE) {
+		__builtin_prefetch(ptr + i, 0, 3);  // High temporal locality for textures
+	}
+	
+	// Memory barrier for coherency on iOS unified memory
+	__sync_synchronize();
+}
+
+/// Process completed async uploads and free resources
+static void ProcessIOSAsyncUploads() {
+	std::lock_guard<std::mutex> lock(g_async_mutex);
+	
+	for (auto it = g_pending_uploads.begin(); it != g_pending_uploads.end();) {
+		if (it->isComplete()) {
+			// Calculate upload time for metrics
+			uint64_t endTime = mach_absolute_time();
+			static mach_timebase_info_data_t timebase = {};
+			if (timebase.denom == 0) {
+				mach_timebase_info(&timebase);
+			}
+			double uploadTimeMs = (double)(endTime - it->startTime) * timebase.numer / timebase.denom / 1000000.0;
+			
+			// Update running average
+			g_ios_tex_metrics.avg_upload_time_ms = 
+				(g_ios_tex_metrics.avg_upload_time_ms * g_ios_tex_metrics.total_uploads + uploadTimeMs) / 
+				(g_ios_tex_metrics.total_uploads + 1);
+			
+			// Release staging buffer back to pool
+			if (it->stagingBuffer) {
+				g_ios_staging_pool.releaseBuffer(it->stagingBuffer);
+			}
+			
+			// Clean up fence
+			if (it->fence) {
+				VulkanContext::Instance()->GetDevice().destroyFence(it->fence);
+			}
+			
+			it = g_pending_uploads.erase(it);
+		} else {
+			++it;
+		}
+	}
+}
+
+/// iOS texture upload with advanced streaming optimizations
+static bool UploadTextureIOSOptimized(Texture* texture, u32 srcSize, const void* srcData, 
+                                       bool isNew, bool genMipmaps, vk::CommandBuffer commandBuffer) {
+	if (!srcData || srcSize == 0) return false;
+	
+	uint64_t startTime = mach_absolute_time();
+	g_ios_tex_metrics.total_uploads++;
+	
+	// Optimize memory layout for iOS
+	OptimizeIOSTextureMemory(srcData, srcSize);
+	
+	// Determine if we should use async upload
+	bool useAsync = srcSize >= IOS_ASYNC_UPLOAD_THRESHOLD && !genMipmaps;
+	
+	if (useAsync) {
+		// Try to get staging buffer from pool
+		BufferData* stagingBuffer = g_ios_staging_pool.acquireBuffer(srcSize);
+		if (!stagingBuffer) {
+			// Pool exhausted, fallback to sync upload
+			useAsync = false;
+		} else {
+			// Async upload path
+			void* mappedData = stagingBuffer->MapMemory();
+			if (mappedData) {
+				memcpy(mappedData, srcData, srcSize);
+				stagingBuffer->UnmapMemory();
+				
+				// Create fence for async tracking
+				vk::Device device = VulkanContext::Instance()->GetDevice();
+				vk::Fence fence = device.createFence(vk::FenceCreateInfo());
+				
+				// Submit copy command
+				vk::BufferImageCopy copyRegion(0, 0, 0,
+					vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
+					vk::Offset3D(0, 0, 0),
+					                                        vk::Extent3D(texture->getSize(), 1));
+				
+				commandBuffer.copyBufferToImage(*stagingBuffer->buffer, 
+					texture->GetImage(), vk::ImageLayout::eTransferDstOptimal, copyRegion);
+				
+				// Track async upload
+				{
+					std::lock_guard<std::mutex> lock(g_async_mutex);
+					IOSAsyncUpload upload;
+					upload.fence = fence;
+					upload.stagingBuffer = stagingBuffer;
+					upload.startTime = startTime;
+					upload.textureSize = srcSize;
+					g_pending_uploads.push_back(upload);
+				}
+				
+				g_ios_tex_metrics.async_uploads++;
+				return true;
+			}
+		}
+	}
+	
+	// Sync upload path (fallback or small textures)
+	return false;  // Let regular path handle it
+}
+
+/// Cleanup iOS texture streaming resources
+static void CleanupIOSTextureStreaming() {
+	// Process any remaining async uploads
+	ProcessIOSAsyncUploads();
+	
+	// Cleanup pools
+	g_ios_texture_pool.cleanup();
+	
+	// Log final performance stats
+	g_ios_tex_metrics.logPerformanceStats();
+}
+
+#endif
+
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
 #include <arm_neon.h>
 void optimized_texture_upload(void* dst, const void* src, int width, int height, int stride)
@@ -235,6 +576,28 @@ void Texture::Init(u32 width, u32 height, vk::Format format, u32 dataSize, bool 
 	if (mipmapped)
 		mipmapLevels += floor(log2(std::max(width, height)));
 
+#if defined(__APPLE__) && defined(TARGET_IPHONE)
+	// Try to acquire texture from iOS pool for FMV performance
+	auto* pooledTexture = g_ios_texture_pool.acquireTexture(extent, format, mipmapLevels);
+	if (pooledTexture && pooledTexture->image) {
+		// Reuse existing pooled texture
+		image = std::move(pooledTexture->image);
+		imageView = std::move(pooledTexture->imageView);
+		allocation = std::move(pooledTexture->allocation);
+		
+		// Configure for reuse
+		needsStaging = true;  // Most pooled textures use staging
+		if (!stagingBufferData) {
+			                        stagingBufferData.reset(g_ios_staging_pool.acquireBuffer(dataSize));
+			if (!stagingBufferData) {
+				stagingBufferData = std::make_unique<BufferData>(dataSize, vk::BufferUsageFlagBits::eTransferSrc);
+			}
+		}
+		return;
+	}
+	// Fall through to regular allocation if pool miss or needs recreation
+#endif
+
 	vk::FormatProperties formatProperties = physicalDevice.getFormatProperties(format);
 
 	vk::ImageTiling imageTiling = (formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImage)
@@ -319,6 +682,20 @@ void Texture::SetImage(u32 srcSize, const void *srcData, bool isNew, bool genMip
 
 	static const float scopeColor[4] = { 1.0f, 1.0f, 0.0f, 1.0f };
 	CommandBufferDebugScope _(commandBuffer, "SetImage", scopeColor);
+
+#if defined(__APPLE__) && defined(TARGET_IPHONE)
+	// Process any completed async uploads first
+	ProcessIOSAsyncUploads();
+	
+	// Try iOS optimized texture upload for FMV performance
+	if (UploadTextureIOSOptimized(this, srcSize, srcData, isNew, genMipmaps, commandBuffer)) {
+		// iOS async upload initiated, return early
+		if (!isNew && !needsStaging)
+			setImageLayout(commandBuffer, image.get(), format, mipmapLevels, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+		return;
+	}
+	// Fall through to regular upload if iOS optimization not used
+#endif
 
 	if (!isNew && !needsStaging)
 		setImageLayout(commandBuffer, image.get(), format, mipmapLevels, vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eGeneral);

@@ -22,6 +22,7 @@
 #include "hw/pvr/Renderer_if.h"
 #include "oslib/directory.h"
 #include "stdclass.h"
+#include "rend/osd.h"
 
 // Use a different function to get the writable path
 std::string getWritableCachePath(const std::string& filename)
@@ -506,4 +507,117 @@ void PipelineManager::LoadPipelineCache()
 		}
 	}
 	fclose(f);
+}
+
+void OSDPipeline::CreatePipeline()
+{
+	// Vertex input state for OSD quad rendering
+	static const vk::VertexInputBindingDescription vertexBindingDescription(0, sizeof(OSDVertex));
+	static const vk::VertexInputAttributeDescription vertexInputAttributeDescriptions[] = {
+		vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32Sfloat, offsetof(OSDVertex, x)),	// position (vec2 -> vec4)
+		vk::VertexInputAttributeDescription(1, 0, vk::Format::eR8G8B8A8Unorm, offsetof(OSDVertex, r)),	// color (vec4)
+		vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32Sfloat, offsetof(OSDVertex, u)),	// texture coords (vec2)
+	};
+	vk::PipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo(
+		vk::PipelineVertexInputStateCreateFlags(),
+		vertexBindingDescription,
+		vertexInputAttributeDescriptions
+	);
+
+	// Input assembly state - triangle strip for quads
+	vk::PipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo(
+		vk::PipelineInputAssemblyStateCreateFlags(),
+		vk::PrimitiveTopology::eTriangleStrip
+	);
+
+	// Viewport and scissor states (dynamic)
+	vk::PipelineViewportStateCreateInfo pipelineViewportStateCreateInfo(
+		vk::PipelineViewportStateCreateFlags(), 1, nullptr, 1, nullptr
+	);
+
+	// Rasterization state
+	vk::PipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo(
+		vk::PipelineRasterizationStateCreateFlags(),
+		false,                                        // depthClampEnable
+		false,                                        // rasterizerDiscardEnable
+		vk::PolygonMode::eFill,                       // polygonMode
+		vk::CullModeFlagBits::eNone,                  // cullMode
+		vk::FrontFace::eCounterClockwise,             // frontFace
+		false,                                        // depthBiasEnable
+		0.0f,                                         // depthBiasConstantFactor
+		0.0f,                                         // depthBiasClamp
+		0.0f,                                         // depthBiasSlopeFactor
+		1.0f                                          // lineWidth
+	);
+
+	// Multisample state
+	vk::PipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo;
+
+	// Depth and stencil state - no depth testing for OSD
+	vk::PipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo(
+		vk::PipelineDepthStencilStateCreateFlags(),
+		false,                                        // depthTestEnable
+		false,                                        // depthWriteEnable
+		vk::CompareOp::eAlways,                       // depthCompareOp
+		false,                                        // depthBoundsTestEnable
+		false,                                        // stencilTestEnable
+		{},                                           // front
+		{}                                            // back
+	);
+
+	// Color blending - alpha blending for OSD
+	vk::PipelineColorBlendAttachmentState pipelineColorBlendAttachmentState(
+		true,                                         // blendEnable
+		vk::BlendFactor::eSrcAlpha,                   // srcColorBlendFactor
+		vk::BlendFactor::eOneMinusSrcAlpha,           // dstColorBlendFactor
+		vk::BlendOp::eAdd,                            // colorBlendOp
+		vk::BlendFactor::eSrcAlpha,                   // srcAlphaBlendFactor
+		vk::BlendFactor::eOneMinusSrcAlpha,           // dstAlphaBlendFactor
+		vk::BlendOp::eAdd,                            // alphaBlendOp
+		vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | 
+		vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA  // colorWriteMask
+	);
+
+	vk::PipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo(
+		vk::PipelineColorBlendStateCreateFlags(),
+		false,                                        // logicOpEnable
+		vk::LogicOp::eNoOp,                           // logicOp
+		pipelineColorBlendAttachmentState,           // attachments
+		{ { 1.0f, 1.0f, 1.0f, 1.0f } }                // blendConstants
+	);
+
+	// Dynamic state
+	std::array<vk::DynamicState, 2> dynamicStates = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
+	vk::PipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo(
+		vk::PipelineDynamicStateCreateFlags(), dynamicStates
+	);
+
+	// Shaders
+	vk::ShaderModule vertex_module = shaderManager->GetOSDVertexShader();
+	vk::ShaderModule fragment_module = shaderManager->GetOSDFragmentShader();
+
+	std::array<vk::PipelineShaderStageCreateInfo, 2> stages = {
+		vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(), vk::ShaderStageFlagBits::eVertex, vertex_module, "main"),
+		vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(), vk::ShaderStageFlagBits::eFragment, fragment_module, "main"),
+	};
+
+	// Create the graphics pipeline
+	vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo(
+		vk::PipelineCreateFlags(),                    // flags
+		stages,                                       // stages
+		&pipelineVertexInputStateCreateInfo,          // pVertexInputState
+		&pipelineInputAssemblyStateCreateInfo,        // pInputAssemblyState
+		nullptr,                                      // pTessellationState
+		&pipelineViewportStateCreateInfo,             // pViewportState
+		&pipelineRasterizationStateCreateInfo,        // pRasterizationState
+		&pipelineMultisampleStateCreateInfo,          // pMultisampleState
+		&pipelineDepthStencilStateCreateInfo,         // pDepthStencilState
+		&pipelineColorBlendStateCreateInfo,           // pColorBlendState
+		&pipelineDynamicStateCreateInfo,              // pDynamicState
+		*pipelineLayout,                              // layout
+		renderPass                                    // renderPass
+	);
+
+	pipeline = GetContext()->GetDevice().createGraphicsPipelineUnique(
+		GetContext()->GetPipelineCache(), graphicsPipelineCreateInfo).value;
 }

@@ -55,9 +55,14 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #ifdef __APPLE__
 #include <TargetConditionals.h>
 #if TARGET_OS_IOS
-// iOS-specific Metal performance optimizations
-#include <Metal/Metal.h>
-#include <QuartzCore/CAMetalLayer.h>
+// iOS-specific performance optimizations (C++ compatible)
+#include <mach/mach_time.h>
+#include <sys/sysctl.h>
+
+/// Forward declaration for iOS texture streaming cleanup
+#if defined(TARGET_IPHONE)
+extern void CleanupIOSTextureStreaming();
+#endif
 
 // MoltenVK FMV optimization configuration
 struct MoltenVKOptimizations {
@@ -79,19 +84,21 @@ struct MoltenVKOptimizations {
         is_moltenvk = true;  // We're on iOS, using MoltenVK
         ios_optimizations_enabled = true;
         
-        // iOS device capabilities detection
-        if (@available(iOS 13.0, *)) {
-            metal_unified_memory = true;
-            metal_resource_options = true;
-            fast_descriptor_updates = true;
-            immediate_command_submission = true;
-            parallel_command_encoding = true;
-        }
+        // iOS device capabilities detection (assume iOS 13.0+ for modern devices)
+        metal_unified_memory = true;
+        metal_resource_options = true;
+        fast_descriptor_updates = true;
+        immediate_command_submission = true;
+        parallel_command_encoding = true;
         
-        INFO_LOG(RENDERER, "🔥 MoltenVK iOS FMV Optimizations: Memory=%s, FastDesc=%s, ParallelCmd=%s",
+        // Configure MoltenVK for optimal FMV texture streaming
+        optimized_swapchain_images = 4;  // Extra buffer for smooth FMV
+        
+        INFO_LOG(RENDERER, "🚀 MoltenVK iOS Texture Streaming: Memory=%s, FastDesc=%s, ParallelCmd=%s, SwapImages=%u",
                  metal_unified_memory ? "Unified" : "Discrete",
                  fast_descriptor_updates ? "ON" : "OFF", 
-                 parallel_command_encoding ? "ON" : "OFF");
+                 parallel_command_encoding ? "ON" : "OFF",
+                 optimized_swapchain_images);
     }
 } g_moltenvk_opts;
 #endif
@@ -671,6 +678,13 @@ bool VulkanContext::InitDevice()
 	    }
 	    allocator.Init(physicalDevice, *device, *instance);
 
+#ifdef __APPLE__
+#if TARGET_OS_IOS
+	    // Initialize iOS MoltenVK texture streaming optimizations
+	    g_moltenvk_opts.detect_and_configure();
+#endif
+#endif
+
 	    shaderManager = std::make_unique<ShaderManager>();
 	    quadPipeline = std::make_unique<QuadPipeline>(true, false);
 	    quadPipelineWithAlpha = std::make_unique<QuadPipeline>(false, false);
@@ -1217,6 +1231,11 @@ void VulkanContext::term()
 		if (res != vk::Result::eSuccess)
 			WARN_LOG(RENDERER, "VulkanContext::term: waitForFences failed %d", (int)res);
 	}
+
+#if defined(__APPLE__) && defined(TARGET_IPHONE)
+	// Cleanup iOS texture streaming optimizations
+	CleanupIOSTextureStreaming();
+#endif
 	inFlightObjects.clear();
 	imguiDriver.reset();
 	if (device && pipelineCache)
