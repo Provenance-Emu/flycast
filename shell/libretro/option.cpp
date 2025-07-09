@@ -82,7 +82,7 @@ Option<int> SkipFrame(CORE_OPTION_NAME "_frame_skipping");
 Option<int> MaxThreads("", 3);
 Option<int> AutoSkipFrame(CORE_OPTION_NAME "_auto_skip_frame", 0);
 Option<int> RenderResolution("", 480);
-Option<bool> VSync("", true);
+Option<bool> VSync("", false);
 Option<bool> ThreadedRendering(CORE_OPTION_NAME "_threaded_rendering", true);
 Option<int> AnisotropicFiltering(CORE_OPTION_NAME "_anisotropic_filtering");
 Option<int> TextureFiltering(CORE_OPTION_NAME "_texture_filtering");
