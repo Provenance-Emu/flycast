@@ -741,12 +741,26 @@ void Texture::SetImage(u32 srcSize, const void *srcData, bool isNew, bool genMip
 			for (; src < srcEnd; src += srcSz, dst += layout.rowPitch)
 				memcpy(dst, src, srcSz);
 		}
-		else
+		else {
+#if defined(__APPLE__) && defined(__ARM_NEON)
+			// Use iOS NEON-optimized copy for texture data
+			extern void fast_bulk_copy_ios(void* dst, const void* src, size_t size);
+			fast_bulk_copy_ios(data, srcData, srcSize);
+#else
 			memcpy(data, srcData, srcSize);
+#endif
+		}
 		allocation.UnmapMemory();
 	}
-	else
+	else {
+#if defined(__APPLE__) && defined(__ARM_NEON)
+		// Use iOS NEON-optimized copy for texture data
+		extern void fast_bulk_copy_ios(void* dst, const void* src, size_t size);
+		fast_bulk_copy_ios(data, srcData, srcSize);
+#else
 		memcpy(data, srcData, srcSize);
+#endif
+	}
 
 	if (needsStaging)
 	{

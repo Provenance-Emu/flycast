@@ -82,3 +82,9 @@ void unprotectVram(u32 addr, u32 size);
 u32 getVramOffset(void *addr);
 
 } // namespace addrspace
+
+#ifdef __APPLE__
+// iOS ARM64 NEON-optimized bulk memory operations for asset loading
+void DYNACALL bulk_transfer_ios(u32 dst_addr, u32 src_addr, u32 size);
+void fast_bulk_copy_ios(void* dst, const void* src, size_t size);
+#endif

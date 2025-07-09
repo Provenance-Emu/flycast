@@ -12,6 +12,120 @@
 #include "oslib/virtmem.h"
 #include <cassert>
 
+#ifdef __APPLE__
+#ifdef __ARM_NEON
+#include <arm_neon.h>
+#endif
+#include <cstring>
+
+// === iOS ARM64 BULK MEMORY OPTIMIZATIONS ===
+
+/// iOS-specific constants for optimal bulk transfers
+#define IOS_BULK_THRESHOLD_BYTES 64      // Use NEON for transfers >= 64 bytes
+#define IOS_NEON_CHUNK_SIZE 64           // Process 64 bytes per NEON iteration
+#define IOS_CACHE_PREFETCH_DISTANCE 256  // Prefetch distance for large transfers
+
+/// iOS ARM64 NEON-optimized bulk memory copy
+void fast_bulk_copy_ios(void* dst, const void* src, size_t size) {
+    if (size < IOS_BULK_THRESHOLD_BYTES) {
+        // Use standard memcpy for small transfers
+        memcpy(dst, src, size);
+        return;
+    }
+    
+#ifdef __ARM_NEON
+    uint8_t* d = static_cast<uint8_t*>(dst);
+    const uint8_t* s = static_cast<const uint8_t*>(src);
+    
+    // Prefetch for large transfers
+    if (size >= IOS_CACHE_PREFETCH_DISTANCE) {
+        __builtin_prefetch(s, 0, 3);                          // High temporal locality
+        __builtin_prefetch(s + IOS_CACHE_PREFETCH_DISTANCE, 0, 2); // Medium locality ahead
+    }
+    
+    // Process 64-byte chunks with NEON (4x 16-byte loads/stores)
+    size_t neon_chunks = size / IOS_NEON_CHUNK_SIZE;
+    for (size_t i = 0; i < neon_chunks; i++) {
+        // Load 4x 16-byte chunks
+        uint8x16_t chunk0 = vld1q_u8(s);
+        uint8x16_t chunk1 = vld1q_u8(s + 16);
+        uint8x16_t chunk2 = vld1q_u8(s + 32);
+        uint8x16_t chunk3 = vld1q_u8(s + 48);
+        
+        // Store 4x 16-byte chunks
+        vst1q_u8(d, chunk0);
+        vst1q_u8(d + 16, chunk1);
+        vst1q_u8(d + 32, chunk2);
+        vst1q_u8(d + 48, chunk3);
+        
+        s += IOS_NEON_CHUNK_SIZE;
+        d += IOS_NEON_CHUNK_SIZE;
+    }
+    
+    // Handle remaining bytes with standard copy
+    size_t remaining = size % IOS_NEON_CHUNK_SIZE;
+    if (remaining > 0) {
+        memcpy(d, s, remaining);
+    }
+#else
+    // Fallback to optimized memcpy
+    memcpy(dst, src, size);
+#endif
+}
+
+/// iOS ARM64 NEON-optimized bulk memory set
+static inline void fast_bulk_set_ios(void* dst, int value, size_t size) {
+    if (size < IOS_BULK_THRESHOLD_BYTES) {
+        memset(dst, value, size);
+        return;
+    }
+    
+#ifdef __ARM_NEON
+    uint8_t* d = static_cast<uint8_t*>(dst);
+    uint8x16_t fill_pattern = vdupq_n_u8(static_cast<uint8_t>(value));
+    
+    // Process 64-byte chunks
+    size_t neon_chunks = size / IOS_NEON_CHUNK_SIZE;
+    for (size_t i = 0; i < neon_chunks; i++) {
+        vst1q_u8(d, fill_pattern);
+        vst1q_u8(d + 16, fill_pattern);
+        vst1q_u8(d + 32, fill_pattern);
+        vst1q_u8(d + 48, fill_pattern);
+        d += IOS_NEON_CHUNK_SIZE;
+    }
+    
+    // Handle remaining bytes
+    size_t remaining = size % IOS_NEON_CHUNK_SIZE;
+    if (remaining > 0) {
+        memset(d, value, remaining);
+    }
+#else
+    memset(dst, value, size);
+#endif
+}
+
+/// iOS-optimized bulk memory transfer for asset loading
+void DYNACALL bulk_transfer_ios(u32 dst_addr, u32 src_addr, u32 size) {
+    if (size == 0) return;
+    
+    // Get memory pointers with bounds checking
+    bool dst_ismem, src_ismem;
+    void* dst_ptr = addrspace::writeConst(dst_addr, dst_ismem, 1);
+    void* src_ptr = addrspace::readConst(src_addr, src_ismem, 1);
+    
+    if (dst_ismem && src_ismem) {
+        // Both are direct memory - use fastest path
+        fast_bulk_copy_ios(dst_ptr, src_ptr, size);
+    } else {
+        // Fallback to individual transfers for hardware registers
+        for (u32 i = 0; i < size; i++) {
+            addrspace::write8(dst_addr + i, addrspace::read8(src_addr + i));
+        }
+    }
+}
+
+#endif // __APPLE__
+
 namespace addrspace
 {
 
