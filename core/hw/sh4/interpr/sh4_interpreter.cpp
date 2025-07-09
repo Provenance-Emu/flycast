@@ -14,6 +14,13 @@
 #include "../sh4_cache.h"
 #include "debug/gdb_server.h"
 #include "../sh4_cycles.h"
+#include "build.h"  // For SH4_MAIN_CLOCK constant
+
+#ifdef ENABLE_SH4_JITLESS
+#include "hw/sh4/dyna_jitless/ngen_jitless.h"
+#else
+#include "hw/sh4/dyna/ngen.h"
+#endif
 
 #include <array>
 #include <algorithm>
@@ -204,6 +211,47 @@ static inline u16 fetchInstructionUltraFast(u8* cycles_out) {
         throw SH4ThrownException(next_pc, Sh4Ex_AddressErrorRead);
 
     u32 addr = next_pc;
+    
+    // Windows CE syscall handling - intercept specific addresses like the dynarec does
+    if (__builtin_expect(mmu_enabled() && (addr & 1), 0))
+    {
+        switch (addr)
+        {
+#ifdef USE_WINCE_HACK
+        case 0xfffffde7: // GetTickCount
+            ERROR_LOG(SH4, "🎯 WINCE SYSCALL: GetTickCount intercepted at PC=0x%08X", addr);
+            // This should make this syscall faster
+            r[0] = sh4_sched_now64() * 1000 / SH4_MAIN_CLOCK;
+            next_pc = pr;
+            Sh4cntx.cycle_counter -= 100;
+            return fetchInstructionUltraFast(cycles_out);
+
+        case 0xfffffd05: // QueryPerformanceCounter(u64 *)
+            {
+                ERROR_LOG(SH4, "🎯 WINCE SYSCALL: QueryPerformanceCounter intercepted at PC=0x%08X", addr);
+                bool isRam;
+                u64 *ptr;
+                u32 paddr;
+                if (rdv_writeMemImmediate(r[4], sizeof(u64), (void*&)ptr, isRam, paddr) && isRam)
+                {
+                    *ptr = sh4_sched_now64() >> 4;
+                    r[0] = 1; // TRUE
+                }
+                else
+                {
+                    r[0] = 0; // FALSE
+                }
+                next_pc = pr;
+                Sh4cntx.cycle_counter -= 100;
+                return fetchInstructionUltraFast(cycles_out);
+            }
+#endif
+        default:
+            // Let other odd addresses fall through to normal address error handling
+            throw SH4ThrownException(next_pc, Sh4Ex_AddressErrorRead);
+        }
+    }
+    
     next_pc += 2;
     return g_ultra_cache.fetch(addr, cycles_out);
 }
