@@ -32,11 +32,9 @@ struct UltraCache {
     u8 estimated_cycles[ICACHE_SIZE]; // Pre-calculated cycle estimates
     
     void reset() {
-        for (int i = 0; i < ICACHE_SIZE; i++) {
-            pc[i] = 0xFFFFFFFF;
-            access_count[i] = 0;
-            estimated_cycles[i] = 1;
-        }
+        std::fill(pc, pc + ICACHE_SIZE, 0xFFFFFFFF);
+        std::memset(access_count, 0, sizeof(access_count[0]) * ICACHE_SIZE);
+        std::fill(estimated_cycles, estimated_cycles + ICACHE_SIZE, 1);
     }
     
     u16 fetch(u32 addr, u8* cycles_out) {
