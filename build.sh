@@ -33,6 +33,7 @@ C_FLAGS="-arch ${ARCH} \
 -DNO_JIT=${NO_JIT} \
 -DUSE_JIT=${USE_JIT} \
 -DTARGET_NO_NIXPROF \
+-DTARGET_OS_IOS=1 \
 -miphoneos-version-min=${IOS_MIN_VERSION} \
 -fdata-sections \
 -ffast-math \
@@ -72,6 +73,7 @@ CXX_FLAGS="-arch ${ARCH} \
 -DIOS \
 -DNO_JIT=${NO_JIT} \
 -DUSE_JIT=${USE_JIT} \
+-DTARGET_OS_IOS=1 \
 -miphoneos-version-min=${IOS_MIN_VERSION} \
 -DTARGET_NO_NIXPROF \
 -fdata-sections \
