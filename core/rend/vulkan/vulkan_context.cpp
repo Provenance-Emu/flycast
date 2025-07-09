@@ -74,6 +74,20 @@ struct MoltenVKOptimizations {
     bool metal_resource_options = false;
     bool fast_descriptor_updates = false;
     
+    // Device capability tier (based on available memory)
+    enum class DeviceCapabilityTier {
+        LOW_MEMORY,    // <2GB total memory (older iPads)
+        MEDIUM_MEMORY, // 2-4GB total memory  
+        HIGH_MEMORY    // >4GB total memory (modern devices)
+    } device_tier = DeviceCapabilityTier::MEDIUM_MEMORY;
+    
+    // Scaled optimization parameters based on device tier
+    u32 descriptor_combined_image_sampler = 40000;
+    u32 descriptor_uniform_buffer = 80000;
+    u32 descriptor_max_sets = 40000;
+    u32 texture_pool_size = 16;
+    u32 staging_buffer_pool_size = 8;
+    
     // FMV-specific optimizations  
     u32 optimized_swapchain_images = 3;  // Minimum for smooth FMV
     bool immediate_command_submission = true;
@@ -84,6 +98,13 @@ struct MoltenVKOptimizations {
         is_moltenvk = true;  // We're on iOS, using MoltenVK
         ios_optimizations_enabled = true;
         
+        // Detect iOS device memory capabilities
+        size_t total_memory = detectIOSDeviceMemory();
+        device_tier = classifyDeviceCapability(total_memory);
+        
+        // Configure optimizations based on device capability tier
+        configureForDeviceTier();
+        
         // iOS device capabilities detection (assume iOS 13.0+ for modern devices)
         metal_unified_memory = true;
         metal_resource_options = true;
@@ -92,13 +113,83 @@ struct MoltenVKOptimizations {
         parallel_command_encoding = true;
         
         // Configure MoltenVK for optimal FMV texture streaming
-        optimized_swapchain_images = 4;  // Extra buffer for smooth FMV
+        optimized_swapchain_images = (device_tier == DeviceCapabilityTier::HIGH_MEMORY) ? 4 : 3;
         
-        INFO_LOG(RENDERER, "🚀 MoltenVK iOS Texture Streaming: Memory=%s, FastDesc=%s, ParallelCmd=%s, SwapImages=%u",
+        INFO_LOG(RENDERER, "🚀 MoltenVK iOS Device Tier: %s, Memory=%s, Descriptors=%u/%u/%u",
+                 getDeviceTierName().c_str(),
                  metal_unified_memory ? "Unified" : "Discrete",
-                 fast_descriptor_updates ? "ON" : "OFF", 
-                 parallel_command_encoding ? "ON" : "OFF",
-                 optimized_swapchain_images);
+                 descriptor_combined_image_sampler, descriptor_uniform_buffer, descriptor_max_sets);
+    }
+    
+private:
+    size_t detectIOSDeviceMemory() {
+        // Use iOS sysctls to detect total system memory
+        size_t total_memory = 0;
+        size_t length = sizeof(total_memory);
+        
+        if (sysctlbyname("hw.memsize", &total_memory, &length, nullptr, 0) == 0) {
+            INFO_LOG(RENDERER, "📱 iOS Device Memory: %.2f GB detected", total_memory / (1024.0 * 1024.0 * 1024.0));
+            return total_memory;
+        }
+        
+        // Fallback: assume medium memory if detection fails
+        WARN_LOG(RENDERER, "⚠️ Failed to detect iOS device memory, assuming medium tier");
+        return 3ULL * 1024ULL * 1024ULL * 1024ULL; // 3GB fallback
+    }
+    
+    DeviceCapabilityTier classifyDeviceCapability(size_t total_memory) {
+        const size_t GB = 1024ULL * 1024ULL * 1024ULL;
+        
+        if (total_memory < 2 * GB) {
+            return DeviceCapabilityTier::LOW_MEMORY;   // <2GB: older iPads, iPhone 6s/7
+        } else if (total_memory < 4 * GB) {
+            return DeviceCapabilityTier::MEDIUM_MEMORY; // 2-4GB: iPad Air, iPhone 8-12
+        } else {
+            return DeviceCapabilityTier::HIGH_MEMORY;   // >4GB: iPad Pro, iPhone 13+
+        }
+    }
+    
+    void configureForDeviceTier() {
+        switch (device_tier) {
+            case DeviceCapabilityTier::LOW_MEMORY:
+                // Ultra-conservative settings for older devices (iPad Air 2, etc.)
+                descriptor_combined_image_sampler = 15000;  // Reduced by ~60%
+                descriptor_uniform_buffer = 30000;          // Reduced by ~60%
+                descriptor_max_sets = 15000;                // Reduced by ~60%
+                texture_pool_size = 4;                      // Minimal pool size
+                staging_buffer_pool_size = 2;               // Minimal staging buffers
+                INFO_LOG(RENDERER, "🔧 iOS LOW_MEMORY tier: Ultra-conservative Vulkan allocations for older device");
+                break;
+                
+            case DeviceCapabilityTier::MEDIUM_MEMORY:
+                // Balanced settings for typical devices
+                descriptor_combined_image_sampler = 35000;  // Slightly reduced
+                descriptor_uniform_buffer = 70000;          // Slightly reduced
+                descriptor_max_sets = 35000;                // Slightly reduced
+                texture_pool_size = 12;                     // Moderate pool size
+                staging_buffer_pool_size = 6;               // Balanced staging buffers
+                INFO_LOG(RENDERER, "🔧 iOS MEDIUM_MEMORY tier: Balanced Vulkan allocations");
+                break;
+                
+            case DeviceCapabilityTier::HIGH_MEMORY:
+                // Aggressive settings for high-end devices
+                descriptor_combined_image_sampler = 60000;  // Full FMV optimization
+                descriptor_uniform_buffer = 120000;         // Full FMV optimization
+                descriptor_max_sets = 60000;                // Full FMV optimization
+                texture_pool_size = 32;                     // Full pool size
+                staging_buffer_pool_size = 16;              // Maximum staging buffers
+                INFO_LOG(RENDERER, "🔧 iOS HIGH_MEMORY tier: Full FMV optimization for high-end device");
+                break;
+        }
+    }
+    
+    std::string getDeviceTierName() const {
+        switch (device_tier) {
+            case DeviceCapabilityTier::LOW_MEMORY: return "LOW_MEMORY";
+            case DeviceCapabilityTier::MEDIUM_MEMORY: return "MEDIUM_MEMORY";
+            case DeviceCapabilityTier::HIGH_MEMORY: return "HIGH_MEMORY";
+            default: return "UNKNOWN";
+        }
     }
 } g_moltenvk_opts;
 #endif
@@ -607,15 +698,15 @@ bool VulkanContext::InitDevice()
 #ifdef __APPLE__
 #if TARGET_OS_IOS
         if (g_moltenvk_opts.ios_optimizations_enabled) {
-            // iOS MoltenVK: Optimized descriptor pool sizes for FMV performance
+            // Use device-tier-specific descriptor pool sizes from MoltenVK optimizations
             pool_sizes = {
                 vk::DescriptorPoolSize(vk::DescriptorType::eSampler, 4),
-                vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 60000),  // More for FMV textures
+                vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, g_moltenvk_opts.descriptor_combined_image_sampler),
                 vk::DescriptorPoolSize(vk::DescriptorType::eSampledImage, 8),
                 vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, 16),
                 vk::DescriptorPoolSize(vk::DescriptorType::eUniformTexelBuffer, 4),
                 vk::DescriptorPoolSize(vk::DescriptorType::eStorageTexelBuffer, 4),
-                vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 120000),  // More for dynamic data
+                vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, g_moltenvk_opts.descriptor_uniform_buffer),
                 vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 200),     // Increased for iOS Metal
                 vk::DescriptorPoolSize(vk::DescriptorType::eUniformBufferDynamic, 8),
                 vk::DescriptorPoolSize(vk::DescriptorType::eStorageBufferDynamic, 8),
@@ -645,13 +736,68 @@ bool VulkanContext::InitDevice()
 #ifdef __APPLE__
 #if TARGET_OS_IOS
         if (g_moltenvk_opts.ios_optimizations_enabled) {
-            maxSets = 60000;  // Increased for iOS FMV performance
+            // Use device-tier-specific max sets from MoltenVK optimizations
+            maxSets = g_moltenvk_opts.descriptor_max_sets;
         }
 #endif
 #endif
-	    descriptorPool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-	    		maxSets, pool_sizes));
 
+        // Progressive fallback allocation - automatically retry with smaller pools if allocation fails
+        bool poolCreated = false;
+        int attempts = 0;
+        const int maxAttempts = 5;
+        float reductionFactor = 1.0f;
+        
+        while (!poolCreated && attempts < maxAttempts) {
+            try {
+                // Scale down allocation sizes with each retry
+                auto scaledPoolSizes = pool_sizes;
+                u32 scaledMaxSets = static_cast<u32>(maxSets * reductionFactor);
+                
+                for (auto& poolSize : scaledPoolSizes) {
+                    if (poolSize.type == vk::DescriptorType::eCombinedImageSampler || 
+                        poolSize.type == vk::DescriptorType::eUniformBuffer) {
+                        poolSize.descriptorCount = static_cast<u32>(poolSize.descriptorCount * reductionFactor);
+                        // Ensure minimum viable counts
+                        if (poolSize.type == vk::DescriptorType::eCombinedImageSampler && poolSize.descriptorCount < 5000) {
+                            poolSize.descriptorCount = 5000;
+                        }
+                        if (poolSize.type == vk::DescriptorType::eUniformBuffer && poolSize.descriptorCount < 10000) {
+                            poolSize.descriptorCount = 10000;
+                        }
+                    }
+                }
+                
+                scaledMaxSets = std::max(scaledMaxSets, 5000u); // Minimum viable max sets
+                
+                descriptorPool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo(
+                    vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, scaledMaxSets, scaledPoolSizes));
+                    
+                poolCreated = true;
+                
+                if (attempts > 0) {
+                    INFO_LOG(RENDERER, "✅ Progressive fallback succeeded on attempt %d (%.0f%% scale): maxSets=%u", 
+                             attempts + 1, reductionFactor * 100, scaledMaxSets);
+                } else {
+                    INFO_LOG(RENDERER, "✅ Descriptor pool created successfully on first attempt: maxSets=%u", scaledMaxSets);
+                }
+                
+            } catch (const vk::OutOfDeviceMemoryError& err) {
+                attempts++;
+                reductionFactor *= 0.7f; // Reduce by 30% each attempt
+                
+                WARN_LOG(RENDERER, "⚠️ Descriptor pool allocation failed (attempt %d/%d) - %.0f%% memory usage, retrying with %.0f%% scale", 
+                         attempts, maxAttempts, reductionFactor / 0.7f * 100, reductionFactor * 100);
+                
+                if (attempts >= maxAttempts) {
+                    ERROR_LOG(RENDERER, "❌ Critical: All descriptor pool allocation attempts failed after %d tries", maxAttempts);
+                    throw; // Re-throw the error if all attempts failed
+                }
+            } catch (const vk::SystemError& err) {
+                ERROR_LOG(RENDERER, "❌ Non-memory Vulkan error during descriptor pool creation: %s", err.what());
+                throw; // Re-throw non-memory errors immediately
+            }
+        }
 
 	    std::string cachePath = hostfs::getShaderCachePath("vulkan_pipeline.cache");
 	    FILE *f = nowide::fopen(cachePath.c_str(), "rb");

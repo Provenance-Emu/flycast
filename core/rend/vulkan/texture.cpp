@@ -31,12 +31,73 @@
 #include <unistd.h>
 
 /// iOS-specific constants for optimal texture streaming
-#define IOS_TEXTURE_POOL_SIZE 32
-#define IOS_STAGING_BUFFER_POOL_SIZE 16
 #define IOS_CACHE_LINE_SIZE 64
 #define IOS_MEMORY_ALIGNMENT 256
 #define IOS_ASYNC_UPLOAD_THRESHOLD (512 * 512)  // 512x512 pixels
 #define IOS_LARGE_TEXTURE_THRESHOLD (1024 * 1024)  // 1MB
+
+// iOS device tier detection
+#ifdef __APPLE__
+#if TARGET_OS_IOS
+static enum class IOSDeviceMemoryTier {
+    LOW_MEMORY,    // <2GB total memory (older iPads)
+    MEDIUM_MEMORY, // 2-4GB total memory  
+    HIGH_MEMORY    // >4GB total memory (modern devices)
+} detectIOSDeviceMemoryTier() {
+    size_t total_memory = 0;
+    size_t length = sizeof(total_memory);
+    
+    if (sysctlbyname("hw.memsize", &total_memory, &length, nullptr, 0) == 0) {
+        const size_t GB = 1024ULL * 1024ULL * 1024ULL;
+        if (total_memory < 2 * GB) {
+            return IOSDeviceMemoryTier::LOW_MEMORY;
+        } else if (total_memory < 4 * GB) {
+            return IOSDeviceMemoryTier::MEDIUM_MEMORY;
+        } else {
+            return IOSDeviceMemoryTier::HIGH_MEMORY;
+        }
+    }
+    return IOSDeviceMemoryTier::MEDIUM_MEMORY; // Fallback
+}
+#endif
+#endif
+
+// Dynamic pool sizes based on device tier
+static u32 getIOSTexturePoolSize() {
+#ifdef __APPLE__
+#if TARGET_OS_IOS
+    static IOSDeviceMemoryTier tier = detectIOSDeviceMemoryTier();
+    switch (tier) {
+        case IOSDeviceMemoryTier::LOW_MEMORY: return 8;  // Conservative for older devices
+        case IOSDeviceMemoryTier::MEDIUM_MEMORY: return 16; // Balanced
+        case IOSDeviceMemoryTier::HIGH_MEMORY: return 32;   // Full optimization
+    }
+    return 16;
+#else
+    return 16; // Default for macOS
+#endif
+#else
+    return 16; // Default for other platforms
+#endif
+}
+
+static u32 getIOSStagingBufferPoolSize() {
+#ifdef __APPLE__
+#if TARGET_OS_IOS
+    static IOSDeviceMemoryTier tier = detectIOSDeviceMemoryTier();
+    switch (tier) {
+        case IOSDeviceMemoryTier::LOW_MEMORY: return 4;  // Conservative for older devices
+        case IOSDeviceMemoryTier::MEDIUM_MEMORY: return 8; // Balanced
+        case IOSDeviceMemoryTier::HIGH_MEMORY: return 16;  // Full optimization
+    }
+    return 8;
+#else
+    return 8; // Default for macOS
+#endif
+#else
+    return 8; // Default for other platforms
+#endif
+}
 
 /// iOS texture streaming performance metrics
 struct IOSTextureMetrics {
@@ -95,7 +156,7 @@ struct IOSTexturePool {
 		}
 		
 		// Create new texture if pool not full
-		if (textures.size() < IOS_TEXTURE_POOL_SIZE) {
+		if (textures.size() < getIOSTexturePoolSize()) {
 			auto newTex = std::make_unique<PooledTexture>();
 			newTex->extent = extent;
 			newTex->format = format;
@@ -196,7 +257,7 @@ struct IOSStagingBufferPool {
 		}
 		
 		// Create new buffer if pool not full
-		if (buffers.size() < IOS_STAGING_BUFFER_POOL_SIZE) {
+		if (buffers.size() < getIOSStagingBufferPoolSize()) {
 			auto newBuf = std::make_unique<PooledBuffer>();
 			newBuf->size = std::max(size, 1024u * 1024u);  // Minimum 1MB for efficiency
 			newBuf->bufferData = std::make_unique<BufferData>(newBuf->size, vk::BufferUsageFlagBits::eTransferSrc);

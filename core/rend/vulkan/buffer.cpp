@@ -77,7 +77,34 @@ BufferData::BufferData(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::Memo
 		// FIXME VMA_ALLOCATION_CREATE_MAPPED_BIT ?
 #ifdef __APPLE__
 		// MoltenVK memory management improvements for 1.2.11+
-		allocInfo.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+		// Check iOS device memory capabilities for graceful fallback
+		static bool isLowMemoryDevice = false;
+		static bool checkedDeviceMemory = false;
+		
+		if (!checkedDeviceMemory) {
+			// Detect iOS device memory for allocation strategy
+			#if TARGET_OS_IOS
+			size_t total_memory = 0;
+			size_t length = sizeof(total_memory);
+			if (sysctlbyname("hw.memsize", &total_memory, &length, nullptr, 0) == 0) {
+				const size_t GB = 1024ULL * 1024ULL * 1024ULL;
+				isLowMemoryDevice = (total_memory < 2 * GB); // <2GB = older iPad
+				INFO_LOG(RENDERER, "📱 iOS Device Memory: %.2f GB, Low Memory Mode: %s", 
+					total_memory / (1024.0 * 1024.0 * 1024.0), isLowMemoryDevice ? "ON" : "OFF");
+			}
+			#endif
+			checkedDeviceMemory = true;
+		}
+		
+		// Use conservative memory allocation for low-memory devices
+		if (isLowMemoryDevice) {
+			// Avoid dedicated allocation on older devices to conserve memory
+			INFO_LOG(RENDERER, "🔧 iOS Low Memory: Using shared allocation for buffer size %llu", size);
+		} else {
+			// Use dedicated allocation for better performance on high-memory devices
+			allocInfo.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+		}
+		
 		// MoltenVK 1.2.11+ has improved host coherent memory support, but we still need to be careful
 		// Only disable host coherent if we're not using a recent MoltenVK version
 		// This check can be removed once minimum MoltenVK version is 1.2.11+
