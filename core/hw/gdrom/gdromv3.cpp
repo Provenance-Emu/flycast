@@ -22,7 +22,7 @@
 /// iOS unified memory architecture optimizations
 #define IOS_GDROM_CACHE_LINE_SIZE 64
 #define IOS_GDROM_OPTIMAL_ALIGNMENT 64
-#define IOS_GDROM_LARGE_BUFFER_SIZE (2352 * 64)  // 2x larger for streaming
+#define IOS_GDROM_LARGE_BUFFER_SIZE (2352 * 128)  // 4x larger for fast asset loading
 
 /// iOS-optimized buffer structure for better cache performance
 struct IOSOptimizedBuffer {
@@ -158,9 +158,9 @@ static void FillReadBuffer()
 	u32 count = read_params.remaining_sectors;
 
 #if defined(__APPLE__) && defined(TARGET_IPHONE)
-	/// iOS-optimized streaming: Use larger buffer for FMV performance
-	if (count > 64 && iosGDROMBuffer.isOptimized) {
-		count = 64;  /// 2x larger for iOS streaming
+	/// iOS-optimized streaming: Much larger buffers for asset loading performance
+	if (count > 128 && iosGDROMBuffer.isOptimized) {
+		count = 128;  /// 4x larger for fast asset loading
 	} else
 #endif
 	if (count > 32)
