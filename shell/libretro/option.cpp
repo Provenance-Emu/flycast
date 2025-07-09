@@ -39,7 +39,7 @@ Option<bool> ForceFreePlay(CORE_OPTION_NAME "_force_freeplay", true);
 
 // Sound
 
-Option<bool> DSPEnabled(CORE_OPTION_NAME "_enable_dsp", false);
+Option<bool> DSPEnabled(CORE_OPTION_NAME "_enable_dsp", true);
 #if HOST_CPU == CPU_ARM
 Option<int> AudioBufferSize("", 5644);	// 128 ms
 #else
