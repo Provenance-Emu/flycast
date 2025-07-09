@@ -15,26 +15,32 @@
 #include "debug/gdb_server.h"
 #include "../sh4_cycles.h"
 
+#include <array>
+#include <algorithm>
+
 // === ULTRA-AGGRESSIVE FMV ARCHITECTURE ===
 extern int getDynamicCpuRatio();
 
 Sh4ICache icache;
 Sh4OCache ocache;
 
-// === MASSIVE INSTRUCTION CACHE ===
+// === MASSIVE INSTRUCTION CACHE - OPTIMIZED ===
 #define ICACHE_SIZE 512  // smaller cache helps with slowdowns
 #define ICACHE_MASK (ICACHE_SIZE - 1)
 
-struct UltraCache {
-    u32 pc[ICACHE_SIZE];
-    u16 opcode[ICACHE_SIZE];
-    u32 access_count[ICACHE_SIZE];
-    u8 estimated_cycles[ICACHE_SIZE]; // Pre-calculated cycle estimates
+// Cache-line aligned structure for better performance
+struct alignas(64) UltraCache {
+    // Separate arrays for better cache locality
+    alignas(64) std::array<u32, ICACHE_SIZE> pc;
+    alignas(64) std::array<u16, ICACHE_SIZE> opcode;
+    alignas(64) std::array<u32, ICACHE_SIZE> access_count;
+    alignas(64) std::array<u8, ICACHE_SIZE> estimated_cycles; // Pre-calculated cycle estimates
     
     void reset() {
-        std::fill(pc, pc + ICACHE_SIZE, 0xFFFFFFFF);
-        std::memset(access_count, 0, sizeof(access_count[0]) * ICACHE_SIZE);
-        std::fill(estimated_cycles, estimated_cycles + ICACHE_SIZE, 1);
+        pc.fill(0xFFFFFFFF);
+        std::memset(access_count.data(), 0, access_count.size() * sizeof(u32));
+        estimated_cycles.fill(1);
+        opcode.fill(0);
     }
     
     u16 fetch(u32 addr, u8* cycles_out) {
