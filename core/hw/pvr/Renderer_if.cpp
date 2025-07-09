@@ -169,6 +169,34 @@ public:
 	{
 		return execute(dequeue(timeoutMs));
 	}
+	
+	// AICA-aware message processing for threaded rendering
+	// Balanced approach: Moderate AICA protection without crushing performance
+	bool waitAndExecuteAICAaware()
+	{
+		// Balanced path: Check AICA more frequently than minimal but less than aggressive
+		const int normal_timeout = SPG_CONTROL.isPAL() ? 23 : 20;
+		
+		// Check AICA every 50 calls instead of 1000 (moderate frequency)
+		static int aica_check_counter = 0;
+		if (++aica_check_counter < 50) {  // Check every 50 calls (~every 20ms)
+			return waitAndExecute(normal_timeout);
+		}
+		
+		aica_check_counter = 0;
+		
+		// Moderate AICA check - more lenient than aggressive approach
+		static constexpr int AICA_TICK_INTERVAL = 4535;
+		uint64_t current_cycles = sh4_sched_now64();
+		uint64_t cycles_since_aica = current_cycles % AICA_TICK_INTERVAL;
+		
+		// Use shorter timeout when AICA is moderately starved (95% instead of 99%)
+		if (cycles_since_aica >= (AICA_TICK_INTERVAL * 95 / 100)) {
+			return waitAndExecute(8);  // 8ms timeout - compromise between 1ms and 20ms
+		}
+		
+		return waitAndExecute(normal_timeout);
+	}
 
 	void reset() {
 		const lock_guard lock(mutex);
@@ -323,10 +351,12 @@ bool rend_single_frame(const bool& enabled)
 {
 	FC_PROFILE_SCOPE;
 
-	const int timeout = SPG_CONTROL.isPAL() ? 23 : 20;
+	// AUDIO FIX: Use AICA-aware waiting to prevent render blocking from disrupting audio
+	// Original timeout: SPG_CONTROL.isPAL() ? 23 : 20 (20-23ms)
+	// New: Automatically adjusts based on AICA scheduling needs
 	presented = false;
 	while (enabled && !presented)
-		if (!pvrQueue.waitAndExecute(timeout))
+		if (!pvrQueue.waitAndExecuteAICAaware())
 			return false;
 	return true;
 }
@@ -507,8 +537,39 @@ int rend_end_render(int tag, int cycles, int jitter, void *arg)
 		asic_RaiseInterrupt(holly_RENDER_DONE_isp);
 		asic_RaiseInterrupt(holly_RENDER_DONE_vd);
 	}
+	
+	// AUDIO FIX: AICA-aware render synchronization
+	// Balanced approach - moderate intervention for audio without crushing performance
 	if (pend_rend && config::ThreadedRendering)
+	{
+		// Balanced path: Check AICA more frequently than minimal but less than aggressive
+		static int render_check_counter = 0;
+		if (++render_check_counter < 20) {  // Check every 20 render calls (~every 300ms at 60fps)
+			renderEnd.Wait();  // Normal infinite wait for performance
+		} else {
+			render_check_counter = 0;
+			
+			// Moderate AICA check - balanced between performance and audio protection
+			static constexpr int AICA_TICK_INTERVAL = 4535;
+			uint64_t current_cycles = sh4_sched_now64();
+			uint64_t cycles_since_aica = current_cycles % AICA_TICK_INTERVAL;
+			
+			// Use timeout when AICA is moderately starved (97% instead of 99.5%)
+			if (cycles_since_aica >= (AICA_TICK_INTERVAL * 97 / 100)) {
+				if (!renderEnd.Wait(25)) {  // 25ms timeout - compromise between 5ms and 100ms
+					// Timeout occurred - let AICA run
+					return 0;
+				}
+			} else {
+				renderEnd.Wait();  // Normal infinite wait
+			}
+		}
+	}
+	else
+	{
+		// Non-threaded rendering - use original infinite wait
 		renderEnd.Wait();
+	}
 
 	return 0;
 }

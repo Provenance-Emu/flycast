@@ -114,12 +114,24 @@ static inline void addCyclesUltraFast(u8 cycles) {
 }
 
 static inline void flushCyclesIfNeeded() {
+    // CRITICAL: AICA needs to run every 4535 cycles - don't let batching delay it!
+    // Check if we're approaching AICA's scheduling deadline
+    u32 cycles_until_aica = (AICA_TICK_INTERVAL - (g_cycles_since_aica_check % AICA_TICK_INTERVAL));
+    
     // Determine appropriate batch size based on AICA timing needs
     u32 batch_size;
     
-    // If we're approaching AICA's next scheduling point, use smaller batches
-    if (g_cycles_since_aica_check >= (AICA_TICK_INTERVAL - AICA_SAFETY_MARGIN)) {
-        batch_size = AICA_AWARE_BATCH_SIZE;  // Small batches to ensure AICA timing
+    // If AICA needs to run soon, force immediate cycle flush
+    if (cycles_until_aica <= AICA_SAFETY_MARGIN || g_cycles_since_aica_check >= (AICA_TICK_INTERVAL - AICA_SAFETY_MARGIN)) {
+        // FORCE IMMEDIATE FLUSH - don't let large batches delay AICA!
+        if (g_cycle_debt > 0) {
+            sh4cycles.addCycles(g_cycle_debt);
+            p_sh4rcb->cntx.cycle_counter -= g_cycle_debt;
+            g_cycles_since_aica_check = 0;  // Reset AICA timing
+            g_cycle_debt = 0;
+            return;
+        }
+        batch_size = 1;  // Minimal batching when AICA is critical
     } else if (g_instruction_count > 100) {
         batch_size = FMV_CYCLE_BATCH_SIZE;   // Large batches for FMV scenarios  
     } else {
@@ -129,12 +141,6 @@ static inline void flushCyclesIfNeeded() {
     if (__builtin_expect(g_cycle_debt >= batch_size, 0)) {
         sh4cycles.addCycles(g_cycle_debt);
         p_sh4rcb->cntx.cycle_counter -= g_cycle_debt;
-        
-        // Reset AICA cycle counter when we flush cycles
-        if (g_cycles_since_aica_check >= (AICA_TICK_INTERVAL - AICA_SAFETY_MARGIN)) {
-            g_cycles_since_aica_check = 0;
-        }
-        
         g_cycle_debt = 0;
     }
 }
@@ -206,12 +212,23 @@ static inline u16 fetchInstructionUltraFast(u8* cycles_out) {
 
 // Ultra-fast execution for FMV scenarios
 static inline void executeFMVMegaBatch() {
-    const u32 MEGA_BATCH_SIZE = 256; // Execute 256 instructions in one go!
+    const u32 MEGA_BATCH_SIZE = 512; // Large batches but with AICA safety checks
     
     for (u32 i = 0; i < MEGA_BATCH_SIZE; i++) {
-        // Check timeslice only occasionally
-        if (__builtin_expect((i & 63) == 0 && p_sh4rcb->cntx.cycle_counter <= 0, 0)) {
+        // Check timeslice every 16 instructions
+        if (__builtin_expect((i & 15) == 0 && p_sh4rcb->cntx.cycle_counter <= 0, 0)) {
             break;
+        }
+        
+        // CRITICAL: Check AICA timing every 64 instructions during FMV
+        // This prevents audio starvation during aggressive FMV optimization
+        if ((i & 63) == 63) {
+            u32 cycles_until_aica = (AICA_TICK_INTERVAL - (g_cycles_since_aica_check % AICA_TICK_INTERVAL));
+            if (cycles_until_aica <= AICA_SAFETY_MARGIN) {
+                // AICA deadline approaching - flush cycles immediately and break out
+                forceFlushCycles();
+                break;  // Exit mega-batch to allow AICA scheduling
+            }
         }
         
         u8 estimated_cycles;
@@ -224,7 +241,7 @@ static inline void executeFMVMegaBatch() {
         OpPtr[op](op);
         addCyclesUltraFast(estimated_cycles);
         
-        // Minimal overhead cycle checking - only every 32 instructions
+        // Check cycles every 32 instructions for regular cycle management
         if ((i & 31) == 31) {
             flushCyclesIfNeeded();
         }
@@ -233,9 +250,19 @@ static inline void executeFMVMegaBatch() {
 
 // Fast execution for hot paths
 static inline void executeHotBatch() {
-    const u32 HOT_BATCH_SIZE = 64;
+    const u32 HOT_BATCH_SIZE = 64;  // Moderate batches with AICA safety
     
     for (u32 i = 0; i < HOT_BATCH_SIZE && p_sh4rcb->cntx.cycle_counter > 0; i++) {
+        // CRITICAL: Check AICA timing during hot path execution
+        if ((i & 31) == 31) {
+            u32 cycles_until_aica = (AICA_TICK_INTERVAL - (g_cycles_since_aica_check % AICA_TICK_INTERVAL));
+            if (cycles_until_aica <= AICA_SAFETY_MARGIN) {
+                // AICA deadline approaching - exit hot batch to allow scheduling
+                forceFlushCycles();
+                break;
+            }
+        }
+        
         u8 estimated_cycles;
         u16 op = fetchInstructionUltraFast(&estimated_cycles);
         
@@ -254,9 +281,19 @@ static inline void executeHotBatch() {
 
 // Normal execution
 static inline void executeNormalBatch() {
-    const u32 NORMAL_BATCH_SIZE = 16;
+    const u32 NORMAL_BATCH_SIZE = 32;  // Small batches with AICA protection
     
     for (u32 i = 0; i < NORMAL_BATCH_SIZE && p_sh4rcb->cntx.cycle_counter > 0; i++) {
+        // CRITICAL: Check AICA timing even during normal execution
+        if ((i & 15) == 15) {
+            u32 cycles_until_aica = (AICA_TICK_INTERVAL - (g_cycles_since_aica_check % AICA_TICK_INTERVAL));
+            if (cycles_until_aica <= AICA_SAFETY_MARGIN) {
+                // AICA deadline approaching - exit normal batch to allow scheduling
+                forceFlushCycles();
+                break;
+            }
+        }
+        
         u8 estimated_cycles;
         u16 op = fetchInstructionUltraFast(&estimated_cycles);
         
