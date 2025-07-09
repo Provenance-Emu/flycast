@@ -22,7 +22,7 @@ Sh4ICache icache;
 Sh4OCache ocache;
 
 // === MASSIVE INSTRUCTION CACHE ===
-#define ICACHE_SIZE 8192  // Much larger cache
+#define ICACHE_SIZE 512  // smaller cache helps with slowdowns
 #define ICACHE_MASK (ICACHE_SIZE - 1)
 
 struct UltraCache {
