@@ -10,6 +10,7 @@ IOS_MIN_VERSION="15.0"
 IOS="ON"
 SYSTEM_NAME="iOS"
 RUN_BUILD="ON"
+AGGRESSIVE_FLAGS="ON"
 # Dynarec type: "jitless" (default), "jit", or "none"
 DYNAREC_TYPE=${DYNAREC_TYPE:-"jitless"}
 
@@ -44,7 +45,7 @@ C_FLAGS="-arch ${ARCH} \
 -ftree-vectorize \
 -funsafe-math-optimizations \
 -fvectorize \
--march=armv8-a+simd+crc+crypto+dotprod+fp16 \
+-march=armv8-a+simd+crc+crypto \
 -mcpu=apple-a10 \
 -mtune=apple-a14 \
 -O3 \
@@ -61,6 +62,11 @@ C_FLAGS="-arch ${ARCH} \
 -DENABLE_NEON_OPT \
 -DFMV_OPTIMIZED \
 -DTARGET_IPHONE"
+
+
+# -march=armv8-a+simd+crc+crypto+dotprod+fp16 \
+# intrinsics are not supported on a10, instead use -march=armv8-a+simd+crc+crypto
+# unless targetting a11+
 
 CXX_FLAGS="-arch ${ARCH} \
 -DIOS \
@@ -79,7 +85,7 @@ CXX_FLAGS="-arch ${ARCH} \
 -ftree-vectorize \
 -funsafe-math-optimizations \
 -fvectorize \
--march=armv8-a+simd+crc+crypto+dotprod+fp16 \
+-march=armv8-a+simd+crc+crypto \
 -mcpu=apple-a10 \
 -mtune=apple-a14 \
 -O3 \
@@ -98,6 +104,85 @@ CXX_FLAGS="-arch ${ARCH} \
 -DFMV_OPTIMIZED \
 -DTARGET_IPHONE"
 
+## Argressive flags
+
+AGGRESSIVE_FLAGS=" \
+-fno-stack-protector \
+-funit-at-a-time \
+-fuse-linker-plugin \
+-fvect-cost-model=dynamic \
+-fweb \
+-fwhole-program \
+-fwrapv \
+-ftree-builtin-call-dce \
+-ftree-ccp \
+-ftree-ch \
+-ftree-coalesce-vars \
+-ftree-copy-prop \
+-ftree-dce \
+-ftree-dominator-opts \
+-ftree-dse \
+-ftree-forwprop \
+-ftree-fre \
+-ftree-loop-if-convert \
+-ftree-loop-if-convert-stores \
+-ftree-loop-im \
+-ftree-loop-ivcanon \
+-ftree-loop-optimize \
+-ftree-parallelize-loops=auto \
+-ftree-phiprop \
+-ftree-pre \
+-ftree-pta \
+-ftree-reassoc \
+-ftree-sink \
+-ftree-slsr \
+-ftree-sra \
+-ftree-switch-conversion \
+-ftree-tail-merge \
+-ftree-ter \
+-ftree-vrp \
+-freorder-blocks-and-partition \
+-freorder-functions \
+-frerun-cse-after-loop \
+-fschedule-insns \
+-fschedule-insns2 \
+-fselective-scheduling \
+-fselective-scheduling2 \
+-fsel-sched-pipelining \
+-fsel-sched-pipelining-outer-loops \
+-fdevirtualize \
+-fdevirtualize-speculatively \
+-fhoist-adjacent-loads \
+-fisolate-erroneous-paths-dereference \
+-fisolate-erroneous-paths-attribute \
+-flra-remat \
+-foptimize-strlen \
+-fpartial-inlining \
+-fpeel-loops \
+-fpredictive-commoning \
+-frename-registers \
+-fgcse-sm \
+-fgcse-las \
+-fgcse-after-reload \
+-fipa-cp-clone \
+-fipa-pta \
+-fipa-ra \
+-fipa-sra \
+-fipa-split \
+-fipa-icf \
+-fipa-cp \
+-fipa-bit-cp \
+-fipa-vrp \
+-falign-functions=32 \
+-falign-loops=32 \
+-falign-jumps=32 \
+-fprefetch-loop-arrays \
+-fbranch-target-load-optimize2"
+
+if [ "$AGGRESSIVE_FLAGS" = "ON" ]; then
+    C_FLAGS="$C_FLAGS $AGGRESSIVE_FLAGS"
+    CXX_FLAGS="$CXX_FLAGS $AGGRESSIVE_FLAGS"
+fi
 
 # Add a function to display usage information
 print_usage() {
