@@ -117,23 +117,47 @@ static inline void forceFlushCycles() {
     }
 }
 
-// === FMV DETECTION SYSTEM ===
+// === CONSERVATIVE FMV DETECTION SYSTEM ===
 static u32 g_consecutive_instructions = 0;
 static u32 g_last_pc = 0;
+static u32 g_fmv_mode_timer = 0;
+static bool g_in_fmv_mode = false;
 
 static inline bool isInFMVMode() {
-    // Detect FMV-like scenarios: consecutive execution with hot cache
+    // Much more conservative FMV detection to avoid gameplay false positives
     u32 current_pc = next_pc;
     
     if (current_pc == g_last_pc + 2) {
         g_consecutive_instructions++;
         g_last_pc = current_pc;
         
-        // FMV mode: long sequences of consecutive instructions with hot cache
-        return g_consecutive_instructions > 50 && g_ultra_cache.isUltraHot(current_pc);
+        // Very strict criteria for FMV mode to avoid gameplay interference
+        bool potential_fmv = g_consecutive_instructions > 300 && // Much higher threshold
+                            g_ultra_cache.isUltraHot(current_pc) &&
+                            (current_pc & 0xFF000000) == 0x8C000000; // Main RAM only, not system areas
+        
+        if (potential_fmv && !g_in_fmv_mode) {
+            g_in_fmv_mode = true;
+            g_fmv_mode_timer = 0;
+            return true;
+        } else if (g_in_fmv_mode) {
+            g_fmv_mode_timer++;
+            // Auto-exit FMV mode after 5000 instructions to prevent gameplay slowdowns
+            if (g_fmv_mode_timer > 5000) {
+                g_in_fmv_mode = false;
+                g_fmv_mode_timer = 0;
+                return false;
+            }
+            return true;
+        }
+        
+        return false;
     } else {
+        // Non-consecutive execution - immediately exit FMV mode
         g_consecutive_instructions = 0;
         g_last_pc = current_pc;
+        g_in_fmv_mode = false;
+        g_fmv_mode_timer = 0;
         return false;
     }
 }
@@ -336,6 +360,8 @@ static void Sh4_int_Reset(bool hard)
     g_instruction_count = 0;
     g_consecutive_instructions = 0;
     g_last_pc = 0;
+    g_fmv_mode_timer = 0;
+    g_in_fmv_mode = false;
 
     INFO_LOG(INTERPRETER, "🚀 ULTRA-AGGRESSIVE FMV OPTIMIZER - Massive batching for maximum CPU utilization!");
 }
@@ -413,6 +439,8 @@ static void sh4_int_resetcache() {
     g_instruction_count = 0;
     g_consecutive_instructions = 0;
     g_last_pc = 0;
+    g_fmv_mode_timer = 0;
+    g_in_fmv_mode = false;
 }
 
 static void Sh4_int_Init()
