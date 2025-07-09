@@ -23,6 +23,10 @@
 #include <algorithm>
 #include <memory>
 
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
+
 /// iOS MoltenVK texture streaming optimizations for FMV performance
 #if defined(__APPLE__) && defined(TARGET_IPHONE)
 // Use C++ compatible includes for iOS optimization
@@ -39,11 +43,13 @@
 // iOS device tier detection
 #ifdef __APPLE__
 #if TARGET_OS_IOS
-static enum class IOSDeviceMemoryTier {
+enum class IOSDeviceMemoryTier {
     LOW_MEMORY,    // <2GB total memory (older iPads)
     MEDIUM_MEMORY, // 2-4GB total memory  
     HIGH_MEMORY    // >4GB total memory (modern devices)
-} detectIOSDeviceMemoryTier() {
+};
+
+static IOSDeviceMemoryTier detectIOSDeviceMemoryTier() {
     size_t total_memory = 0;
     size_t length = sizeof(total_memory);
     

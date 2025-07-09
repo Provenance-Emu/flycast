@@ -21,6 +21,10 @@
 #include "buffer.h"
 #include "vulkan_context.h"
 
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
+
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
 #include <arm_neon.h>
 
