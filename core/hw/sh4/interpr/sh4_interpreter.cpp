@@ -96,22 +96,45 @@ static UltraCache g_ultra_cache;
 // === ULTRA-AGGRESSIVE CYCLE MANAGEMENT ===
 static u32 g_cycle_debt = 0;
 static u32 g_instruction_count = 0;
+static u32 g_cycles_since_aica_check = 0;
 
-// For FMV scenarios, we batch MUCH more aggressively
-static const u32 FMV_CYCLE_BATCH_SIZE = 512;      // Massive cycle batches
-static const u32 NORMAL_CYCLE_BATCH_SIZE = 128;   // Still large for normal code
+// AICA runs every 4535 cycles at 44.1 KHz - we must respect this!
+static const u32 AICA_TICK_INTERVAL = 4535;
+static const u32 AICA_SAFETY_MARGIN = 200;  // Flush cycles early to ensure AICA timing
+
+// Aggressive batch sizes, but AICA-aware
+static const u32 FMV_CYCLE_BATCH_SIZE = 512;      // Large batches for FMV performance
+static const u32 NORMAL_CYCLE_BATCH_SIZE = 128;   // Smaller batches for normal code
+static const u32 AICA_AWARE_BATCH_SIZE = 64;      // Small batches when AICA needs attention
 
 static inline void addCyclesUltraFast(u8 cycles) {
     g_cycle_debt += cycles;
+    g_cycles_since_aica_check += cycles;
     g_instruction_count++;
 }
 
 static inline void flushCyclesIfNeeded() {
-    u32 batch_size = g_instruction_count > 100 ? FMV_CYCLE_BATCH_SIZE : NORMAL_CYCLE_BATCH_SIZE;
+    // Determine appropriate batch size based on AICA timing needs
+    u32 batch_size;
+    
+    // If we're approaching AICA's next scheduling point, use smaller batches
+    if (g_cycles_since_aica_check >= (AICA_TICK_INTERVAL - AICA_SAFETY_MARGIN)) {
+        batch_size = AICA_AWARE_BATCH_SIZE;  // Small batches to ensure AICA timing
+    } else if (g_instruction_count > 100) {
+        batch_size = FMV_CYCLE_BATCH_SIZE;   // Large batches for FMV scenarios  
+    } else {
+        batch_size = NORMAL_CYCLE_BATCH_SIZE; // Normal batches
+    }
     
     if (__builtin_expect(g_cycle_debt >= batch_size, 0)) {
         sh4cycles.addCycles(g_cycle_debt);
         p_sh4rcb->cntx.cycle_counter -= g_cycle_debt;
+        
+        // Reset AICA cycle counter when we flush cycles
+        if (g_cycles_since_aica_check >= (AICA_TICK_INTERVAL - AICA_SAFETY_MARGIN)) {
+            g_cycles_since_aica_check = 0;
+        }
+        
         g_cycle_debt = 0;
     }
 }
@@ -120,6 +143,7 @@ static inline void forceFlushCycles() {
     if (g_cycle_debt > 0) {
         sh4cycles.addCycles(g_cycle_debt);
         g_cycle_debt = 0;
+        g_cycles_since_aica_check = 0; // Reset AICA tracking
     }
 }
 
@@ -364,6 +388,7 @@ static void Sh4_int_Reset(bool hard)
     g_ultra_cache.reset();
     g_cycle_debt = 0;
     g_instruction_count = 0;
+    g_cycles_since_aica_check = 0;  // Reset AICA timing tracking
     g_consecutive_instructions = 0;
     g_last_pc = 0;
     g_fmv_mode_timer = 0;
@@ -443,6 +468,7 @@ static void sh4_int_resetcache() {
     g_ultra_cache.reset();
     g_cycle_debt = 0;
     g_instruction_count = 0;
+    g_cycles_since_aica_check = 0;  // Reset AICA timing tracking
     g_consecutive_instructions = 0;
     g_last_pc = 0;
     g_fmv_mode_timer = 0;
