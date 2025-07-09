@@ -45,7 +45,7 @@ C_FLAGS="-arch ${ARCH} \
 -funsafe-math-optimizations \
 -fvectorize \
 -march=armv8-a+simd+crc+crypto+dotprod+fp16 \
--mcpu=apple-a14 \
+-mcpu=apple-a10 \
 -mtune=apple-a14 \
 -O3 \
 -Ofast \
@@ -59,7 +59,7 @@ C_FLAGS="-arch ${ARCH} \
 -DARM_NEON \
 -DHAVE_NEON \
 -DENABLE_NEON_OPT \
--DFMV_OPTIMIZED
+-DFMV_OPTIMIZED \
 -DTARGET_IPHONE"
 
 CXX_FLAGS="-arch ${ARCH} \
@@ -80,7 +80,7 @@ CXX_FLAGS="-arch ${ARCH} \
 -funsafe-math-optimizations \
 -fvectorize \
 -march=armv8-a+simd+crc+crypto+dotprod+fp16 \
--mcpu=apple-a14 \
+-mcpu=apple-a10 \
 -mtune=apple-a14 \
 -O3 \
 -Ofast \
