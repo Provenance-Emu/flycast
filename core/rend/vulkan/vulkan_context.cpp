@@ -68,78 +68,78 @@ extern void CleanupIOSTextureStreaming();
 struct MoltenVKOptimizations {
     bool is_moltenvk = false;
     bool ios_optimizations_enabled = false;
-    
+
     // iOS Metal performance settings
     bool metal_unified_memory = false;
     bool metal_resource_options = false;
     bool fast_descriptor_updates = false;
-    
+
     // Device capability tier (based on available memory)
     enum class DeviceCapabilityTier {
         LOW_MEMORY,    // <2GB total memory (older iPads)
-        MEDIUM_MEMORY, // 2-4GB total memory  
+        MEDIUM_MEMORY, // 2-4GB total memory
         HIGH_MEMORY    // >4GB total memory (modern devices)
     } device_tier = DeviceCapabilityTier::MEDIUM_MEMORY;
-    
+
     // Scaled optimization parameters based on device tier
     u32 descriptor_combined_image_sampler = 40000;
     u32 descriptor_uniform_buffer = 80000;
     u32 descriptor_max_sets = 40000;
     u32 texture_pool_size = 16;
     u32 staging_buffer_pool_size = 8;
-    
-    // FMV-specific optimizations  
+
+    // FMV-specific optimizations
     u32 optimized_swapchain_images = 3;  // Minimum for smooth FMV
     bool immediate_command_submission = true;
     bool parallel_command_encoding = true;
-    
+
     void detect_and_configure() {
         // Auto-detect MoltenVK and configure iOS optimizations
         is_moltenvk = true;  // We're on iOS, using MoltenVK
         ios_optimizations_enabled = true;
-        
+
         // Detect iOS device memory capabilities
         size_t total_memory = detectIOSDeviceMemory();
         device_tier = classifyDeviceCapability(total_memory);
-        
+
         // Configure optimizations based on device capability tier
         configureForDeviceTier();
-        
+
         // iOS device capabilities detection (assume iOS 13.0+ for modern devices)
         metal_unified_memory = true;
         metal_resource_options = true;
         fast_descriptor_updates = true;
         immediate_command_submission = true;
         parallel_command_encoding = true;
-        
+
         // Configure MoltenVK for optimal FMV texture streaming
         optimized_swapchain_images = (device_tier == DeviceCapabilityTier::HIGH_MEMORY) ? 4 : 3;
-        
+
         INFO_LOG(RENDERER, "🚀 MoltenVK iOS Device Tier: %s, Memory=%s, Descriptors=%u/%u/%u",
                  getDeviceTierName().c_str(),
                  metal_unified_memory ? "Unified" : "Discrete",
                  descriptor_combined_image_sampler, descriptor_uniform_buffer, descriptor_max_sets);
     }
-    
+
 private:
     size_t detectIOSDeviceMemory() {
         // Use iOS sysctls to detect total system memory
         size_t total_memory = 0;
         size_t length = sizeof(total_memory);
-        
+
         if (sysctlbyname("hw.memsize", &total_memory, &length, nullptr, 0) == 0) {
             INFO_LOG(RENDERER, "📱 iOS Device Memory: %.2f GB detected", total_memory / (1024.0 * 1024.0 * 1024.0));
             return total_memory;
         }
-        
+
         // Fallback: assume medium memory if detection fails
         WARN_LOG(RENDERER, "⚠️ Failed to detect iOS device memory, assuming medium tier");
         return 3ULL * 1024ULL * 1024ULL * 1024ULL; // 3GB fallback
     }
-    
+
     DeviceCapabilityTier classifyDeviceCapability(size_t total_memory) {
         const size_t GB = 1024ULL * 1024ULL * 1024ULL;
-        
+
         if (total_memory < 2 * GB) {
             return DeviceCapabilityTier::LOW_MEMORY;   // <2GB: older iPads, iPhone 6s/7
         } else if (total_memory < 4 * GB) {
@@ -148,7 +148,7 @@ private:
             return DeviceCapabilityTier::HIGH_MEMORY;   // >4GB: iPad Pro, iPhone 13+
         }
     }
-    
+
     void configureForDeviceTier() {
         switch (device_tier) {
             case DeviceCapabilityTier::LOW_MEMORY:
@@ -160,7 +160,7 @@ private:
                 staging_buffer_pool_size = 2;               // Minimal staging buffers
                 INFO_LOG(RENDERER, "🔧 iOS LOW_MEMORY tier: Ultra-conservative Vulkan allocations for older device");
                 break;
-                
+
             case DeviceCapabilityTier::MEDIUM_MEMORY:
                 // Balanced settings for typical devices
                 descriptor_combined_image_sampler = 35000;  // Slightly reduced
@@ -170,7 +170,7 @@ private:
                 staging_buffer_pool_size = 6;               // Balanced staging buffers
                 INFO_LOG(RENDERER, "🔧 iOS MEDIUM_MEMORY tier: Balanced Vulkan allocations");
                 break;
-                
+
             case DeviceCapabilityTier::HIGH_MEMORY:
                 // Aggressive settings for high-end devices
                 descriptor_combined_image_sampler = 60000;  // Full FMV optimization
@@ -182,7 +182,7 @@ private:
                 break;
         }
     }
-    
+
     std::string getDeviceTierName() const {
         switch (device_tier) {
             case DeviceCapabilityTier::LOW_MEMORY: return "LOW_MEMORY";
@@ -510,7 +510,7 @@ bool VulkanContext::InitDevice()
 		g_moltenvk_opts.detect_and_configure();
 #endif
 #endif
-		
+
 		const vk::PhysicalDeviceProperties physicalDeviceProperties = physicalDevice.getProperties();
 
 		std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
@@ -628,7 +628,7 @@ bool VulkanContext::InitDevice()
 			// Enable VK_EXT_provoking_vertex if available
 			provokingVertexSupported = tryAddDeviceExtension(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME);
 		}
-		
+
 		// Get device features
 
 		vk::PhysicalDeviceFeatures2 featuresChain{};
@@ -639,7 +639,7 @@ bool VulkanContext::InitDevice()
 		{
 			featuresChain.pNext = &provokingVertexFeatures;
 		}
-		
+
 		// Get the physical device's features
 		if (getPhysicalDeviceProperties2Supported && featuresChain.pNext)
 		{
@@ -731,7 +731,7 @@ bool VulkanContext::InitDevice()
                 vk::DescriptorPoolSize(vk::DescriptorType::eInputAttachment, 100)
             };
         }
-        
+
         u32 maxSets = 40000;
 #ifdef __APPLE__
 #if TARGET_OS_IOS
@@ -747,15 +747,15 @@ bool VulkanContext::InitDevice()
         int attempts = 0;
         const int maxAttempts = 5;
         float reductionFactor = 1.0f;
-        
+
         while (!poolCreated && attempts < maxAttempts) {
             try {
                 // Scale down allocation sizes with each retry
                 auto scaledPoolSizes = pool_sizes;
                 u32 scaledMaxSets = static_cast<u32>(maxSets * reductionFactor);
-                
+
                 for (auto& poolSize : scaledPoolSizes) {
-                    if (poolSize.type == vk::DescriptorType::eCombinedImageSampler || 
+                    if (poolSize.type == vk::DescriptorType::eCombinedImageSampler ||
                         poolSize.type == vk::DescriptorType::eUniformBuffer) {
                         poolSize.descriptorCount = static_cast<u32>(poolSize.descriptorCount * reductionFactor);
                         // Ensure minimum viable counts
@@ -767,28 +767,28 @@ bool VulkanContext::InitDevice()
                         }
                     }
                 }
-                
+
                 scaledMaxSets = std::max(scaledMaxSets, 5000u); // Minimum viable max sets
-                
+
                 descriptorPool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo(
                     vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, scaledMaxSets, scaledPoolSizes));
-                    
+
                 poolCreated = true;
-                
+
                 if (attempts > 0) {
-                    INFO_LOG(RENDERER, "✅ Progressive fallback succeeded on attempt %d (%.0f%% scale): maxSets=%u", 
+                    INFO_LOG(RENDERER, "✅ Progressive fallback succeeded on attempt %d (%.0f%% scale): maxSets=%u",
                              attempts + 1, reductionFactor * 100, scaledMaxSets);
                 } else {
                     INFO_LOG(RENDERER, "✅ Descriptor pool created successfully on first attempt: maxSets=%u", scaledMaxSets);
                 }
-                
+
             } catch (const vk::OutOfDeviceMemoryError& err) {
                 attempts++;
                 reductionFactor *= 0.7f; // Reduce by 30% each attempt
-                
-                WARN_LOG(RENDERER, "⚠️ Descriptor pool allocation failed (attempt %d/%d) - %.0f%% memory usage, retrying with %.0f%% scale", 
+
+                WARN_LOG(RENDERER, "⚠️ Descriptor pool allocation failed (attempt %d/%d) - %.0f%% memory usage, retrying with %.0f%% scale",
                          attempts, maxAttempts, reductionFactor / 0.7f * 100, reductionFactor * 100);
-                
+
                 if (attempts >= maxAttempts) {
                     ERROR_LOG(RENDERER, "❌ Critical: All descriptor pool allocation attempts failed after %d tries", maxAttempts);
                     throw; // Re-throw the error if all attempts failed
@@ -914,7 +914,19 @@ void VulkanContext::CreateSwapChain()
 			colorFormat = (formats[0].format == vk::Format::eUndefined) ? vk::Format::eB8G8R8A8Unorm : formats[0].format;
 		}
 
+		// Progressive fallback strategy for A10+ GPU compatibility
+		struct SwapchainConfig {
+			u32 imageCount;
+			vk::PresentModeKHR presentMode;
+			vk::ImageUsageFlags usage;
+			std::string description;
+		};
+
+		std::vector<SwapchainConfig> fallbackConfigs;
+
 		int tries = 0;
+		bool swapchainCreated = false;
+
 		do {
 			vk::SurfaceCapabilitiesKHR surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(GetSurface());
 			DEBUG_LOG(RENDERER, "Surface capabilities: %d x %d, %s, image count: %d - %d", surfaceCapabilities.currentExtent.width, surfaceCapabilities.currentExtent.height,
@@ -936,54 +948,99 @@ void VulkanContext::CreateSwapChain()
 			if (!IsValid())
 				throw InvalidVulkanContext();
 
-			// The FIFO present mode is guaranteed by the spec to be supported
-			vk::PresentModeKHR swapchainPresentMode = vk::PresentModeKHR::eFifo;
-			// Use FIFO on mobile, prefer Mailbox on desktop
-			for (auto& presentMode : physicalDevice.getSurfacePresentModesKHR(GetSurface()))
-			{
+						// Build progressive fallback configurations on first attempt
+			if (fallbackConfigs.empty()) {
+				// Calculate swap interval first
+				if (swapOnVSync && config::DupeFrames && settings.display.refreshRate > 60.f)
+					swapInterval = settings.display.refreshRate / 60.f;
+				else
+					swapInterval = 1;
+
+				// Get available present modes
+				std::vector<vk::PresentModeKHR> availableModes = physicalDevice.getSurfacePresentModesKHR(GetSurface());
+				bool hasMailbox = std::find(availableModes.begin(), availableModes.end(), vk::PresentModeKHR::eMailbox) != availableModes.end();
+				bool hasImmediate = std::find(availableModes.begin(), availableModes.end(), vk::PresentModeKHR::eImmediate) != availableModes.end();
+
+				// Determine optimal configurations based on device capabilities
+#ifdef __APPLE__
+#if TARGET_OS_IOS
+				// iOS-specific fallback strategy for A10+ compatibility
+				if (g_moltenvk_opts.device_tier == MoltenVKOptimizations::DeviceCapabilityTier::LOW_MEMORY) {
+					// Ultra-conservative for A10/A11 devices
+					fallbackConfigs = {
+						{surfaceCapabilities.minImageCount, vk::PresentModeKHR::eFifo, vk::ImageUsageFlagBits::eColorAttachment, "Minimal (A10+ safe)"},
+						{surfaceCapabilities.minImageCount + 1, vk::PresentModeKHR::eFifo, vk::ImageUsageFlagBits::eColorAttachment, "Minimal+1 (A10+ safe)"}
+					};
+				} else if (g_moltenvk_opts.device_tier == MoltenVKOptimizations::DeviceCapabilityTier::MEDIUM_MEMORY) {
+					// Balanced for A12/A13 devices
+					u32 optimalCount = std::min(3u, surfaceCapabilities.maxImageCount > 0 ? surfaceCapabilities.maxImageCount : 3u);
+					fallbackConfigs = {
+						{optimalCount, vk::PresentModeKHR::eFifo, vk::ImageUsageFlagBits::eColorAttachment, "Balanced (A12+ optimized)"},
+						{surfaceCapabilities.minImageCount, vk::PresentModeKHR::eFifo, vk::ImageUsageFlagBits::eColorAttachment, "Fallback minimal"}
+					};
+				} else {
+					// Aggressive for A14+ devices
+					u32 optimalCount = std::max(g_moltenvk_opts.optimized_swapchain_images, surfaceCapabilities.minImageCount);
+					if (surfaceCapabilities.maxImageCount != 0)
+						optimalCount = std::min(optimalCount, surfaceCapabilities.maxImageCount);
+					fallbackConfigs = {
+						{optimalCount, hasMailbox ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eFifo, vk::ImageUsageFlagBits::eColorAttachment, "High-end optimized"},
+						{3u, vk::PresentModeKHR::eFifo, vk::ImageUsageFlagBits::eColorAttachment, "Standard fallback"},
+						{surfaceCapabilities.minImageCount, vk::PresentModeKHR::eFifo, vk::ImageUsageFlagBits::eColorAttachment, "Minimal fallback"}
+					};
+				}
+#else
+				// macOS fallback
+				u32 imageCount = std::max(3u * swapInterval, surfaceCapabilities.minImageCount);
+				if (surfaceCapabilities.maxImageCount != 0)
+					imageCount = std::min(imageCount, surfaceCapabilities.maxImageCount);
+				fallbackConfigs = {
+					{imageCount, hasMailbox ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eFifo, vk::ImageUsageFlagBits::eColorAttachment, "macOS optimized"},
+					{surfaceCapabilities.minImageCount, vk::PresentModeKHR::eFifo, vk::ImageUsageFlagBits::eColorAttachment, "macOS minimal"}
+				};
+#endif
+#else
+				// Non-Apple platforms - existing logic
+				u32 imageCount = std::max(3u * swapInterval, surfaceCapabilities.minImageCount);
+				if (surfaceCapabilities.maxImageCount != 0)
+					imageCount = std::min(imageCount, surfaceCapabilities.maxImageCount);
+
+				vk::PresentModeKHR preferredMode = vk::PresentModeKHR::eFifo;
 #if HOST_CPU != CPU_ARM && HOST_CPU != CPU_ARM64 && !defined(__ANDROID__)
-				if (swapOnVSync && presentMode == vk::PresentModeKHR::eMailbox
-						&& vendorID != VENDOR_ATI && vendorID != VENDOR_AMD)
-				{
-					INFO_LOG(RENDERER, "Using mailbox present mode");
-					swapchainPresentMode = vk::PresentModeKHR::eMailbox;
-					break;
+				if (swapOnVSync && hasMailbox && vendorID != VENDOR_ATI && vendorID != VENDOR_AMD) {
+					preferredMode = vk::PresentModeKHR::eMailbox;
 				}
 #endif
-				if (!swapOnVSync && presentMode == vk::PresentModeKHR::eImmediate)
-				{
-					INFO_LOG(RENDERER, "Using immediate present mode");
-					swapchainPresentMode = vk::PresentModeKHR::eImmediate;
-					break;
+				if (!swapOnVSync && hasImmediate) {
+					preferredMode = vk::PresentModeKHR::eImmediate;
 				}
+
+				fallbackConfigs = {
+					{imageCount, preferredMode, vk::ImageUsageFlagBits::eColorAttachment, "Standard desktop"},
+					{surfaceCapabilities.minImageCount, vk::PresentModeKHR::eFifo, vk::ImageUsageFlagBits::eColorAttachment, "Desktop minimal"}
+				};
+#endif
+
+#if defined(TEST_AUTOMATION) || (defined(VIDEO_ROUTING) && defined(TARGET_MAC))
+				// Add transfer src usage for screenshots/Syphon
+				for (auto& config : fallbackConfigs) {
+					config.usage |= vk::ImageUsageFlagBits::eTransferSrc;
+				}
+#endif
 			}
-			if (swapOnVSync && config::DupeFrames && settings.display.refreshRate > 60.f)
-				swapInterval = settings.display.refreshRate / 60.f;
-			else
-				swapInterval = 1;
+
+			// Try each configuration
+			size_t configIndex = std::min(static_cast<size_t>(tries), fallbackConfigs.size() - 1);
+			const auto& config = fallbackConfigs[configIndex];
+
+			INFO_LOG(RENDERER, "🔧 Swapchain attempt %d: %s (images=%u, mode=%s)",
+			         tries + 1, config.description.c_str(), config.imageCount,
+			         vk::to_string(config.presentMode).c_str());
 
 			vk::SurfaceTransformFlagBitsKHR preTransform = (surfaceCapabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity) ? vk::SurfaceTransformFlagBitsKHR::eIdentity : surfaceCapabilities.currentTransform;
 
-			u32 imageCount = std::max(3u * swapInterval, surfaceCapabilities.minImageCount);
-#ifdef __APPLE__
-#if TARGET_OS_IOS
-			// iOS MoltenVK: Optimize swapchain for FMV performance
-			if (g_moltenvk_opts.ios_optimizations_enabled) {
-				// Use optimized image count for smooth FMV playback
-				imageCount = std::max(g_moltenvk_opts.optimized_swapchain_images, surfaceCapabilities.minImageCount);
-				INFO_LOG(RENDERER, "🔥 MoltenVK iOS: Using %u swapchain images for FMV optimization", imageCount);
-			}
-#endif
-#endif
-			if (surfaceCapabilities.maxImageCount != 0)
-				imageCount = std::min(imageCount, surfaceCapabilities.maxImageCount);
-			vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eColorAttachment;
-#if defined(TEST_AUTOMATION) || (defined(VIDEO_ROUTING) && defined(TARGET_MAC))
-			// for final screenshot or Syphon
-			usage |= vk::ImageUsageFlagBits::eTransferSrc;
-#endif
-			vk::SwapchainCreateInfoKHR swapChainCreateInfo(vk::SwapchainCreateFlagsKHR(), GetSurface(), imageCount, colorFormat, vk::ColorSpaceKHR::eSrgbNonlinear,
-					swapchainExtent, 1, usage, vk::SharingMode::eExclusive, 0, nullptr, preTransform, vk::CompositeAlphaFlagBitsKHR::eOpaque, swapchainPresentMode, true, nullptr);
+			vk::SwapchainCreateInfoKHR swapChainCreateInfo(vk::SwapchainCreateFlagsKHR(), GetSurface(), config.imageCount, colorFormat, vk::ColorSpaceKHR::eSrgbNonlinear,
+					swapchainExtent, 1, config.usage, vk::SharingMode::eExclusive, 0, nullptr, preTransform, vk::CompositeAlphaFlagBitsKHR::eOpaque, config.presentMode, true, nullptr);
 
 			u32 queueFamilyIndices[2] = { graphicsQueueIndex, presentQueueIndex };
 			if (graphicsQueueIndex != presentQueueIndex)
@@ -998,15 +1055,33 @@ void VulkanContext::CreateSwapChain()
 			swapChain.reset();
 			try {
 				swapChain = device->createSwapchainKHRUnique(swapChainCreateInfo);
+				swapchainCreated = true;
+				INFO_LOG(RENDERER, "✅ Swapchain created successfully with config: %s", config.description.c_str());
+				break;
+			}
+			catch (const vk::OutOfDeviceMemoryError& err)
+			{
+				ERROR_LOG(RENDERER, "❌ VK_ERROR_OUT_OF_DEVICE_MEMORY in swapchain creation (attempt %d): %s", tries + 1, err.what());
+				if (++tries >= static_cast<int>(fallbackConfigs.size())) {
+					ERROR_LOG(RENDERER, "❌ All swapchain configurations failed - device memory exhausted");
+					throw InvalidVulkanContext();
+				}
 			}
 			catch (const vk::SystemError& err)
 			{
-				DEBUG_LOG(RENDERER, "createSwapchainKHRUnique failed: %s", err.what());
-				if (++tries > 10)
+				WARN_LOG(RENDERER, "⚠️ Swapchain creation failed (attempt %d): %s", tries + 1, err.what());
+				if (++tries >= static_cast<int>(fallbackConfigs.size())) {
+					ERROR_LOG(RENDERER, "❌ All swapchain configurations failed after %d attempts", tries);
 					throw InvalidVulkanContext();
+				}
 			}
 		}
-		while (!swapChain);
+		while (!swapchainCreated && tries < static_cast<int>(fallbackConfigs.size()));
+
+		if (!swapChain) {
+			ERROR_LOG(RENDERER, "❌ Failed to create swapchain after all fallback attempts");
+			throw InvalidVulkanContext();
+		}
 
 		std::vector<vk::Image> swapChainImages = device->getSwapchainImagesKHR(*swapChain);
 
@@ -1187,9 +1262,74 @@ void VulkanContext::NewFrame()
 	recreateSwapChainIfNeeded();
 	if (!IsValid())
 		throw InvalidVulkanContext();
-	vk::Result res = device->acquireNextImageKHR(*swapChain, UINT64_MAX, *imageAcquiredSemaphores[currentSemaphore], nullptr, &currentImage);
-	res = device->waitForFences(*drawFences[currentImage], true, UINT64_MAX);
-	(void)res;
+
+	// Enhanced error handling for acquireNextImageKHR with device loss recovery
+	vk::Result res = vk::Result::eSuccess;
+	int acquireRetries = 0;
+	const int maxAcquireRetries = 3;
+
+	do {
+		try {
+			res = device->acquireNextImageKHR(*swapChain, UINT64_MAX, *imageAcquiredSemaphores[currentSemaphore], nullptr, &currentImage);
+
+			// Handle specific error cases
+			if (res == vk::Result::eErrorDeviceLost) {
+				ERROR_LOG(RENDERER, "❌ VK_ERROR_DEVICE_LOST detected in acquireNextImageKHR - attempting recovery");
+				throw InvalidVulkanContext(); // Trigger full context recreation
+			}
+			else if (res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR) {
+				WARN_LOG(RENDERER, "⚠️ Swapchain out of date/suboptimal, recreating...");
+				CreateSwapChain();
+				if (++acquireRetries >= maxAcquireRetries) {
+					ERROR_LOG(RENDERER, "❌ Failed to acquire image after %d retries", maxAcquireRetries);
+					throw InvalidVulkanContext();
+				}
+				continue; // Retry with new swapchain
+			}
+			else if (res == vk::Result::eErrorOutOfDeviceMemory) {
+				ERROR_LOG(RENDERER, "❌ VK_ERROR_OUT_OF_DEVICE_MEMORY in acquireNextImageKHR - device memory exhausted");
+				throw InvalidVulkanContext();
+			}
+			else if (res != vk::Result::eSuccess) {
+				WARN_LOG(RENDERER, "⚠️ acquireNextImageKHR returned unexpected result: %d", static_cast<int>(res));
+				if (++acquireRetries >= maxAcquireRetries) {
+					throw InvalidVulkanContext();
+				}
+				continue;
+			}
+
+			// Success - break out of retry loop
+			break;
+
+		} catch (const vk::SystemError& e) {
+			ERROR_LOG(RENDERER, "❌ SystemError in acquireNextImageKHR: %s", e.what());
+			if (++acquireRetries >= maxAcquireRetries) {
+				throw InvalidVulkanContext();
+			}
+			// Try recreating swapchain
+			try {
+				CreateSwapChain();
+			} catch (...) {
+				throw InvalidVulkanContext();
+			}
+		}
+	} while (acquireRetries < maxAcquireRetries);
+
+	// Wait for fence with error handling
+	try {
+		res = device->waitForFences(*drawFences[currentImage], true, UINT64_MAX);
+		if (res == vk::Result::eErrorDeviceLost) {
+			ERROR_LOG(RENDERER, "❌ VK_ERROR_DEVICE_LOST detected in waitForFences");
+			throw InvalidVulkanContext();
+		}
+		else if (res != vk::Result::eSuccess) {
+			WARN_LOG(RENDERER, "⚠️ waitForFences failed with result: %d", static_cast<int>(res));
+		}
+	} catch (const vk::SystemError& e) {
+		ERROR_LOG(RENDERER, "❌ SystemError in waitForFences: %s", e.what());
+		throw InvalidVulkanContext();
+	}
+
 	device->resetCommandPool(*commandPools[currentImage], vk::CommandPoolResetFlagBits::eReleaseResources);
 	inFlightObjects[currentImage].clear();
 	vk::CommandBuffer commandBuffer = *commandBuffers[currentImage];
@@ -1234,8 +1374,28 @@ void VulkanContext::Present() noexcept
 	{
 		try {
 			DoSwapAutomation();
+
+			// Enhanced present with device loss handling
 			vk::Result res = presentQueue.presentKHR(vk::PresentInfoKHR(1, &(*renderCompleteSemaphores[currentSemaphore]), 1, &(*swapChain), &currentImage));
-			(void)res;
+
+			// Handle present errors
+			if (res == vk::Result::eErrorDeviceLost) {
+				ERROR_LOG(RENDERER, "❌ VK_ERROR_DEVICE_LOST detected in presentKHR");
+				resized = true; // Trigger swapchain recreation
+			}
+			else if (res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR) {
+				INFO_LOG(RENDERER, "🔄 Swapchain out of date/suboptimal in present, will recreate");
+				resized = true;
+			}
+			else if (res == vk::Result::eErrorOutOfDeviceMemory) {
+				ERROR_LOG(RENDERER, "❌ VK_ERROR_OUT_OF_DEVICE_MEMORY in presentKHR");
+				resized = true;
+			}
+			else if (res != vk::Result::eSuccess) {
+				WARN_LOG(RENDERER, "⚠️ presentKHR returned unexpected result: %d", static_cast<int>(res));
+				resized = true;
+			}
+
 			currentSemaphore = (currentSemaphore + 1) % renderCompleteSemaphores.size();
 
 			if (lastFrameView && IsValid() && !gui_is_open())
@@ -1243,11 +1403,24 @@ void VulkanContext::Present() noexcept
 				{
 					PresentFrame(vk::Image(), lastFrameView, lastFrameExtent, lastFrameAR);
 					res = presentQueue.presentKHR(vk::PresentInfoKHR(1, &(*renderCompleteSemaphores[currentSemaphore]), 1, &(*swapChain), &currentImage));
+
+					// Handle errors in duplicate frame presents
+					if (res == vk::Result::eErrorDeviceLost || res == vk::Result::eErrorOutOfDateKHR ||
+					    res == vk::Result::eSuboptimalKHR || res == vk::Result::eErrorOutOfDeviceMemory) {
+						resized = true;
+						break; // Stop duplicate frames on error
+					}
+
 					currentSemaphore = (currentSemaphore + 1) % renderCompleteSemaphores.size();
 				}
 		} catch (const vk::SystemError& e) {
-			// Happens when resizing the window
-			INFO_LOG(RENDERER, "vk::SystemError %s", e.what());
+			// Enhanced error logging and recovery
+			const std::string errorMsg = e.what();
+			if (errorMsg.find("VK_ERROR_DEVICE_LOST") != std::string::npos) {
+				ERROR_LOG(RENDERER, "❌ Device lost in Present(): %s", errorMsg.c_str());
+			} else {
+				INFO_LOG(RENDERER, "🔄 Vulkan system error in Present() (likely resize): %s", errorMsg.c_str());
+			}
 			resized = true;
 		}
 		renderDone = false;
@@ -1262,6 +1435,7 @@ void VulkanContext::Present() noexcept
 			CreateSwapChain();
 			lastFrameView = vk::ImageView();
 		} catch (const InvalidVulkanContext& err) {
+			ERROR_LOG(RENDERER, "❌ Failed to recreate swapchain after device loss");
 		}
 }
 
@@ -1311,8 +1485,11 @@ void VulkanContext::WaitIdle() const
 {
 	try {
 		graphicsQueue.waitIdle();
-	} catch (const vk::Error &err) {
-		WARN_LOG(RENDERER, "WaitIdle: %s", err.what());
+	} catch (const vk::DeviceLostError& err) {
+		ERROR_LOG(RENDERER, "❌ VK_ERROR_DEVICE_LOST in WaitIdle: %s", err.what());
+		// Don't throw here - let the caller handle device loss
+	} catch (const vk::Error& err) {
+		WARN_LOG(RENDERER, "⚠️ WaitIdle error: %s", err.what());
 	}
 }
 
@@ -1352,7 +1529,7 @@ void VulkanContext::PresentFrame(vk::Image image, vk::ImageView imageView, const
 			renderer->DrawOSD(false);
 			EndFrame(overlayCmdBuffer);
 			static_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();
-			
+
 		} catch (const InvalidVulkanContext& err) {
 		}
 	}
@@ -1373,9 +1550,18 @@ void VulkanContext::term()
 	if (device && !drawFences.empty())
 	{
 		std::vector<vk::Fence> allFences = vk::uniqueToRaw(drawFences);
-		vk::Result res = device->waitForFences(allFences, true, UINT64_MAX);
-		if (res != vk::Result::eSuccess)
-			WARN_LOG(RENDERER, "VulkanContext::term: waitForFences failed %d", (int)res);
+		try {
+			vk::Result res = device->waitForFences(allFences, true, UINT64_MAX);
+			if (res == vk::Result::eErrorDeviceLost) {
+				WARN_LOG(RENDERER, "⚠️ Device lost during termination - continuing cleanup");
+			} else if (res != vk::Result::eSuccess) {
+				WARN_LOG(RENDERER, "VulkanContext::term: waitForFences failed %d", (int)res);
+			}
+		} catch (const vk::DeviceLostError& err) {
+			WARN_LOG(RENDERER, "⚠️ Device lost during fence wait in termination: %s", err.what());
+		} catch (const vk::Error& err) {
+			WARN_LOG(RENDERER, "⚠️ Error during fence wait in termination: %s", err.what());
+		}
 	}
 
 #if defined(__APPLE__) && defined(TARGET_IPHONE)
@@ -1386,16 +1572,20 @@ void VulkanContext::term()
 	imguiDriver.reset();
 	if (device && pipelineCache)
 	{
-		std::vector<u8> cacheData = device->getPipelineCacheData(*pipelineCache);
-		if (!cacheData.empty())
-		{
-			std::string cachePath = hostfs::getShaderCachePath("vulkan_pipeline.cache");
-			FILE *f = nowide::fopen(cachePath.c_str(), "wb");
-			if (f != nullptr)
+		try {
+			std::vector<u8> cacheData = device->getPipelineCacheData(*pipelineCache);
+			if (!cacheData.empty())
 			{
-				(void)std::fwrite(&cacheData[0], 1, cacheData.size(), f);
-				std::fclose(f);
+				std::string cachePath = hostfs::getShaderCachePath("vulkan_pipeline.cache");
+				FILE *f = nowide::fopen(cachePath.c_str(), "wb");
+				if (f != nullptr)
+				{
+					(void)std::fwrite(&cacheData[0], 1, cacheData.size(), f);
+					std::fclose(f);
+				}
 			}
+		} catch (const vk::Error& err) {
+			WARN_LOG(RENDERER, "⚠️ Error saving pipeline cache during termination: %s", err.what());
 		}
 	}
 	overlay.reset();
