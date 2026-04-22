@@ -19,6 +19,8 @@
 
 #include "metal_context.h"
 #include "metal_driver.h"
+
+#include <algorithm>
 #ifdef USE_SDL
 #include "sdl/sdl.h"
 #endif
@@ -45,9 +47,19 @@ void MetalContext::CreateSwapChain()
 #endif
 
     auto size = [layer drawableSize];
-    width = size.width;
-    height = size.height;
-    SetWindowSize(width, height);
+    // Don't write the layer's drawable size straight into this->width /
+    // this->height: SetWindowSize() short-circuits when the new size
+    // matches the cached one, so the zero-size rejection (and any future
+    // resize bookkeeping inside SetWindowSize) would never fire from this
+    // path. Validate up front, then let SetWindowSize() do the assignment
+    // and propagation.
+    if (size.width <= 0 || size.height <= 0)
+    {
+        WARN_LOG(RENDERER, "Metal layer reported invalid drawable size %.0fx%.0f; skipping swap chain creation",
+                 size.width, size.height);
+        return;
+    }
+    SetWindowSize((u32)size.width, (u32)size.height);
     resized = false;
 
     if (swapOnVSync && config::DupeFrames && settings.display.refreshRate > 60.f)
@@ -237,15 +249,21 @@ void MetalContext::DrawFrame(id<MTLTexture> texture, MTLViewport viewport, float
 
     MTLViewport framePort = { dx, dy, width - dx * 2, height - dy * 2, 0, 1 };
     [commandEncoder setViewport:framePort];
-    // Clamp the scissor rect to the render target. With unusual aspect
-    // ratios or very small framebuffers the (width - dx * 2) computation
-    // can overflow the render target by a pixel and trip Metal's API
-    // validation layer.
-    MTLScissorRect scissor { (uint)dx, (uint)dy, (uint)(width - dx * 2), (uint)(height - dy * 2) };
-    if (scissor.x + scissor.width > width)
-        scissor.width = width - scissor.x;
-    if (scissor.y + scissor.height > height)
-        scissor.height = height - scissor.y;
+    // Clamp the scissor rect in float / signed space *before* casting to
+    // unsigned. With unusual aspect ratios or very small framebuffers the
+    // (width - dx * 2) math can land on a small negative; the float ->
+    // unsigned conversion is undefined for negatives and would wrap to a
+    // huge value that the post-cast unsigned clamp can't recover from.
+    const float sx = std::max(0.f, dx);
+    const float sy = std::max(0.f, dy);
+    const float sw = std::max(0.f, std::min((float)width  - sx, (float)width  - dx * 2));
+    const float sh = std::max(0.f, std::min((float)height - sy, (float)height - dy * 2));
+    MTLScissorRect scissor {
+        (NSUInteger)sx,
+        (NSUInteger)sy,
+        (NSUInteger)sw,
+        (NSUInteger)sh
+    };
     [commandEncoder setScissorRect:scissor];
     if (config::Rotate90)
         quadRotateDrawer->Draw(commandEncoder, texture, vtx, config::TextureFiltering == 1);
