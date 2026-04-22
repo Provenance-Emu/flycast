@@ -37,7 +37,10 @@ void MetalContext::CreateSwapChain()
     [layer setFramebufferOnly:TRUE];
     [layer setColorspace:CGColorSpaceCreateWithName(kCGColorSpaceSRGB)];
     [layer setMaximumDrawableCount:3];
-#if TARGET_OS_MAC || TARGET_OS_MACCATALYST
+    // setDisplaySyncEnabled is exposed only on macOS and Mac Catalyst.
+    // TARGET_OS_MAC is true on every Apple platform (it's misleadingly
+    // named) so guarding on it would still hit iOS / tvOS at runtime.
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
     [layer setDisplaySyncEnabled:TRUE];
 #endif
 
@@ -234,7 +237,16 @@ void MetalContext::DrawFrame(id<MTLTexture> texture, MTLViewport viewport, float
 
     MTLViewport framePort = { dx, dy, width - dx * 2, height - dy * 2, 0, 1 };
     [commandEncoder setViewport:framePort];
-    [commandEncoder setScissorRect:MTLScissorRect { (uint)dx, (uint)dy, (uint)(width - dx * 2), (uint)(height - dy * 2) }];
+    // Clamp the scissor rect to the render target. With unusual aspect
+    // ratios or very small framebuffers the (width - dx * 2) computation
+    // can overflow the render target by a pixel and trip Metal's API
+    // validation layer.
+    MTLScissorRect scissor { (uint)dx, (uint)dy, (uint)(width - dx * 2), (uint)(height - dy * 2) };
+    if (scissor.x + scissor.width > width)
+        scissor.width = width - scissor.x;
+    if (scissor.y + scissor.height > height)
+        scissor.height = height - scissor.y;
+    [commandEncoder setScissorRect:scissor];
     if (config::Rotate90)
         quadRotateDrawer->Draw(commandEncoder, texture, vtx, config::TextureFiltering == 1);
     else
@@ -266,7 +278,11 @@ void MetalContext::PresentFrame(id<MTLTexture> texture, MTLViewport viewport, fl
     else {
         if (!IsValid())
         {
-            ERROR_LOG(RENDERER, "NOT PRESENTING INVALID SIZE!");
+            DEBUG_LOG(RENDERER, "Skipping present: invalid size %ux%u", width, height);
+        }
+        else if (texture == nil)
+        {
+            DEBUG_LOG(RENDERER, "Skipping present: no texture");
         }
     }
 }
@@ -280,6 +296,7 @@ void MetalContext::PresentLastFrame()
 void MetalContext::term() {
     GraphicsContext::instance = nullptr;
     lastFrameTexture = nil;
+    currentDrawable = nil;
     imguiDriver.reset();
     quadDrawer.reset();
     quadPipeline.reset();
@@ -298,8 +315,16 @@ bool MetalContext::HasSurfaceDimensionChanged() const
 
 void MetalContext::SetWindowSize(u32 width, u32 height)
 {
-    if (this->width != width && this->height != height)
+    // The original guard used && which only fired when *both* dimensions
+    // changed and silently dropped the window-size update otherwise.
+    if (this->width != width || this->height != height)
     {
+        // Reject obviously broken sizes early so we don't trigger Metal
+        // validation by trying to recreate the swap chain at 0x0 or at
+        // sizes Metal cannot allocate textures for.
+        if (width == 0 || height == 0)
+            return;
+
         this->width = width;
         this->height = height;
 
