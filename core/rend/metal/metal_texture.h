@@ -30,7 +30,15 @@ class MetalTexture final : public BaseTextureCacheData
 public:
     MetalTexture(TSP tsp = {}, TCW tcw = {}) : BaseTextureCacheData(tsp, tcw) {}
 
-    std::string GetId() override { return std::to_string([texture gpuResourceID]._impl); }
+    std::string GetId() override {
+        // gpuResourceID was added in iOS 16 / macOS 13. Fall back to the
+        // Objective-C object pointer for older deployment targets so the
+        // backend still builds and runs against iOS 15 / macOS 12 SDKs.
+        if (@available(iOS 16.0, macOS 13.0, tvOS 16.0, *))
+            return std::to_string([texture gpuResourceID]._impl);
+        else
+            return std::to_string(reinterpret_cast<uintptr_t>(texture));
+    }
     id<MTLTexture> GetTexture() const { return texture; }
     void UploadToGPU(int width, int height, const u8 *data, bool mipmapped, bool mipmapsIncluded = false) override;
     void SetCommandBuffer(id<MTLCommandBuffer> commandBuffer) { this->commandBuffer = commandBuffer; }
@@ -118,14 +126,29 @@ public:
             [desc setRAddressMode:tRepeat];
             [desc setCompareFunction:MTLCompareFunctionNever];
             if (tsp.FilterMode == 1 && !punchThrough) {
-                [desc setMaxAnisotropy:config::AnisotropicFiltering];
+                // Metal requires maxAnisotropy in [1, 16]. The user-facing
+                // option goes higher than 16 in some setups; clamp instead
+                // of letting Metal raise NSInvalidArgumentException.
+                NSUInteger anisotropy = std::clamp<u32>(config::AnisotropicFiltering, 1, 16);
+                [desc setMaxAnisotropy:anisotropy];
             } else {
                 [desc setMaxAnisotropy:1];
             }
 
             sampler = [MetalContext::Instance()->GetDevice() newSamplerStateWithDescriptor:desc];
-
-            samplers.emplace(hash, sampler).first->second;
+            if (sampler == nil) {
+                // newSamplerStateWithDescriptor can return nil if the
+                // device can't satisfy the descriptor (e.g. anisotropy
+                // on a software renderer). Fall back to a minimal nearest
+                // sampler so callers don't propagate nil into the encoder.
+                ERROR_LOG(RENDERER, "Sampler creation failed; using fallback");
+                auto fallback = [[MTLSamplerDescriptor alloc] init];
+                [fallback setMinFilter:MTLSamplerMinMagFilterNearest];
+                [fallback setMagFilter:MTLSamplerMinMagFilterNearest];
+                [fallback setMipFilter:MTLSamplerMipFilterNearest];
+                sampler = [MetalContext::Instance()->GetDevice() newSamplerStateWithDescriptor:fallback];
+            }
+            samplers[hash] = sampler;
         }
 
         return sampler;
