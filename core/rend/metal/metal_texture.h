@@ -31,13 +31,24 @@ public:
     MetalTexture(TSP tsp = {}, TCW tcw = {}) : BaseTextureCacheData(tsp, tcw) {}
 
     std::string GetId() override {
-        // gpuResourceID was added in iOS 16 / macOS 13. Fall back to the
-        // Objective-C object pointer for older deployment targets so the
-        // backend still builds and runs against iOS 15 / macOS 12 SDKs.
+        // gpuResourceID was added in iOS 16 / macOS 13 / tvOS 16. Older
+        // SDKs don't declare the selector at all, so an @available check
+        // alone still fails to compile against an iOS 15 / macOS 12 SDK
+        // (the protocol method does not exist for the compiler to resolve).
+        // Gate the call on the SDK first, then keep the runtime check for
+        // older OS versions on a newer SDK build.
+        // The fallback uses (__bridge void *) so the cast is well-defined
+        // under both ARC and MRR (raw `reinterpret_cast` on an `id` trips
+        // -Warc-bridge-casts-disallowed-in-nonarc and ARC errors in some
+        // configurations); we only need a stable, unique-for-lifetime
+        // value, which the bridged void* hash provides.
+#if (defined(__IPHONE_OS_VERSION_MAX_ALLOWED) && __IPHONE_OS_VERSION_MAX_ALLOWED >= 160000) \
+    || (defined(__MAC_OS_X_VERSION_MAX_ALLOWED) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 130000) \
+    || (defined(__TV_OS_VERSION_MAX_ALLOWED) && __TV_OS_VERSION_MAX_ALLOWED >= 160000)
         if (@available(iOS 16.0, macOS 13.0, tvOS 16.0, *))
             return std::to_string([texture gpuResourceID]._impl);
-        else
-            return std::to_string(reinterpret_cast<uintptr_t>(texture));
+#endif
+        return std::to_string(reinterpret_cast<uintptr_t>((__bridge void *)texture));
     }
     id<MTLTexture> GetTexture() const { return texture; }
     void UploadToGPU(int width, int height, const u8 *data, bool mipmapped, bool mipmapsIncluded = false) override;
@@ -81,6 +92,8 @@ public:
 
     void term() {
         samplers.clear();
+        fallbackSampler = nil;
+        fallbackFailedLogged = false;
     }
 
     id<MTLSamplerState> GetSampler(const PolyParam& poly, bool punchThrough, bool texture1 = false) {
@@ -127,9 +140,11 @@ public:
             [desc setCompareFunction:MTLCompareFunctionNever];
             if (tsp.FilterMode == 1 && !punchThrough) {
                 // Metal requires maxAnisotropy in [1, 16]. The user-facing
-                // option goes higher than 16 in some setups; clamp instead
-                // of letting Metal raise NSInvalidArgumentException.
-                NSUInteger anisotropy = std::clamp<u32>(config::AnisotropicFiltering, 1, 16);
+                // option is Option<int>, so clamp in *signed* space first:
+                // a negative value would underflow when converted to u32
+                // and incorrectly pin to 16 instead of 1.
+                NSUInteger anisotropy = static_cast<NSUInteger>(
+                    std::clamp<int>(config::AnisotropicFiltering, 1, 16));
                 [desc setMaxAnisotropy:anisotropy];
             } else {
                 [desc setMaxAnisotropy:1];
@@ -139,23 +154,53 @@ public:
             if (sampler == nil) {
                 // newSamplerStateWithDescriptor can return nil if the
                 // device can't satisfy the descriptor (e.g. anisotropy
-                // on a software renderer). Fall back to a minimal nearest
-                // sampler so callers don't propagate nil into the encoder.
-                ERROR_LOG(RENDERER, "Sampler creation failed; using fallback");
-                auto fallback = [[MTLSamplerDescriptor alloc] init];
-                [fallback setMinFilter:MTLSamplerMinMagFilterNearest];
-                [fallback setMagFilter:MTLSamplerMinMagFilterNearest];
-                [fallback setMipFilter:MTLSamplerMipFilterNearest];
-                sampler = [MetalContext::Instance()->GetDevice() newSamplerStateWithDescriptor:fallback];
+                // on a software renderer, OOM, or unsupported combos).
+                // Fall back to a single shared minimal-nearest sampler
+                // so callers never receive nil and Metal validation
+                // doesn't crash deep inside the encoder.
+                sampler = GetOrCreateFallbackSampler();
             }
-            samplers[hash] = sampler;
+            // Only cache real samplers. Caching nil here would mean every
+            // subsequent lookup for this hash short-circuits with nil and
+            // bypasses the fallback path above.
+            if (sampler != nil)
+                samplers[hash] = sampler;
         }
 
         return sampler;
     }
 
 private:
+    id<MTLSamplerState> GetOrCreateFallbackSampler() {
+        if (fallbackSampler != nil)
+            return fallbackSampler;
+
+        auto desc = [[MTLSamplerDescriptor alloc] init];
+        [desc setMinFilter:MTLSamplerMinMagFilterNearest];
+        [desc setMagFilter:MTLSamplerMinMagFilterNearest];
+        [desc setMipFilter:MTLSamplerMipFilterNearest];
+        fallbackSampler = [MetalContext::Instance()->GetDevice() newSamplerStateWithDescriptor:desc];
+
+        if (fallbackSampler == nil) {
+            // Log once. If the device can't produce even a default nearest
+            // sampler something is very wrong, but spamming every frame
+            // doesn't help diagnose it.
+            if (!fallbackFailedLogged) {
+                ERROR_LOG(RENDERER, "Sampler creation failed and fallback sampler is unavailable");
+                fallbackFailedLogged = true;
+            }
+        } else if (!fallbackLogged) {
+            ERROR_LOG(RENDERER, "Sampler creation failed; using shared nearest fallback");
+            fallbackLogged = true;
+        }
+
+        return fallbackSampler;
+    }
+
     std::unordered_map<u32, id<MTLSamplerState>> samplers;
+    id<MTLSamplerState> fallbackSampler = nil;
+    bool fallbackLogged = false;
+    bool fallbackFailedLogged = false;
 };
 
 class MetalTextureCache final : public BaseTextureCache<MetalTexture>
